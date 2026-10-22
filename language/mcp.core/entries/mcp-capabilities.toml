@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-capabilities"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Capabilities"
+component = "ClientCapabilities"
+
+[[form]]
+id = "mcp-capabilities"
+channel = "text"
+surface = "MCP capabilities"
+canonical_source = true
+features = ["sentence-case", "singular"]

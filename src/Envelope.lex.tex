@@ -1,0 +1,140 @@
+\begin{lexlean}{Envelope}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Common}
+\importmodule{Dispatch}
+\importmodule{Extension}
+\importmodule{Tasks}
+\importmodule{Input}
+\importmodule{Json}
+\importmodule{Meta}
+\importmodule{Methods}
+\importmodule{Refusal}
+\title{MCP result envelope}
+\begin{semanticmodule}
+definition{
+  name: textMember,
+  parameters: [key : String, value : (Option String)],
+  result: (List (String * Json::Json)),
+  body: (match value
+    | Option.none => (nil (String * Json::Json))
+    | Option.some content => (cons (key, (ctor Json::Json.text content)) (nil (String * Json::Json))))
+}
+
+definition{
+  name: iconThemeMember,
+  parameters: [theme : (Option Common::IconTheme)],
+  result: (List (String * Json::Json)),
+  body: (match theme
+    | Option.none => (nil (String * Json::Json))
+    | Option.some chosen => (cons ("theme", (ctor Json::Json.text (Common::iconThemeWire chosen))) (nil (String * Json::Json))))
+}
+
+definition{
+  name: sizesMember,
+  parameters: [sizes : (Option (List String))],
+  result: (List (String * Json::Json)),
+  body: (match sizes
+    | Option.none => (nil (String * Json::Json))
+    | Option.some items => (cons ("sizes", (ctor Json::Json.array (Refusal::textList items))) (nil (String * Json::Json))))
+}
+
+definition{
+  name: iconJson,
+  parameters: [icon : Common::Icon],
+  result: Json::Json,
+  body: (ctor Json::Json.object (cons ("src", (ctor Json::Json.text (project icon src))) (prim append (textMember "mimeType" (project icon mimeType)) (prim append (sizesMember (project icon sizes)) (iconThemeMember (project icon theme)) : (List (String * Json::Json))) : (List (String * Json::Json)))))
+}
+
+definition{
+  name: iconsJson,
+  parameters: [icons : (List Common::Icon)],
+  result: (List Json::Json),
+  body: (match icons
+    | List.nil => (nil Json::Json)
+    | List.cons head tail => (cons (iconJson head) (iconsJson tail))),
+  recursive_argument: icons
+}
+
+definition{
+  name: iconsMember,
+  parameters: [icons : (Option (List Common::Icon))],
+  result: (List (String * Json::Json)),
+  body: (match icons
+    | Option.none => (nil (String * Json::Json))
+    | Option.some items => (cons ("icons", (ctor Json::Json.array (iconsJson items))) (nil (String * Json::Json))))
+}
+
+definition{
+  name: implementationJson,
+  parameters: [info : Common::Implementation],
+  result: Json::Json,
+  body: (ctor Json::Json.object (cons ("name", (ctor Json::Json.text (project info name))) (cons ("version", (ctor Json::Json.text (project info version))) (prim append (textMember "title" (project info title)) (prim append (textMember "description" (project info description)) (prim append (textMember "websiteUrl" (project info websiteUrl)) (iconsMember (project info icons)) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))))))
+}
+
+definition{
+  name: serverInfoMember,
+  parameters: [info : (Option Common::Implementation)],
+  result: (List (String * Json::Json)),
+  body: (match info
+    | Option.none => (nil (String * Json::Json))
+    | Option.some described => (cons ((Meta::serverInfoKey), (implementationJson described)) (nil (String * Json::Json))))
+}
+
+definition{
+  name: envelope,
+  parameters: [reply : Dispatch::Reply],
+  result: Json::JsonObject,
+  body: (record Json::JsonObject {members := (cons ("resultType", (ctor Json::Json.text (Meta::resultTypeWire (Methods::resultTypeOf (project reply body))))) (cons ("_meta", (ctor Json::Json.object (serverInfoMember (project (project reply meta) serverInfo)))) (nil (String * Json::Json))))})
+}
+
+definition{
+  name: serverInfoOfEnvelope,
+  parameters: [object : Json::JsonObject],
+  result: (Option Json::Json),
+  body: (match (Json::lookup "_meta" object)
+    | Json::Lookup.absent => (ctor Option.none [Json::Json])
+    | Json::Lookup.present found => (match (Json::asObject found)
+      | Option.none => (ctor Option.none [Json::Json])
+      | Option.some meta => (match (Json::lookup (Meta::serverInfoKey) meta)
+        | Json::Lookup.absent => (ctor Option.none [Json::Json])
+        | Json::Lookup.present info => (ctor Option.some [Json::Json] info))))
+}
+
+theorem{
+  name: envelope_declares_the_result_type,
+  parameters: [reply : Dispatch::Reply],
+  statement: ((Json::lookup "resultType" (envelope reply)) = (ctor Json::Lookup.present (ctor Json::Json.text (Meta::resultTypeWire (Methods::resultTypeOf (project reply body)))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: envelope_of_a_complete_result_declares_complete,
+  parameters: [provider : Extension::Provider, found : Methods::CallToolResult],
+  statement: ((Json::lookup "resultType" (envelope (Dispatch::replyOf provider (ctor Methods::ResultBody.callTool found)))) = (ctor Json::Lookup.present (ctor Json::Json.text "complete"))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: envelope_of_an_interim_result_declares_input_required,
+  parameters: [provider : Extension::Provider, needed : Input::InputRequiredResult],
+  statement: ((Json::lookup "resultType" (envelope (Dispatch::replyOf provider (ctor Methods::ResultBody.inputRequired needed)))) = (ctor Json::Lookup.present (ctor Json::Json.text "input_required"))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: envelope_of_a_created_task_declares_task,
+  parameters: [provider : Extension::Provider, created : Tasks::CreateTaskResult],
+  statement: ((Json::lookup "resultType" (envelope (Dispatch::replyOf provider (ctor Methods::ResultBody.taskCreated created)))) = (ctor Json::Lookup.present (ctor Json::Json.text "task"))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: envelope_of_a_dispatched_reply_carries_the_server_info,
+  parameters: [provider : Extension::Provider, body : Methods::ResultBody],
+  statement: ((serverInfoOfEnvelope (envelope (Dispatch::replyOf provider body))) = (ctor Option.some [Json::Json] (implementationJson (project provider serverInfo)))),
+  proof: reflexivity{}
+}
+\end{semanticmodule}
+\end{lexlean}

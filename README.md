@@ -13,7 +13,34 @@ and by any other LexLean-authored MCP server.
 
 ## Status
 
-Nothing is built yet.
+The protocol core is modeled in LexLean language 1.2 under `src/` (project
+`lexlean.toml`, module prefix `UorMcp`, locked by `lexlean.lock`). It
+type-checks, builds and verifies under Lean 4.32.1 with an exact axiom policy
+on every declaration and no `sorry`. Nothing in it is yet checked against
+MCP's own oracles, so this repository makes no conformance claim.
+
+| Module | Source of |
+| --- | --- |
+| `Json` | the closed JSON value type, object member lookup and the typed accessors every decoder uses |
+| `JsonRpc` | the JSON-RPC 2.0 envelope: request, notification, result and error responses, ids, and the error codes `-32700`, `-32600` to `-32603`, `-32020` to `-32022` |
+| `Common` | shared schema types: roles, logging levels, icons, `Implementation`, annotations, progress tokens, and the `ttlMs` and `cacheScope` cache hint |
+| `Capabilities` | client and server capabilities and the `io.modelcontextprotocol/tasks` extension identifier |
+| `Content` | content blocks, resources, resource templates, prompts and tools |
+| `Input` | multi-round-trip input: elicitation, sampling and roots requests and responses, `InputRequiredResult`, and the capability each request needs |
+| `Tasks` | the tasks extension state machine, `DetailedTask` and `CreateTaskResult` |
+| `Meta` | the request `_meta` keys (`protocolVersion`, `clientCapabilities`, `clientInfo`, `logLevel`, `progressToken`), `resultType` and the result `_meta` with `serverInfo` |
+| `Methods` | the server method names, typed params and results for `server/discover`, `tools/list`, `tools/call`, `resources/list`, `resources/read`, `resources/templates/list`, `prompts/list`, `prompts/get`, `completion/complete`, `tasks/get`, `tasks/update` and `tasks/cancel`, and which methods may answer `input_required` or `task` |
+| `Refusal` | the typed, closed refusals (`-32602`, `-32601`, `-32020`, `-32022`, `-32021`, `-32603`) and their JSON-RPC error objects |
+| `Decode` | decoding a validated `params` object into the typed params of each method |
+| `Validation` | per-request validation: the required `_meta` keys, header and body agreement, version support, and the order in which refusals are chosen |
+| `Extension` | the interface through which a tool layer contributes tools, resources, resource templates and prompts (the `Provider` record) |
+| `Dispatch` | dispatch from a validated request to a reply or a typed refusal, parameterized over the `Provider` |
+| `Envelope` | the result envelope: `resultType` and `_meta` `io.modelcontextprotocol/serverInfo` |
+
+What is not modeled: the JSON text codec (the LexLean stdlib has no JSON
+parser or printer), the JSON encoding of result bodies beyond the envelope,
+the `subscriptions/listen` stream (its params and result types are declared,
+but the method is not dispatched), server notifications, and host effects.
 
 - The claim registers in `model/` are empty, so `CONFORMANCE.md` lists no
   capability and this repository claims none.

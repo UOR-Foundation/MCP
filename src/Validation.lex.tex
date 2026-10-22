@@ -1,0 +1,973 @@
+\begin{lexlean}{Validation}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Capabilities}
+\importmodule{Common}
+\importmodule{Decode}
+\importmodule{Json}
+\importmodule{JsonRpc}
+\importmodule{Meta}
+\importmodule{Methods}
+\importmodule{Refusal}
+\title{MCP request validation}
+\begin{semanticmodule}
+structure{
+  name: Headers,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: protocolVersion, type: (Option String)},
+    {name: method, type: (Option String)},
+    {name: name, type: (Option String)}
+  ]
+}
+
+structure{
+  name: Admitted,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: id, type: JsonRpc::RequestId},
+    {name: wire, type: String},
+    {name: meta, type: Meta::RequestMeta},
+    {name: params, type: Json::JsonObject}
+  ]
+}
+
+inductive{
+  name: Admission,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: admitted, fields: [Admitted]}, {name: refused, fields: [Refusal::Refusal]}]
+}
+
+structure{
+  name: Routed,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: id, type: JsonRpc::RequestId},
+    {name: method, type: Methods::Method},
+    {name: meta, type: Meta::RequestMeta},
+    {name: params, type: Json::JsonObject}
+  ]
+}
+
+definition{
+  name: supportedVersions,
+  parameters: [],
+  result: (List String),
+  body: (cons (Meta::latestProtocolVersion) (nil String))
+}
+
+definition{
+  name: isSupported,
+  parameters: [version : String, versions : (List String)],
+  result: Bool,
+  body: (match versions
+    | List.nil => false
+    | List.cons head tail => (if (prim equal head version : Bool) then true else (isSupported version tail))),
+  recursive_argument: versions
+}
+
+definition{
+  name: optionalCapability,
+  parameters: [key : String, object : Json::JsonObject],
+  result: (Option (Option Json::JsonObject)),
+  body: (match (Json::lookup key object)
+    | Json::Lookup.absent => (ctor Option.some [(Option Json::JsonObject)] (ctor Option.none [Json::JsonObject]))
+    | Json::Lookup.present value => (match (Json::asObject value)
+      | Option.none => (ctor Option.none [(Option Json::JsonObject)])
+      | Option.some found => (ctor Option.some [(Option Json::JsonObject)] (ctor Option.some [Json::JsonObject] found))))
+}
+
+definition{
+  name: decodeCapabilities,
+  parameters: [value : Json::Json],
+  result: (Option Capabilities::ClientCapabilities),
+  body: (match (Json::asObject value)
+    | Option.none => (ctor Option.none [Capabilities::ClientCapabilities])
+    | Option.some object => (match (optionalCapability "experimental" object)
+      | Option.none => (ctor Option.none [Capabilities::ClientCapabilities])
+      | Option.some experimental => (match (optionalCapability "roots" object)
+        | Option.none => (ctor Option.none [Capabilities::ClientCapabilities])
+        | Option.some roots => (match (optionalCapability "sampling" object)
+          | Option.none => (ctor Option.none [Capabilities::ClientCapabilities])
+          | Option.some sampling => (match (optionalCapability "elicitation" object)
+            | Option.none => (ctor Option.none [Capabilities::ClientCapabilities])
+            | Option.some elicitation => (match (optionalCapability "extensions" object)
+              | Option.none => (ctor Option.none [Capabilities::ClientCapabilities])
+              | Option.some extensions => (ctor Option.some [Capabilities::ClientCapabilities] (record Capabilities::ClientCapabilities {experimental := experimental, roots := roots, sampling := sampling, elicitation := elicitation, extensions := extensions}))))))))
+}
+
+definition{
+  name: readLogLevel,
+  parameters: [object : Json::JsonObject],
+  result: (Result (Option Common::LoggingLevel) Refusal::ParamsProblem),
+  body: (match (Decode::optText (Meta::logLevelKey) object)
+    | Result.error problem => (ctor Result.error [(Option Common::LoggingLevel), Refusal::ParamsProblem] problem)
+    | Result.ok wire => (match wire
+      | Option.none => (ctor Result.ok [(Option Common::LoggingLevel), Refusal::ParamsProblem] (ctor Option.none [Common::LoggingLevel]))
+      | Option.some text => (match (Common::loggingLevelOfWire text)
+        | Common::LoggingLevelRead.recognized level => (ctor Result.ok [(Option Common::LoggingLevel), Refusal::ParamsProblem] (ctor Option.some [Common::LoggingLevel] level))
+        | Common::LoggingLevelRead.unrecognized => (ctor Result.error [(Option Common::LoggingLevel), Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedField (Meta::logLevelKey))))))
+}
+
+definition{
+  name: readProgressToken,
+  parameters: [object : Json::JsonObject],
+  result: (Result (Option Common::ProgressToken) Refusal::ParamsProblem),
+  body: (match (Json::lookup (Meta::progressTokenKey) object)
+    | Json::Lookup.absent => (ctor Result.ok [(Option Common::ProgressToken), Refusal::ParamsProblem] (ctor Option.none [Common::ProgressToken]))
+    | Json::Lookup.present value => (match (Json::asText value)
+      | Option.some content => (ctor Result.ok [(Option Common::ProgressToken), Refusal::ParamsProblem] (ctor Option.some [Common::ProgressToken] (ctor Common::ProgressToken.text content)))
+      | Option.none => (match (Json::asInteger value)
+        | Option.some whole => (ctor Result.ok [(Option Common::ProgressToken), Refusal::ParamsProblem] (ctor Option.some [Common::ProgressToken] (ctor Common::ProgressToken.number whole)))
+        | Option.none => (ctor Result.error [(Option Common::ProgressToken), Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedField (Meta::progressTokenKey)))))),
+  axioms: [propext]
+}
+
+definition{
+  name: buildMeta,
+  parameters: [meta : Json::JsonObject, version : Json::Json, capabilities : Json::Json],
+  result: (Result Meta::RequestMeta Refusal::ParamsProblem),
+  body: (match (Json::asText version)
+    | Option.none => (ctor Result.error [Meta::RequestMeta, Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedProtocolVersion))
+    | Option.some protocolVersion => (match (decodeCapabilities capabilities)
+      | Option.none => (ctor Result.error [Meta::RequestMeta, Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedClientCapabilities))
+      | Option.some clientCapabilities => (match (Decode::optObject (Meta::clientInfoKey) meta)
+        | Result.error problem => (ctor Result.error [Meta::RequestMeta, Refusal::ParamsProblem] problem)
+        | Result.ok clientInfo => (match (readLogLevel meta)
+          | Result.error problem => (ctor Result.error [Meta::RequestMeta, Refusal::ParamsProblem] problem)
+          | Result.ok logLevel => (match (readProgressToken meta)
+            | Result.error problem => (ctor Result.error [Meta::RequestMeta, Refusal::ParamsProblem] problem)
+            | Result.ok progressToken => (ctor Result.ok [Meta::RequestMeta, Refusal::ParamsProblem] (record Meta::RequestMeta {protocolVersion := protocolVersion, clientCapabilities := clientCapabilities, clientInfo := clientInfo, logLevel := logLevel, progressToken := progressToken, raw := meta}))))))),
+  axioms: [propext]
+}
+
+definition{
+  name: metaFromLookups,
+  parameters: [meta : Json::JsonObject, version : Json::Lookup, capabilities : Json::Lookup],
+  result: (Result Meta::RequestMeta Refusal::ParamsProblem),
+  body: (match version
+    | Json::Lookup.absent => (ctor Result.error [Meta::RequestMeta, Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.missingProtocolVersion))
+    | Json::Lookup.present versionValue => (match capabilities
+      | Json::Lookup.absent => (ctor Result.error [Meta::RequestMeta, Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.missingClientCapabilities))
+      | Json::Lookup.present capabilitiesValue => (buildMeta meta versionValue capabilitiesValue))),
+  axioms: [propext]
+}
+
+inductive{
+  name: KeyPresence,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: bothPresent, fields: []},
+    {name: noVersion, fields: []},
+    {name: noCapabilities, fields: []}
+  ]
+}
+
+definition{
+  name: presenceOfLookups,
+  parameters: [version : Json::Lookup, capabilities : Json::Lookup],
+  result: KeyPresence,
+  body: (match version
+    | Json::Lookup.absent => (ctor KeyPresence.noVersion)
+    | Json::Lookup.present versionValue => (match capabilities
+      | Json::Lookup.absent => (ctor KeyPresence.noCapabilities)
+      | Json::Lookup.present capabilitiesValue => (ctor KeyPresence.bothPresent)))
+}
+
+definition{
+  name: requiredKeys,
+  parameters: [meta : Json::JsonObject],
+  result: KeyPresence,
+  body: (presenceOfLookups (Json::lookup (Meta::protocolVersionKey) meta) (Json::lookup (Meta::clientCapabilitiesKey) meta))
+}
+
+definition{
+  name: metaFromObject,
+  parameters: [meta : Json::JsonObject],
+  result: (Result Meta::RequestMeta Refusal::ParamsProblem),
+  body: (match (requiredKeys meta)
+    | KeyPresence.noVersion => (ctor Result.error [Meta::RequestMeta, Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.missingProtocolVersion))
+    | KeyPresence.noCapabilities => (ctor Result.error [Meta::RequestMeta, Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.missingClientCapabilities))
+    | KeyPresence.bothPresent => (metaFromLookups meta (Json::lookup (Meta::protocolVersionKey) meta) (Json::lookup (Meta::clientCapabilitiesKey) meta))),
+  axioms: [propext]
+}
+
+definition{
+  name: metaOf,
+  parameters: [params : (Option Json::JsonObject)],
+  result: (Result Meta::RequestMeta Refusal::ParamsProblem),
+  body: (match params
+    | Option.none => (ctor Result.error [Meta::RequestMeta, Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.missingParams))
+    | Option.some object => (match (Json::lookup "_meta" object)
+      | Json::Lookup.absent => (ctor Result.error [Meta::RequestMeta, Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.missingMeta))
+      | Json::Lookup.present value => (match (Json::asObject value)
+        | Option.none => (ctor Result.error [Meta::RequestMeta, Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedMeta))
+        | Option.some meta => (metaFromObject meta)))),
+  axioms: [propext]
+}
+
+definition{
+  name: isAccepted,
+  parameters: [outcome : (Result Meta::RequestMeta Refusal::ParamsProblem)],
+  result: Bool,
+  body: (match outcome | Result.ok meta => true | Result.error problem => false)
+}
+
+definition{
+  name: paramsObject,
+  parameters: [params : (Option Json::JsonObject)],
+  result: Json::JsonObject,
+  body: (match params | Option.none => (Capabilities::noObject) | Option.some object => object)
+}
+
+definition{
+  name: nameInBody,
+  parameters: [field : Methods::NameField, params : Json::JsonObject],
+  result: (Option String),
+  body: (match field
+    | Methods::NameField.noName => (ctor Option.none [String])
+    | Methods::NameField.name => (match (Json::lookup "name" params)
+      | Json::Lookup.absent => (ctor Option.none [String])
+      | Json::Lookup.present value => (Json::asText value))
+    | Methods::NameField.uri => (match (Json::lookup "uri" params)
+      | Json::Lookup.absent => (ctor Option.none [String])
+      | Json::Lookup.present value => (Json::asText value))
+    | Methods::NameField.taskId => (match (Json::lookup "taskId" params)
+      | Json::Lookup.absent => (ctor Option.none [String])
+      | Json::Lookup.present value => (Json::asText value)))
+}
+
+definition{
+  name: nameHeaderAgainst,
+  parameters: [header : (Option String), body : (Option String)],
+  result: (Option Refusal::HeaderProblem),
+  body: (match header
+    | Option.none => (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.missingNameHeader))
+    | Option.some value => (match body
+      | Option.none => (ctor Option.none [Refusal::HeaderProblem])
+      | Option.some expected => (if (prim equal value expected : Bool) then (ctor Option.none [Refusal::HeaderProblem]) else (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.nameDiffers)))))
+}
+
+definition{
+  name: nameHeaderCheck,
+  parameters: [header : (Option String), field : Methods::NameField, params : Json::JsonObject],
+  result: (Option Refusal::HeaderProblem),
+  body: (match field
+    | Methods::NameField.noName => (ctor Option.none [Refusal::HeaderProblem])
+    | Methods::NameField.name => (nameHeaderAgainst header (nameInBody field params))
+    | Methods::NameField.uri => (nameHeaderAgainst header (nameInBody field params))
+    | Methods::NameField.taskId => (nameHeaderAgainst header (nameInBody field params)))
+}
+
+definition{
+  name: headerCheck,
+  parameters: [
+    headers : (Option Headers),
+    field : Methods::NameField,
+    wireMethod : String,
+    version : String,
+    params : Json::JsonObject
+  ],
+  result: (Option Refusal::HeaderProblem),
+  body: (match headers
+    | Option.none => (ctor Option.none [Refusal::HeaderProblem])
+    | Option.some present => (match (project present protocolVersion)
+      | Option.none => (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.missingProtocolVersionHeader))
+      | Option.some headerVersion => (if (prim equal headerVersion version : Bool) then (match (project present method)
+        | Option.none => (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.missingMethodHeader))
+        | Option.some headerMethod => (if (prim equal headerMethod wireMethod : Bool) then (nameHeaderCheck (project present name) field params) else (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.methodDiffers)))) else (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.protocolVersionDiffers)))))
+}
+
+definition{
+  name: gate,
+  parameters: [supported : Bool, version : String, versions : (List String)],
+  result: (Option Refusal::Refusal),
+  body: (if supported then (ctor Option.none [Refusal::Refusal]) else (ctor Option.some [Refusal::Refusal] (ctor Refusal::Refusal.unsupportedProtocolVersion version versions)))
+}
+
+definition{
+  name: versionGate,
+  parameters: [version : String, versions : (List String)],
+  result: (Option Refusal::Refusal),
+  body: (gate (isSupported version versions) version versions)
+}
+
+definition{
+  name: afterVersion,
+  parameters: [
+    request : JsonRpc::Request,
+    meta : Meta::RequestMeta,
+    gated : (Option Refusal::Refusal)
+  ],
+  result: Admission,
+  body: (match gated
+    | Option.some refusal => (ctor Admission.refused refusal)
+    | Option.none => (ctor Admission.admitted (record Admitted {id := (project request id), wire := (project request method), meta := meta, params := (paramsObject (project request params))})))
+}
+
+definition{
+  name: afterHeaders,
+  parameters: [
+    versions : (List String),
+    request : JsonRpc::Request,
+    meta : Meta::RequestMeta,
+    header : (Option Refusal::HeaderProblem)
+  ],
+  result: Admission,
+  body: (match header
+    | Option.some problem => (ctor Admission.refused (ctor Refusal::Refusal.headerMismatch problem))
+    | Option.none => (afterVersion request meta (versionGate (project meta protocolVersion) versions)))
+}
+
+definition{
+  name: afterMeta,
+  parameters: [
+    headers : (Option Headers),
+    versions : (List String),
+    request : JsonRpc::Request,
+    read : (Result Meta::RequestMeta Refusal::ParamsProblem)
+  ],
+  result: Admission,
+  body: (match read
+    | Result.error problem => (ctor Admission.refused (ctor Refusal::Refusal.invalidParams problem))
+    | Result.ok meta => (afterHeaders versions request meta (headerCheck headers (Methods::nameFieldOfWire (project request method)) (project request method) (project meta protocolVersion) (paramsObject (project request params)))))
+}
+
+definition{
+  name: admissionOf,
+  parameters: [headers : (Option Headers), versions : (List String), request : JsonRpc::Request],
+  result: Admission,
+  body: (afterMeta headers versions request (metaOf (project request params))),
+  axioms: [propext]
+}
+
+definition{
+  name: afterRoute,
+  parameters: [admitted : Admitted, route : Methods::MethodRoute],
+  result: (Result Routed Refusal::Refusal),
+  body: (match route
+    | Methods::MethodRoute.unknown => (ctor Result.error [Routed, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound (project admitted wire)))
+    | Methods::MethodRoute.known method => (ctor Result.ok [Routed, Refusal::Refusal] (record Routed {id := (project admitted id), method := method, meta := (project admitted meta), params := (project admitted params)})))
+}
+
+definition{
+  name: afterAdmit,
+  parameters: [route : Methods::MethodRoute, admission : Admission],
+  result: (Result Routed Refusal::Refusal),
+  body: (match admission
+    | Admission.refused refusal => (ctor Result.error [Routed, Refusal::Refusal] refusal)
+    | Admission.admitted admitted => (afterRoute admitted route))
+}
+
+definition{
+  name: validate,
+  parameters: [headers : (Option Headers), versions : (List String), request : JsonRpc::Request],
+  result: (Result Routed Refusal::Refusal),
+  body: (afterAdmit (Methods::routeOf (project request method)) (admissionOf headers versions request)),
+  axioms: [propext]
+}
+
+definition{
+  name: problemTag,
+  parameters: [problem : Refusal::ParamsProblem],
+  result: Nat,
+  body: (match problem
+    | Refusal::ParamsProblem.missingParams => 1
+    | Refusal::ParamsProblem.missingMeta => 2
+    | Refusal::ParamsProblem.missingProtocolVersion => 3
+    | Refusal::ParamsProblem.missingClientCapabilities => 4
+    | Refusal::ParamsProblem.malformedMeta => 5
+    | Refusal::ParamsProblem.malformedProtocolVersion => 6
+    | Refusal::ParamsProblem.malformedClientCapabilities => 7
+    | Refusal::ParamsProblem.missingField key => 8
+    | Refusal::ParamsProblem.malformedField key => 9)
+}
+
+definition{
+  name: tagOf,
+  parameters: [outcome : (Result Meta::RequestMeta Refusal::ParamsProblem)],
+  result: Nat,
+  body: (match outcome | Result.ok meta => 0 | Result.error problem => (problemTag problem))
+}
+
+definition{
+  name: keysAgree,
+  parameters: [presence : KeyPresence, outcome : (Result Meta::RequestMeta Refusal::ParamsProblem)],
+  result: Bool,
+  body: (match presence
+    | KeyPresence.bothPresent => true
+    | KeyPresence.noVersion => (prim equal (tagOf outcome) 3 : Bool)
+    | KeyPresence.noCapabilities => (prim equal (tagOf outcome) 4 : Bool))
+}
+
+definition{
+  name: acceptedOnlyWithKeys,
+  parameters: [presence : KeyPresence, outcome : (Result Meta::RequestMeta Refusal::ParamsProblem)],
+  result: Bool,
+  body: (match presence
+    | KeyPresence.bothPresent => true
+    | KeyPresence.noVersion => (not (isAccepted outcome))
+    | KeyPresence.noCapabilities => (not (isAccepted outcome)))
+}
+
+definition{
+  name: metaKeyAgrees,
+  parameters: [found : Json::Lookup, outcome : (Result Meta::RequestMeta Refusal::ParamsProblem)],
+  result: Bool,
+  body: (match found
+    | Json::Lookup.absent => (prim equal (tagOf outcome) 2 : Bool)
+    | Json::Lookup.present value => true)
+}
+
+theorem{
+  name: problem_tags_are_the_listed_numbers,
+  parameters: [],
+  statement: (((((problemTag (ctor Refusal::ParamsProblem.missingParams)) = 1) /\ ((problemTag (ctor Refusal::ParamsProblem.missingMeta)) = 2)) /\ (((problemTag (ctor Refusal::ParamsProblem.missingProtocolVersion)) = 3) /\ ((problemTag (ctor Refusal::ParamsProblem.missingClientCapabilities)) = 4))) /\ ((((problemTag (ctor Refusal::ParamsProblem.malformedMeta)) = 5) /\ ((problemTag (ctor Refusal::ParamsProblem.malformedProtocolVersion)) = 6)) /\ (((problemTag (ctor Refusal::ParamsProblem.malformedClientCapabilities)) = 7) /\ (((problemTag (ctor Refusal::ParamsProblem.missingField "k")) = 8) /\ ((problemTag (ctor Refusal::ParamsProblem.malformedField "k")) = 9))))),
+  proof: decide{}
+}
+
+theorem{
+  name: lookups_without_version_report_no_version,
+  parameters: [capabilities : Json::Lookup],
+  statement: ((presenceOfLookups (ctor Json::Lookup.absent) capabilities) = (ctor KeyPresence.noVersion)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: lookups_without_capabilities_report_no_capabilities,
+  parameters: [version : Json::Json],
+  statement: ((presenceOfLookups (ctor Json::Lookup.present version) (ctor Json::Lookup.absent)) = (ctor KeyPresence.noCapabilities)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: lookups_with_both_report_both_present,
+  parameters: [version : Json::Json, capabilities : Json::Json],
+  statement: ((presenceOfLookups (ctor Json::Lookup.present version) (ctor Json::Lookup.present capabilities)) = (ctor KeyPresence.bothPresent)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: meta_is_refused_exactly_when_a_required_key_is_absent,
+  parameters: [meta : Json::JsonObject],
+  statement: ((keysAgree (requiredKeys meta) (metaFromObject meta)) = true),
+  proof: term_cases{
+    definitions: [keysAgree, metaFromObject, problemTag, tagOf],
+    scrutinee: (requiredKeys meta)
+  },
+  axioms: [propext]
+}
+
+theorem{
+  name: meta_is_accepted_only_when_both_required_keys_are_present,
+  parameters: [meta : Json::JsonObject],
+  statement: ((acceptedOnlyWithKeys (requiredKeys meta) (metaFromObject meta)) = true),
+  proof: term_cases{
+    definitions: [acceptedOnlyWithKeys, isAccepted, metaFromObject],
+    scrutinee: (requiredKeys meta)
+  },
+  axioms: [propext]
+}
+
+theorem{
+  name: params_without_meta_are_refused,
+  parameters: [object : Json::JsonObject],
+  statement: ((metaKeyAgrees (Json::lookup "_meta" object) (metaOf (ctor Option.some [Json::JsonObject] object))) = true),
+  proof: term_cases{
+    definitions: [metaKeyAgrees, metaOf, problemTag, tagOf],
+    scrutinee: (Json::lookup "_meta" object)
+  },
+  axioms: [propext]
+}
+
+theorem{
+  name: absent_params_are_refused,
+  parameters: [],
+  statement: ((tagOf (metaOf (ctor Option.none [Json::JsonObject]))) = 1),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+definition{
+  name: methodOfOutcome,
+  parameters: [outcome : (Result Routed Refusal::Refusal)],
+  result: (Option Methods::Method),
+  body: (match outcome
+    | Result.ok routed => (ctor Option.some [Methods::Method] (project routed method))
+    | Result.error refusal => (ctor Option.none [Methods::Method]))
+}
+
+definition{
+  name: codeOfOutcome,
+  parameters: [outcome : (Result Routed Refusal::Refusal)],
+  result: (Option Int),
+  body: (match outcome
+    | Result.ok routed => (ctor Option.none [Int])
+    | Result.error refusal => (ctor Option.some [Int] (Refusal::codeOf refusal)))
+}
+
+definition{
+  name: sampleMeta,
+  parameters: [version : String],
+  result: Json::JsonObject,
+  body: (record Json::JsonObject {members := (cons ((Meta::protocolVersionKey), (ctor Json::Json.text version)) (cons ((Meta::clientCapabilitiesKey), (ctor Json::Json.object (nil (String * Json::Json)))) (nil (String * Json::Json))))})
+}
+
+definition{
+  name: sampleCall,
+  parameters: [wire : String, version : String],
+  result: JsonRpc::Request,
+  body: (record JsonRpc::Request {id := (ctor JsonRpc::RequestId.number (1 : Int)), method := wire, params := (ctor Option.some [Json::JsonObject] (record Json::JsonObject {members := (cons ("_meta", (ctor Json::Json.object (project (sampleMeta version) members))) (cons ("name", (ctor Json::Json.text "echo")) (nil (String * Json::Json))))}))})
+}
+
+definition{
+  name: sampleCallWithoutMeta,
+  parameters: [wire : String],
+  result: JsonRpc::Request,
+  body: (record JsonRpc::Request {id := (ctor JsonRpc::RequestId.number (1 : Int)), method := wire, params := (ctor Option.some [Json::JsonObject] (record Json::JsonObject {members := (cons ("name", (ctor Json::Json.text "echo")) (nil (String * Json::Json)))}))})
+}
+
+definition{
+  name: sampleCallMetaOnly,
+  parameters: [wire : String],
+  result: JsonRpc::Request,
+  body: (record JsonRpc::Request {id := (ctor JsonRpc::RequestId.number (1 : Int)), method := wire, params := (ctor Option.some [Json::JsonObject] (record Json::JsonObject {members := (cons ("_meta", (ctor Json::Json.object (project (sampleMeta "2026-07-28") members))) (nil (String * Json::Json)))}))})
+}
+
+definition{
+  name: headersFor,
+  parameters: [version : String, wire : String, name : (Option String)],
+  result: (Option Headers),
+  body: (ctor Option.some [Headers] (record Headers {protocolVersion := (ctor Option.some [String] version), method := (ctor Option.some [String] wire), name := name}))
+}
+
+theorem{
+  name: unsupported_version_is_refused_with_the_supported_list,
+  parameters: [version : String, versions : (List String)],
+  statement: ((gate false version versions) = (ctor Option.some [Refusal::Refusal] (ctor Refusal::Refusal.unsupportedProtocolVersion version versions))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: supported_version_passes_the_gate,
+  parameters: [version : String, versions : (List String)],
+  statement: ((gate true version versions) = (ctor Option.none [Refusal::Refusal])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: version_gate_asks_whether_the_version_is_supported,
+  parameters: [version : String, versions : (List String)],
+  statement: ((versionGate version versions) = (gate (isSupported version versions) version versions)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_core_version_passes_the_gate,
+  parameters: [],
+  statement: ((versionGate "2026-07-28" (supportedVersions)) = (ctor Option.none [Refusal::Refusal])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_previous_version_is_refused_by_the_gate,
+  parameters: [],
+  statement: ((versionGate "2025-11-25" (supportedVersions)) = (ctor Option.some [Refusal::Refusal] (ctor Refusal::Refusal.unsupportedProtocolVersion "2025-11-25" (supportedVersions)))),
+  proof: reflexivity{}
+}
+
+definition{
+  name: isRefused,
+  parameters: [outcome : (Result Routed Refusal::Refusal)],
+  result: Bool,
+  body: (match outcome | Result.ok routed => false | Result.error refusal => true)
+}
+
+definition{
+  name: neverRoutesUnknown,
+  parameters: [route : Methods::MethodRoute, outcome : (Result Routed Refusal::Refusal)],
+  result: Bool,
+  body: (match route
+    | Methods::MethodRoute.known method => true
+    | Methods::MethodRoute.unknown => (isRefused outcome))
+}
+
+theorem{
+  name: validation_admits_before_it_routes,
+  parameters: [headers : (Option Headers), versions : (List String), request : JsonRpc::Request],
+  statement: ((validate headers versions request) = (afterAdmit (Methods::routeOf (project request method)) (admissionOf headers versions request))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: admission_starts_with_the_meta,
+  parameters: [headers : (Option Headers), versions : (List String), request : JsonRpc::Request],
+  statement: ((admissionOf headers versions request) = (afterMeta headers versions request (metaOf (project request params)))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: unreadable_meta_is_invalid_params,
+  parameters: [
+    headers : (Option Headers),
+    versions : (List String),
+    request : JsonRpc::Request,
+    problem : Refusal::ParamsProblem
+  ],
+  statement: ((afterMeta headers versions request (ctor Result.error [Meta::RequestMeta, Refusal::ParamsProblem] problem)) = (ctor Admission.refused (ctor Refusal::Refusal.invalidParams problem))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: readable_meta_continues_with_the_header_check,
+  parameters: [
+    headers : (Option Headers),
+    versions : (List String),
+    request : JsonRpc::Request,
+    meta : Meta::RequestMeta
+  ],
+  statement: ((afterMeta headers versions request (ctor Result.ok [Meta::RequestMeta, Refusal::ParamsProblem] meta)) = (afterHeaders versions request meta (headerCheck headers (Methods::nameFieldOfWire (project request method)) (project request method) (project meta protocolVersion) (paramsObject (project request params))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: header_problem_is_header_mismatch,
+  parameters: [
+    versions : (List String),
+    request : JsonRpc::Request,
+    meta : Meta::RequestMeta,
+    problem : Refusal::HeaderProblem
+  ],
+  statement: ((afterHeaders versions request meta (ctor Option.some [Refusal::HeaderProblem] problem)) = (ctor Admission.refused (ctor Refusal::Refusal.headerMismatch problem))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: matching_headers_continue_with_the_version_gate,
+  parameters: [versions : (List String), request : JsonRpc::Request, meta : Meta::RequestMeta],
+  statement: ((afterHeaders versions request meta (ctor Option.none [Refusal::HeaderProblem])) = (afterVersion request meta (versionGate (project meta protocolVersion) versions))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: gated_version_is_refused,
+  parameters: [request : JsonRpc::Request, meta : Meta::RequestMeta, refusal : Refusal::Refusal],
+  statement: ((afterVersion request meta (ctor Option.some [Refusal::Refusal] refusal)) = (ctor Admission.refused refusal)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: admitted_request_keeps_its_id_and_method,
+  parameters: [request : JsonRpc::Request, meta : Meta::RequestMeta],
+  statement: ((afterVersion request meta (ctor Option.none [Refusal::Refusal])) = (ctor Admission.admitted (record Admitted {id := (project request id), wire := (project request method), meta := meta, params := (paramsObject (project request params))}))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: unknown_method_is_method_not_found,
+  parameters: [admitted : Admitted],
+  statement: ((afterRoute admitted (ctor Methods::MethodRoute.unknown)) = (ctor Result.error [Routed, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound (project admitted wire)))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: known_method_is_routed,
+  parameters: [admitted : Admitted, method : Methods::Method],
+  statement: ((afterRoute admitted (ctor Methods::MethodRoute.known method)) = (ctor Result.ok [Routed, Refusal::Refusal] (record Routed {id := (project admitted id), method := method, meta := (project admitted meta), params := (project admitted params)}))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_refused_admission_is_never_routed,
+  parameters: [route : Methods::MethodRoute, refusal : Refusal::Refusal],
+  statement: ((afterAdmit route (ctor Admission.refused refusal)) = (ctor Result.error [Routed, Refusal::Refusal] refusal)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_unknown_method_never_validates,
+  parameters: [route : Methods::MethodRoute, admission : Admission],
+  statement: ((neverRoutesUnknown route (afterAdmit route admission)) = true),
+  proof: cases{
+    branches: [
+      {proof: reflexivity{}, binders: [method], constructor: known},
+      {
+        proof: cases{
+          branches: [
+            {proof: reflexivity{}, binders: [admitted], constructor: admitted},
+            {proof: reflexivity{}, binders: [refusal], constructor: refused}
+          ],
+          scrutinee: admission
+        },
+        binders: [],
+        constructor: unknown
+      }
+    ],
+    scrutinee: route
+  }
+}
+
+theorem{
+  name: an_unknown_method_never_validates_for_any_request,
+  parameters: [headers : (Option Headers), versions : (List String), request : JsonRpc::Request],
+  statement: ((neverRoutesUnknown (Methods::routeOf (project request method)) (validate headers versions request)) = true),
+  proof: apply{
+    arguments: [
+      (Methods::routeOf (project request method)),
+      (admissionOf headers versions request)
+    ],
+    theorem: an_unknown_method_never_validates
+  },
+  axioms: [propext]
+}
+
+theorem{
+  name: no_headers_means_no_header_check,
+  parameters: [
+    field : Methods::NameField,
+    wire : String,
+    version : String,
+    params : Json::JsonObject
+  ],
+  statement: ((headerCheck (ctor Option.none [Headers]) field wire version params) = (ctor Option.none [Refusal::HeaderProblem])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: missing_version_header_is_refused,
+  parameters: [
+    field : Methods::NameField,
+    wire : String,
+    version : String,
+    params : Json::JsonObject,
+    headerMethod : (Option String),
+    headerName : (Option String)
+  ],
+  statement: ((headerCheck (ctor Option.some [Headers] (record Headers {protocolVersion := (ctor Option.none [String]), method := headerMethod, name := headerName})) field wire version params) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.missingProtocolVersionHeader))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: differing_version_header_is_refused,
+  parameters: [field : Methods::NameField, params : Json::JsonObject],
+  statement: ((headerCheck (headersFor "2025-11-25" "tools/list" (ctor Option.none [String])) field "tools/list" "2026-07-28" params) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.protocolVersionDiffers))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: differing_method_header_is_refused,
+  parameters: [params : Json::JsonObject],
+  statement: ((headerCheck (headersFor "2026-07-28" "tools/list" (ctor Option.none [String])) (Methods::nameFieldOf (ctor Methods::Method.toolsCall)) "tools/call" "2026-07-28" params) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.methodDiffers))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: missing_method_header_is_refused,
+  parameters: [
+    field : Methods::NameField,
+    wire : String,
+    params : Json::JsonObject,
+    headerName : (Option String)
+  ],
+  statement: ((headerCheck (ctor Option.some [Headers] (record Headers {protocolVersion := (ctor Option.some [String] "2026-07-28"), method := (ctor Option.none [String]), name := headerName})) field wire "2026-07-28" params) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.missingMethodHeader))),
+  proof: reflexivity{}
+}
+
+definition{
+  name: bodyWith,
+  parameters: [key : String, value : String],
+  result: Json::JsonObject,
+  body: (record Json::JsonObject {members := (cons (key, (ctor Json::Json.text value)) (nil (String * Json::Json)))})
+}
+
+theorem{
+  name: tools_call_needs_its_name_header,
+  parameters: [],
+  statement: ((headerCheck (headersFor "2026-07-28" "tools/call" (ctor Option.none [String])) (Methods::nameFieldOf (ctor Methods::Method.toolsCall)) "tools/call" "2026-07-28" (bodyWith "name" "echo")) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.missingNameHeader))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: tools_call_name_header_must_equal_the_body_name,
+  parameters: [],
+  statement: ((headerCheck (headersFor "2026-07-28" "tools/call" (ctor Option.some [String] "foo")) (Methods::nameFieldOf (ctor Methods::Method.toolsCall)) "tools/call" "2026-07-28" (bodyWith "name" "bar")) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.nameDiffers))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: tools_call_name_header_may_equal_the_body_name,
+  parameters: [],
+  statement: ((headerCheck (headersFor "2026-07-28" "tools/call" (ctor Option.some [String] "echo")) (Methods::nameFieldOf (ctor Methods::Method.toolsCall)) "tools/call" "2026-07-28" (bodyWith "name" "echo")) = (ctor Option.none [Refusal::HeaderProblem])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: prompts_get_name_header_must_equal_the_body_name,
+  parameters: [],
+  statement: ((headerCheck (headersFor "2026-07-28" "prompts/get" (ctor Option.some [String] "foo")) (Methods::nameFieldOf (ctor Methods::Method.promptsGet)) "prompts/get" "2026-07-28" (bodyWith "name" "bar")) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.nameDiffers))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: resources_read_name_header_is_the_uri,
+  parameters: [],
+  statement: ((headerCheck (headersFor "2026-07-28" "resources/read" (ctor Option.some [String] "file:///a")) (Methods::nameFieldOf (ctor Methods::Method.resourcesRead)) "resources/read" "2026-07-28" (bodyWith "uri" "file:///a")) = (ctor Option.none [Refusal::HeaderProblem])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: resources_read_uri_header_must_equal_the_body_uri,
+  parameters: [],
+  statement: ((headerCheck (headersFor "2026-07-28" "resources/read" (ctor Option.some [String] "file:///b")) (Methods::nameFieldOf (ctor Methods::Method.resourcesRead)) "resources/read" "2026-07-28" (bodyWith "uri" "file:///a")) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.nameDiffers))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: tasks_get_name_header_is_the_task_id,
+  parameters: [],
+  statement: ((headerCheck (headersFor "2026-07-28" "tasks/get" (ctor Option.some [String] "t1")) (Methods::nameFieldOf (ctor Methods::Method.tasksGet)) "tasks/get" "2026-07-28" (bodyWith "taskId" "t1")) = (ctor Option.none [Refusal::HeaderProblem])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: tasks_cancel_name_header_must_equal_the_task_id,
+  parameters: [],
+  statement: ((headerCheck (headersFor "2026-07-28" "tasks/cancel" (ctor Option.some [String] "t2")) (Methods::nameFieldOf (ctor Methods::Method.tasksCancel)) "tasks/cancel" "2026-07-28" (bodyWith "taskId" "t1")) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.nameDiffers))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: tasks_update_needs_its_name_header,
+  parameters: [],
+  statement: ((headerCheck (headersFor "2026-07-28" "tasks/update" (ctor Option.none [String])) (Methods::nameFieldOf (ctor Methods::Method.tasksUpdate)) "tasks/update" "2026-07-28" (bodyWith "taskId" "t1")) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.missingNameHeader))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: tools_list_has_no_name_header,
+  parameters: [],
+  statement: ((headerCheck (headersFor "2026-07-28" "tools/list" (ctor Option.none [String])) (Methods::nameFieldOf (ctor Methods::Method.toolsList)) "tools/list" "2026-07-28" (bodyWith "cursor" "c")) = (ctor Option.none [Refusal::HeaderProblem])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: well_formed_tools_call_validates_as_tools_call,
+  parameters: [],
+  statement: ((methodOfOutcome (validate (ctor Option.none [Headers]) (supportedVersions) (sampleCall "tools/call" "2026-07-28"))) = (ctor Option.some [Methods::Method] (ctor Methods::Method.toolsCall))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: well_formed_tools_call_with_headers_validates,
+  parameters: [],
+  statement: ((methodOfOutcome (validate (headersFor "2026-07-28" "tools/call" (ctor Option.some [String] "echo")) (supportedVersions) (sampleCall "tools/call" "2026-07-28"))) = (ctor Option.some [Methods::Method] (ctor Methods::Method.toolsCall))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: tools_call_without_meta_is_invalid_params,
+  parameters: [],
+  statement: ((codeOfOutcome (validate (ctor Option.none [Headers]) (supportedVersions) (sampleCallWithoutMeta "tools/call"))) = (ctor Option.some [Int] (-32602 : Int))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: unsupported_protocol_version_has_its_code,
+  parameters: [],
+  statement: ((codeOfOutcome (validate (ctor Option.none [Headers]) (supportedVersions) (sampleCall "tools/call" "2025-11-25"))) = (ctor Option.some [Int] (-32022 : Int))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: unknown_method_has_its_code,
+  parameters: [],
+  statement: ((codeOfOutcome (validate (ctor Option.none [Headers]) (supportedVersions) (sampleCall "initialize" "2026-07-28"))) = (ctor Option.some [Int] (-32601 : Int))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: header_version_differing_from_meta_has_its_code,
+  parameters: [],
+  statement: ((codeOfOutcome (validate (headersFor "2025-11-25" "tools/call" (ctor Option.some [String] "echo")) (supportedVersions) (sampleCall "tools/call" "2026-07-28"))) = (ctor Option.some [Int] (-32020 : Int))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: tools_list_ignores_unrelated_params_and_validates,
+  parameters: [],
+  statement: ((codeOfOutcome (validate (ctor Option.none [Headers]) (supportedVersions) (sampleCall "tools/list" "2026-07-28"))) = (ctor Option.none [Int])),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: tools_list_with_only_meta_validates_as_tools_list,
+  parameters: [],
+  statement: ((methodOfOutcome (validate (ctor Option.none [Headers]) (supportedVersions) (sampleCallMetaOnly "tools/list"))) = (ctor Option.some [Methods::Method] (ctor Methods::Method.toolsList))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_missing_meta_beats_an_unknown_method,
+  parameters: [],
+  statement: ((codeOfOutcome (validate (ctor Option.none [Headers]) (supportedVersions) (sampleCallWithoutMeta "initialize"))) = (ctor Option.some [Int] (-32602 : Int))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_header_mismatch_beats_an_unknown_method,
+  parameters: [],
+  statement: ((codeOfOutcome (validate (headersFor "2025-11-25" "initialize" (ctor Option.none [String])) (supportedVersions) (sampleCall "initialize" "2026-07-28"))) = (ctor Option.some [Int] (-32020 : Int))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: an_unsupported_version_beats_an_unknown_method,
+  parameters: [],
+  statement: ((codeOfOutcome (validate (ctor Option.none [Headers]) (supportedVersions) (sampleCall "initialize" "2025-11-25"))) = (ctor Option.some [Int] (-32022 : Int))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_header_mismatch_beats_an_unsupported_version,
+  parameters: [],
+  statement: ((codeOfOutcome (validate (headersFor "2026-07-28" "tools/list" (ctor Option.none [String])) (supportedVersions) (sampleCall "tools/list" "2025-11-25"))) = (ctor Option.some [Int] (-32020 : Int))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_missing_meta_beats_a_header_mismatch,
+  parameters: [],
+  statement: ((codeOfOutcome (validate (headersFor "2025-11-25" "tools/list" (ctor Option.none [String])) (supportedVersions) (sampleCallWithoutMeta "tools/list"))) = (ctor Option.some [Int] (-32602 : Int))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: an_unknown_method_with_everything_else_valid_is_method_not_found,
+  parameters: [],
+  statement: ((codeOfOutcome (validate (headersFor "2026-07-28" "initialize" (ctor Option.none [String])) (supportedVersions) (sampleCall "initialize" "2026-07-28"))) = (ctor Option.some [Int] (-32601 : Int))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+\end{semanticmodule}
+\end{lexlean}

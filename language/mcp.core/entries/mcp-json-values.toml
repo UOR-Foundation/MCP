@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-json-values"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Json"
+component = "Json"
+
+[[form]]
+id = "mcp-json-values"
+channel = "text"
+surface = "MCP JSON values"
+canonical_source = true
+features = ["sentence-case", "singular"]

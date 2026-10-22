@@ -1,0 +1,197 @@
+\begin{lexlean}{Content}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Common}
+\importmodule{Json}
+\title{MCP content and catalog types}
+\begin{semanticmodule}
+structure{
+  name: TextContent,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: text, type: String},
+    {name: annotations, type: (Option Common::Annotations)},
+    {name: meta, type: (Option Json::JsonObject)}
+  ]
+}
+
+structure{
+  name: ImageContent,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: data, type: String},
+    {name: mimeType, type: String},
+    {name: annotations, type: (Option Common::Annotations)},
+    {name: meta, type: (Option Json::JsonObject)}
+  ]
+}
+
+structure{
+  name: AudioContent,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: data, type: String},
+    {name: mimeType, type: String},
+    {name: annotations, type: (Option Common::Annotations)},
+    {name: meta, type: (Option Json::JsonObject)}
+  ]
+}
+
+structure{
+  name: TextResourceContents,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: uri, type: String},
+    {name: mimeType, type: (Option String)},
+    {name: text, type: String},
+    {name: meta, type: (Option Json::JsonObject)}
+  ]
+}
+
+structure{
+  name: BlobResourceContents,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: uri, type: String},
+    {name: mimeType, type: (Option String)},
+    {name: blob, type: String},
+    {name: meta, type: (Option Json::JsonObject)}
+  ]
+}
+
+inductive{
+  name: ResourceContents,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: text, fields: [TextResourceContents]},
+    {name: blob, fields: [BlobResourceContents]}
+  ]
+}
+
+structure{
+  name: Resource,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: name, type: String},
+    {name: title, type: (Option String)},
+    {name: icons, type: (Option (List Common::Icon))},
+    {name: uri, type: String},
+    {name: description, type: (Option String)},
+    {name: mimeType, type: (Option String)},
+    {name: annotations, type: (Option Common::Annotations)},
+    {name: size, type: (Option Nat)},
+    {name: meta, type: (Option Json::JsonObject)}
+  ]
+}
+
+structure{
+  name: EmbeddedResource,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: resource, type: ResourceContents},
+    {name: annotations, type: (Option Common::Annotations)},
+    {name: meta, type: (Option Json::JsonObject)}
+  ]
+}
+
+inductive{
+  name: ContentBlock,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: text, fields: [TextContent]},
+    {name: image, fields: [ImageContent]},
+    {name: audio, fields: [AudioContent]},
+    {name: resource_link, fields: [Resource]},
+    {name: resource, fields: [EmbeddedResource]}
+  ]
+}
+
+structure{
+  name: ResourceTemplate,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: name, type: String},
+    {name: title, type: (Option String)},
+    {name: icons, type: (Option (List Common::Icon))},
+    {name: uriTemplate, type: String},
+    {name: description, type: (Option String)},
+    {name: mimeType, type: (Option String)},
+    {name: annotations, type: (Option Common::Annotations)},
+    {name: meta, type: (Option Json::JsonObject)}
+  ]
+}
+
+structure{
+  name: PromptArgument,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: name, type: String},
+    {name: title, type: (Option String)},
+    {name: description, type: (Option String)},
+    {name: required, type: (Option Bool)}
+  ]
+}
+
+structure{
+  name: Prompt,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: name, type: String},
+    {name: title, type: (Option String)},
+    {name: icons, type: (Option (List Common::Icon))},
+    {name: description, type: (Option String)},
+    {name: arguments, type: (Option (List PromptArgument))},
+    {name: meta, type: (Option Json::JsonObject)}
+  ]
+}
+
+structure{
+  name: PromptMessage,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: role, type: Common::Role}, {name: content, type: ContentBlock}]
+}
+
+structure{
+  name: ToolAnnotations,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: title, type: (Option String)},
+    {name: readOnlyHint, type: (Option Bool)},
+    {name: destructiveHint, type: (Option Bool)},
+    {name: idempotentHint, type: (Option Bool)},
+    {name: openWorldHint, type: (Option Bool)}
+  ]
+}
+
+structure{
+  name: Tool,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: name, type: String},
+    {name: title, type: (Option String)},
+    {name: icons, type: (Option (List Common::Icon))},
+    {name: description, type: (Option String)},
+    {name: inputSchema, type: Json::JsonObject},
+    {name: outputSchema, type: (Option Json::JsonObject)},
+    {name: annotations, type: (Option ToolAnnotations)},
+    {name: meta, type: (Option Json::JsonObject)}
+  ]
+}
+\end{semanticmodule}
+\end{lexlean}

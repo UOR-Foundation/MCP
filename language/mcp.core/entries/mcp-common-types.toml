@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-common-types"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Common"
+component = "CacheHint"
+
+[[form]]
+id = "mcp-common-types"
+channel = "text"
+surface = "MCP common types"
+canonical_source = true
+features = ["sentence-case", "singular"]

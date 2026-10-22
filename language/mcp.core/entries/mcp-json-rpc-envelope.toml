@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-json-rpc-envelope"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "JsonRpc"
+component = "Message"
+
+[[form]]
+id = "mcp-json-rpc-envelope"
+channel = "text"
+surface = "MCP JSON-RPC envelope"
+canonical_source = true
+features = ["sentence-case", "singular"]

@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-result-envelope"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Envelope"
+component = "Envelope"
+
+[[form]]
+id = "mcp-result-envelope"
+channel = "text"
+surface = "MCP result envelope"
+canonical_source = true
+features = ["sentence-case", "singular"]

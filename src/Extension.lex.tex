@@ -1,0 +1,102 @@
+\begin{lexlean}{Extension}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Capabilities}
+\importmodule{Common}
+\importmodule{Input}
+\importmodule{Json}
+\importmodule{Methods}
+\importmodule{Refusal}
+\importmodule{Tasks}
+\title{MCP extension point}
+\begin{semanticmodule}
+inductive{
+  name: CallOutcome,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: complete, fields: [Methods::CallToolResult]},
+    {name: pending, fields: [Input::InputRequiredResult]},
+    {name: task, fields: [Tasks::CreateTaskResult]}
+  ]
+}
+
+inductive{
+  name: ReadOutcome,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: complete, fields: [Methods::ReadResourceResult]},
+    {name: pending, fields: [Input::InputRequiredResult]}
+  ]
+}
+
+inductive{
+  name: PromptOutcome,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: complete, fields: [Methods::GetPromptResult]},
+    {name: pending, fields: [Input::InputRequiredResult]}
+  ]
+}
+
+structure{
+  name: Provider,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: serverInfo, type: Common::Implementation},
+    {name: instructions, type: (Option String)},
+    {name: capabilities, type: Capabilities::ServerCapabilities},
+    {name: discoverCache, type: Common::CacheHint},
+    {
+      name: listTools,
+      type: (Fn (Methods::PaginatedParams) (Result Methods::ListToolsResult Refusal::ProviderRefusal))
+    },
+    {
+      name: callTool,
+      type: (Fn (Methods::CallToolParams) (Result CallOutcome Refusal::ProviderRefusal))
+    },
+    {
+      name: listResources,
+      type: (Fn (Methods::PaginatedParams) (Result Methods::ListResourcesResult Refusal::ProviderRefusal))
+    },
+    {
+      name: listResourceTemplates,
+      type: (Fn (Methods::PaginatedParams) (Result Methods::ListResourceTemplatesResult Refusal::ProviderRefusal))
+    },
+    {
+      name: readResource,
+      type: (Fn (Methods::ReadResourceParams) (Result ReadOutcome Refusal::ProviderRefusal))
+    },
+    {
+      name: listPrompts,
+      type: (Fn (Methods::PaginatedParams) (Result Methods::ListPromptsResult Refusal::ProviderRefusal))
+    },
+    {
+      name: getPrompt,
+      type: (Fn (Methods::GetPromptParams) (Result PromptOutcome Refusal::ProviderRefusal))
+    },
+    {
+      name: complete,
+      type: (Fn (Methods::CompleteParams) (Result Methods::CompleteResult Refusal::ProviderRefusal))
+    },
+    {
+      name: getTask,
+      type: (Fn (Methods::GetTaskParams) (Result Tasks::DetailedTask Refusal::ProviderRefusal))
+    },
+    {name: updateTask, type: (Fn (Methods::UpdateTaskParams) (Option Refusal::ProviderRefusal))},
+    {name: cancelTask, type: (Fn (Methods::CancelTaskParams) (Option Refusal::ProviderRefusal))}
+  ]
+}
+
+definition{
+  name: inertProvider,
+  parameters: [info : Common::Implementation],
+  result: Provider,
+  body: (record Provider {serverInfo := info, instructions := (ctor Option.none [String]), capabilities := (record Capabilities::ServerCapabilities {experimental := (ctor Option.none [Json::JsonObject]), logging := (ctor Option.none [Json::JsonObject]), completions := (ctor Option.none [Json::JsonObject]), prompts := (ctor Option.none [Capabilities::ListChangedCapability]), resources := (ctor Option.none [Capabilities::ResourcesCapability]), tools := (ctor Option.none [Capabilities::ListChangedCapability]), extensions := (ctor Option.none [Json::JsonObject])}), discoverCache := (record Common::CacheHint {ttlMs := 0, cacheScope := (ctor Common::CacheScope.public)}), listTools := (fun (params : Methods::PaginatedParams) => (ctor Result.error [Methods::ListToolsResult, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), callTool := (fun (params : Methods::CallToolParams) => (ctor Result.error [CallOutcome, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), listResources := (fun (params : Methods::PaginatedParams) => (ctor Result.error [Methods::ListResourcesResult, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), listResourceTemplates := (fun (params : Methods::PaginatedParams) => (ctor Result.error [Methods::ListResourceTemplatesResult, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), readResource := (fun (params : Methods::ReadResourceParams) => (ctor Result.error [ReadOutcome, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), listPrompts := (fun (params : Methods::PaginatedParams) => (ctor Result.error [Methods::ListPromptsResult, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), getPrompt := (fun (params : Methods::GetPromptParams) => (ctor Result.error [PromptOutcome, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), complete := (fun (params : Methods::CompleteParams) => (ctor Result.error [Methods::CompleteResult, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), getTask := (fun (params : Methods::GetTaskParams) => (ctor Result.error [Tasks::DetailedTask, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), updateTask := (fun (params : Methods::UpdateTaskParams) => (ctor Option.some [Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), cancelTask := (fun (params : Methods::CancelTaskParams) => (ctor Option.some [Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer")))})
+}
+\end{semanticmodule}
+\end{lexlean}
