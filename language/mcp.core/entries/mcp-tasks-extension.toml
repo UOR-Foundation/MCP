@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-tasks-extension"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Tasks"
+component = "DetailedTask"
+
+[[form]]
+id = "mcp-tasks-extension"
+channel = "text"
+surface = "MCP tasks extension"
+canonical_source = true
+features = ["sentence-case", "singular"]

@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-content-and-catalog-types"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Content"
+component = "Tool"
+
+[[form]]
+id = "mcp-content-and-catalog-types"
+channel = "text"
+surface = "MCP content and catalog types"
+canonical_source = true
+features = ["sentence-case", "singular"]

@@ -1,0 +1,139 @@
+\begin{lexlean}{JsonRpc}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Json}
+\title{MCP JSON-RPC envelope}
+\begin{semanticmodule}
+inductive{
+  name: RequestId,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: text, fields: [String]}, {name: number, fields: [Int]}]
+}
+
+structure{
+  name: ErrorObject,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: code, type: Int},
+    {name: message, type: String},
+    {name: data, type: (Option Json::Json)}
+  ]
+}
+
+structure{
+  name: Request,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: id, type: RequestId},
+    {name: method, type: String},
+    {name: params, type: (Option Json::JsonObject)}
+  ]
+}
+
+structure{
+  name: Notification,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: method, type: String}, {name: params, type: (Option Json::JsonObject)}]
+}
+
+structure{
+  name: ResultResponse,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: id, type: RequestId}, {name: result, type: Json::JsonObject}]
+}
+
+structure{
+  name: ErrorResponse,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: id, type: (Option RequestId)}, {name: error, type: ErrorObject}]
+}
+
+inductive{
+  name: Message,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: request, fields: [Request]},
+    {name: notification, fields: [Notification]},
+    {name: resultResponse, fields: [ResultResponse]},
+    {name: errorResponse, fields: [ErrorResponse]}
+  ]
+}
+
+definition{name: jsonrpcVersion, parameters: [], result: String, body: "2.0"}
+
+definition{name: parseErrorCode, parameters: [], result: Int, body: (-32700 : Int)}
+
+definition{name: invalidRequestCode, parameters: [], result: Int, body: (-32600 : Int)}
+
+definition{name: methodNotFoundCode, parameters: [], result: Int, body: (-32601 : Int)}
+
+definition{name: invalidParamsCode, parameters: [], result: Int, body: (-32602 : Int)}
+
+definition{name: internalErrorCode, parameters: [], result: Int, body: (-32603 : Int)}
+
+definition{name: headerMismatchCode, parameters: [], result: Int, body: (-32020 : Int)}
+
+definition{
+  name: missingRequiredClientCapabilityCode,
+  parameters: [],
+  result: Int,
+  body: (-32021 : Int)
+}
+
+definition{name: unsupportedProtocolVersionCode, parameters: [], result: Int, body: (-32022 : Int)}
+
+definition{
+  name: inMcpReservedRange,
+  parameters: [code : Int],
+  result: Bool,
+  body: (not ((prim less_than code (-32099 : Int) : Bool) || (prim less_than (-32020 : Int) code : Bool))),
+  axioms: [propext]
+}
+
+definition{
+  name: inImplementationDefinedRange,
+  parameters: [code : Int],
+  result: Bool,
+  body: (not ((prim less_than code (-32019 : Int) : Bool) || (prim less_than (-32000 : Int) code : Bool))),
+  axioms: [propext]
+}
+
+theorem{
+  name: standard_codes_are_the_jsonrpc_values,
+  parameters: [],
+  statement: ((((parseErrorCode) = (-32700 : Int)) /\ ((invalidRequestCode) = (-32600 : Int))) /\ ((((methodNotFoundCode) = (-32601 : Int)) /\ ((invalidParamsCode) = (-32602 : Int))) /\ ((internalErrorCode) = (-32603 : Int)))),
+  proof: decide{}
+}
+
+theorem{
+  name: mcp_codes_are_the_schema_values,
+  parameters: [],
+  statement: ((((headerMismatchCode) = (-32020 : Int)) /\ ((missingRequiredClientCapabilityCode) = (-32021 : Int))) /\ ((unsupportedProtocolVersionCode) = (-32022 : Int))),
+  proof: decide{}
+}
+
+theorem{
+  name: mcp_codes_lie_in_the_reserved_range,
+  parameters: [],
+  statement: ((((inMcpReservedRange (headerMismatchCode)) = true) /\ ((inMcpReservedRange (missingRequiredClientCapabilityCode)) = true)) /\ ((inMcpReservedRange (unsupportedProtocolVersionCode)) = true)),
+  proof: decide{},
+  axioms: [propext]
+}
+
+theorem{
+  name: jsonrpc_codes_lie_outside_both_mcp_ranges,
+  parameters: [],
+  statement: (((((inMcpReservedRange (parseErrorCode)) = false) /\ ((inMcpReservedRange (invalidRequestCode)) = false)) /\ (((inMcpReservedRange (methodNotFoundCode)) = false) /\ ((inMcpReservedRange (invalidParamsCode)) = false))) /\ ((((inMcpReservedRange (internalErrorCode)) = false) /\ ((inImplementationDefinedRange (invalidParamsCode)) = false)) /\ ((inImplementationDefinedRange (headerMismatchCode)) = false))),
+  proof: decide{},
+  axioms: [propext]
+}
+\end{semanticmodule}
+\end{lexlean}

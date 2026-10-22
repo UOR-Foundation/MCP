@@ -1,0 +1,143 @@
+\begin{lexlean}{Capabilities}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Json}
+\title{MCP capabilities}
+\begin{semanticmodule}
+structure{
+  name: ClientCapabilities,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: experimental, type: (Option Json::JsonObject)},
+    {name: roots, type: (Option Json::JsonObject)},
+    {name: sampling, type: (Option Json::JsonObject)},
+    {name: elicitation, type: (Option Json::JsonObject)},
+    {name: extensions, type: (Option Json::JsonObject)}
+  ]
+}
+
+structure{
+  name: ListChangedCapability,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: listChanged, type: (Option Bool)}]
+}
+
+structure{
+  name: ResourcesCapability,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: subscribe, type: (Option Bool)}, {name: listChanged, type: (Option Bool)}]
+}
+
+structure{
+  name: ServerCapabilities,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: experimental, type: (Option Json::JsonObject)},
+    {name: logging, type: (Option Json::JsonObject)},
+    {name: completions, type: (Option Json::JsonObject)},
+    {name: prompts, type: (Option ListChangedCapability)},
+    {name: resources, type: (Option ResourcesCapability)},
+    {name: tools, type: (Option ListChangedCapability)},
+    {name: extensions, type: (Option Json::JsonObject)}
+  ]
+}
+
+definition{
+  name: tasksExtensionId,
+  parameters: [],
+  result: String,
+  body: "io.modelcontextprotocol/tasks"
+}
+
+definition{
+  name: noObject,
+  parameters: [],
+  result: Json::JsonObject,
+  body: (record Json::JsonObject {members := (nil (String * Json::Json))})
+}
+
+definition{
+  name: noClientCapabilities,
+  parameters: [],
+  result: ClientCapabilities,
+  body: (record ClientCapabilities {experimental := (ctor Option.none [Json::JsonObject]), roots := (ctor Option.none [Json::JsonObject]), sampling := (ctor Option.none [Json::JsonObject]), elicitation := (ctor Option.none [Json::JsonObject]), extensions := (ctor Option.none [Json::JsonObject])})
+}
+
+definition{
+  name: isDeclared,
+  parameters: [capability : (Option Json::JsonObject)],
+  result: Bool,
+  body: (match capability | Option.none => false | Option.some declared => true)
+}
+
+definition{
+  name: declaresExtension,
+  parameters: [extensions : (Option Json::JsonObject), identifier : String],
+  result: Bool,
+  body: (match extensions
+    | Option.none => false
+    | Option.some declared => (Json::hasKey identifier declared))
+}
+
+definition{
+  name: clientDeclaresTasks,
+  parameters: [capabilities : ClientCapabilities],
+  result: Bool,
+  body: (declaresExtension (project capabilities extensions) (tasksExtensionId))
+}
+
+definition{
+  name: tasksRequirement,
+  parameters: [],
+  result: ClientCapabilities,
+  body: (record ClientCapabilities {experimental := (ctor Option.none [Json::JsonObject]), roots := (ctor Option.none [Json::JsonObject]), sampling := (ctor Option.none [Json::JsonObject]), elicitation := (ctor Option.none [Json::JsonObject]), extensions := (ctor Option.some [Json::JsonObject] (record Json::JsonObject {members := (cons ((tasksExtensionId), (ctor Json::Json.object (nil (String * Json::Json)))) (nil (String * Json::Json)))}))})
+}
+
+definition{
+  name: elicitationRequirement,
+  parameters: [],
+  result: ClientCapabilities,
+  body: (record ClientCapabilities {experimental := (ctor Option.none [Json::JsonObject]), roots := (ctor Option.none [Json::JsonObject]), sampling := (ctor Option.none [Json::JsonObject]), elicitation := (ctor Option.some [Json::JsonObject] (noObject)), extensions := (ctor Option.none [Json::JsonObject])})
+}
+
+definition{
+  name: samplingRequirement,
+  parameters: [],
+  result: ClientCapabilities,
+  body: (record ClientCapabilities {experimental := (ctor Option.none [Json::JsonObject]), roots := (ctor Option.none [Json::JsonObject]), sampling := (ctor Option.some [Json::JsonObject] (noObject)), elicitation := (ctor Option.none [Json::JsonObject]), extensions := (ctor Option.none [Json::JsonObject])})
+}
+
+definition{
+  name: rootsRequirement,
+  parameters: [],
+  result: ClientCapabilities,
+  body: (record ClientCapabilities {experimental := (ctor Option.none [Json::JsonObject]), roots := (ctor Option.some [Json::JsonObject] (noObject)), sampling := (ctor Option.none [Json::JsonObject]), elicitation := (ctor Option.none [Json::JsonObject]), extensions := (ctor Option.none [Json::JsonObject])})
+}
+
+theorem{
+  name: no_capabilities_declare_no_tasks,
+  parameters: [],
+  statement: ((clientDeclaresTasks (noClientCapabilities)) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: tasks_requirement_is_met_by_declaring_tasks,
+  parameters: [],
+  statement: ((clientDeclaresTasks (tasksRequirement)) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: tasks_requirement_declares_nothing_else,
+  parameters: [],
+  statement: ((((isDeclared (project (tasksRequirement) elicitation)) = false) /\ ((isDeclared (project (tasksRequirement) sampling)) = false)) /\ ((isDeclared (project (tasksRequirement) roots)) = false)),
+  proof: decide{}
+}
+\end{semanticmodule}
+\end{lexlean}

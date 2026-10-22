@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-server-methods"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Methods"
+component = "Method"
+
+[[form]]
+id = "mcp-server-methods"
+channel = "text"
+surface = "MCP server methods"
+canonical_source = true
+features = ["sentence-case", "singular"]

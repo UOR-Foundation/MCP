@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-multi-round-trip-input"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Input"
+component = "InputRequiredResult"
+
+[[form]]
+id = "mcp-multi-round-trip-input"
+channel = "text"
+surface = "MCP multi round-trip input"
+canonical_source = true
+features = ["sentence-case", "singular"]

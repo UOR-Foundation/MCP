@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-request-validation"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Validation"
+component = "Request"
+
+[[form]]
+id = "mcp-request-validation"
+channel = "text"
+surface = "MCP request validation"
+canonical_source = true
+features = ["sentence-case", "singular"]

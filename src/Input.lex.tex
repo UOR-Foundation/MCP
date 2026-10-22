@@ -1,0 +1,348 @@
+\begin{lexlean}{Input}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Capabilities}
+\importmodule{Common}
+\importmodule{Content}
+\importmodule{Json}
+\title{MCP multi round-trip input}
+\begin{semanticmodule}
+inductive{
+  name: ElicitFormMode,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: form, fields: []}]
+}
+
+structure{
+  name: ElicitFormParams,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: mode, type: (Option ElicitFormMode)},
+    {name: message, type: String},
+    {name: requestedSchema, type: Json::JsonObject}
+  ]
+}
+
+structure{
+  name: ElicitUrlParams,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: message, type: String}, {name: url, type: String}]
+}
+
+inductive{
+  name: ElicitRequestParams,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: form, fields: [ElicitFormParams]}, {name: url, fields: [ElicitUrlParams]}]
+}
+
+inductive{
+  name: ElicitAction,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: accept, fields: []},
+    {name: decline, fields: []},
+    {name: cancel, fields: []}
+  ]
+}
+
+structure{
+  name: ElicitResult,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: action, type: ElicitAction}, {name: content, type: (Option Json::JsonObject)}]
+}
+
+structure{
+  name: ToolUseContent,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: id, type: String},
+    {name: name, type: String},
+    {name: input, type: Json::JsonObject},
+    {name: meta, type: (Option Json::JsonObject)}
+  ]
+}
+
+structure{
+  name: ToolResultContent,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: toolUseId, type: String},
+    {name: content, type: (List Content::ContentBlock)},
+    {name: structuredContent, type: (Option Json::Json)},
+    {name: isError, type: (Option Bool)},
+    {name: meta, type: (Option Json::JsonObject)}
+  ]
+}
+
+inductive{
+  name: SamplingContentBlock,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: text, fields: [Content::TextContent]},
+    {name: image, fields: [Content::ImageContent]},
+    {name: audio, fields: [Content::AudioContent]},
+    {name: tool_use, fields: [ToolUseContent]},
+    {name: tool_result, fields: [ToolResultContent]}
+  ]
+}
+
+inductive{
+  name: SamplingContent,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: single, fields: [SamplingContentBlock]},
+    {name: many, fields: [(List SamplingContentBlock)]}
+  ]
+}
+
+structure{
+  name: SamplingMessage,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: role, type: Common::Role},
+    {name: content, type: SamplingContent},
+    {name: meta, type: (Option Json::JsonObject)}
+  ]
+}
+
+structure{
+  name: ModelHint,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: name, type: (Option String)}]
+}
+
+structure{
+  name: ModelPreferences,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: hints, type: (Option (List ModelHint))},
+    {name: costPriority, type: (Option Json::Decimal)},
+    {name: speedPriority, type: (Option Json::Decimal)},
+    {name: intelligencePriority, type: (Option Json::Decimal)}
+  ]
+}
+
+inductive{
+  name: IncludeContext,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: none, fields: []},
+    {name: thisServer, fields: []},
+    {name: allServers, fields: []}
+  ]
+}
+
+inductive{
+  name: ToolChoiceMode,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: auto, fields: []}, {name: required, fields: []}, {name: none, fields: []}]
+}
+
+structure{
+  name: ToolChoice,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: mode, type: (Option ToolChoiceMode)}]
+}
+
+structure{
+  name: CreateMessageParams,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: messages, type: (List SamplingMessage)},
+    {name: modelPreferences, type: (Option ModelPreferences)},
+    {name: systemPrompt, type: (Option String)},
+    {name: includeContext, type: (Option IncludeContext)},
+    {name: temperature, type: (Option Json::Decimal)},
+    {name: maxTokens, type: Nat},
+    {name: stopSequences, type: (Option (List String))},
+    {name: metadata, type: (Option Json::JsonObject)},
+    {name: tools, type: (Option (List Content::Tool))},
+    {name: toolChoice, type: (Option ToolChoice)}
+  ]
+}
+
+structure{
+  name: CreateMessageResult,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: message, type: SamplingMessage},
+    {name: model, type: String},
+    {name: stopReason, type: (Option String)}
+  ]
+}
+
+structure{
+  name: Root,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: uri, type: String},
+    {name: name, type: (Option String)},
+    {name: meta, type: (Option Json::JsonObject)}
+  ]
+}
+
+structure{
+  name: ListRootsResult,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: roots, type: (List Root)}]
+}
+
+inductive{
+  name: InputRequest,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: elicitation, fields: [ElicitRequestParams]},
+    {name: sampling, fields: [CreateMessageParams]},
+    {name: roots, fields: [(Option Json::JsonObject)]}
+  ]
+}
+
+inductive{
+  name: InputResponse,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: elicitation, fields: [ElicitResult]},
+    {name: sampling, fields: [CreateMessageResult]},
+    {name: roots, fields: [ListRootsResult]}
+  ]
+}
+
+inductive{
+  name: InputRequiredResult,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: requests, fields: [(List (String * InputRequest))]},
+    {name: state, fields: [String]},
+    {name: requestsAndState, fields: [(List (String * InputRequest)), String]}
+  ]
+}
+
+definition{
+  name: requestsOf,
+  parameters: [required : InputRequiredResult],
+  result: (List (String * InputRequest)),
+  body: (match required
+    | InputRequiredResult.requests pending => pending
+    | InputRequiredResult.state token => (nil (String * InputRequest))
+    | InputRequiredResult.requestsAndState pending token => pending)
+}
+
+definition{
+  name: stateOf,
+  parameters: [required : InputRequiredResult],
+  result: (Option String),
+  body: (match required
+    | InputRequiredResult.requests pending => (ctor Option.none [String])
+    | InputRequiredResult.state token => (ctor Option.some [String] token)
+    | InputRequiredResult.requestsAndState pending token => (ctor Option.some [String] token))
+}
+
+definition{
+  name: needsElicitation,
+  parameters: [pending : (List (String * InputRequest))],
+  result: Bool,
+  body: (match pending
+    | List.nil => false
+    | List.cons entry rest => (match (second entry)
+      | InputRequest.elicitation params => true
+      | InputRequest.sampling params => (needsElicitation rest)
+      | InputRequest.roots params => (needsElicitation rest))),
+  recursive_argument: pending
+}
+
+definition{
+  name: needsSampling,
+  parameters: [pending : (List (String * InputRequest))],
+  result: Bool,
+  body: (match pending
+    | List.nil => false
+    | List.cons entry rest => (match (second entry)
+      | InputRequest.elicitation params => (needsSampling rest)
+      | InputRequest.sampling params => true
+      | InputRequest.roots params => (needsSampling rest))),
+  recursive_argument: pending
+}
+
+definition{
+  name: needsRoots,
+  parameters: [pending : (List (String * InputRequest))],
+  result: Bool,
+  body: (match pending
+    | List.nil => false
+    | List.cons entry rest => (match (second entry)
+      | InputRequest.elicitation params => (needsRoots rest)
+      | InputRequest.sampling params => (needsRoots rest)
+      | InputRequest.roots params => true)),
+  recursive_argument: pending
+}
+
+definition{
+  name: requiredCapabilities,
+  parameters: [pending : (List (String * InputRequest))],
+  result: Capabilities::ClientCapabilities,
+  body: (record Capabilities::ClientCapabilities {experimental := (ctor Option.none [Json::JsonObject]), roots := (if (needsRoots pending) then (ctor Option.some [Json::JsonObject] (Capabilities::noObject)) else (ctor Option.none [Json::JsonObject])), sampling := (if (needsSampling pending) then (ctor Option.some [Json::JsonObject] (Capabilities::noObject)) else (ctor Option.none [Json::JsonObject])), elicitation := (if (needsElicitation pending) then (ctor Option.some [Json::JsonObject] (Capabilities::noObject)) else (ctor Option.none [Json::JsonObject])), extensions := (ctor Option.none [Json::JsonObject])})
+}
+
+definition{
+  name: covers,
+  parameters: [
+    declared : Capabilities::ClientCapabilities,
+    pending : (List (String * InputRequest))
+  ],
+  result: Bool,
+  body: ((((not (needsElicitation pending)) || (Capabilities::isDeclared (project declared elicitation))) && ((not (needsSampling pending)) || (Capabilities::isDeclared (project declared sampling)))) && ((not (needsRoots pending)) || (Capabilities::isDeclared (project declared roots))))
+}
+
+theorem{
+  name: nothing_pending_needs_no_capability,
+  parameters: [declared : Capabilities::ClientCapabilities],
+  statement: ((covers declared (nil (String * InputRequest))) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: elicitation_needs_the_elicitation_capability,
+  parameters: [],
+  statement: ((covers (Capabilities::noClientCapabilities) (cons ("name", (ctor InputRequest.elicitation (ctor ElicitRequestParams.url (record ElicitUrlParams {message := "m", url := "u"})))) (nil (String * InputRequest)))) = false),
+  proof: decide{}
+}
+
+theorem{
+  name: declared_elicitation_covers_elicitation,
+  parameters: [],
+  statement: ((covers (Capabilities::elicitationRequirement) (cons ("name", (ctor InputRequest.elicitation (ctor ElicitRequestParams.url (record ElicitUrlParams {message := "m", url := "u"})))) (nil (String * InputRequest)))) = true),
+  proof: decide{}
+}
+
+theorem{
+  name: required_capabilities_of_elicitation_is_the_elicitation_requirement,
+  parameters: [],
+  statement: ((Capabilities::isDeclared (project (requiredCapabilities (cons ("name", (ctor InputRequest.elicitation (ctor ElicitRequestParams.url (record ElicitUrlParams {message := "m", url := "u"})))) (nil (String * InputRequest)))) elicitation)) = true),
+  proof: decide{}
+}
+\end{semanticmodule}
+\end{lexlean}

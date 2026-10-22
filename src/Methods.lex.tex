@@ -1,0 +1,570 @@
+\begin{lexlean}{Methods}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Capabilities}
+\importmodule{Common}
+\importmodule{Content}
+\importmodule{Input}
+\importmodule{Json}
+\importmodule{JsonRpc}
+\importmodule{Meta}
+\importmodule{Tasks}
+\title{MCP server methods}
+\begin{semanticmodule}
+inductive{
+  name: Method,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: serverDiscover, fields: []},
+    {name: toolsList, fields: []},
+    {name: toolsCall, fields: []},
+    {name: resourcesList, fields: []},
+    {name: resourcesRead, fields: []},
+    {name: resourcesTemplatesList, fields: []},
+    {name: promptsList, fields: []},
+    {name: promptsGet, fields: []},
+    {name: completionComplete, fields: []},
+    {name: tasksGet, fields: []},
+    {name: tasksUpdate, fields: []},
+    {name: tasksCancel, fields: []}
+  ]
+}
+
+definition{
+  name: methodWire,
+  parameters: [method : Method],
+  result: String,
+  body: (match method
+    | Method.serverDiscover => "server/discover"
+    | Method.toolsList => "tools/list"
+    | Method.toolsCall => "tools/call"
+    | Method.resourcesList => "resources/list"
+    | Method.resourcesRead => "resources/read"
+    | Method.resourcesTemplatesList => "resources/templates/list"
+    | Method.promptsList => "prompts/list"
+    | Method.promptsGet => "prompts/get"
+    | Method.completionComplete => "completion/complete"
+    | Method.tasksGet => "tasks/get"
+    | Method.tasksUpdate => "tasks/update"
+    | Method.tasksCancel => "tasks/cancel")
+}
+
+inductive{
+  name: MethodRoute,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: unknown, fields: []}, {name: known, fields: [Method]}]
+}
+
+definition{
+  name: routeOf,
+  parameters: [wire : String],
+  result: MethodRoute,
+  body: (if (prim equal wire "server/discover" : Bool) then (ctor MethodRoute.known (ctor Method.serverDiscover)) else (if (prim equal wire "tools/list" : Bool) then (ctor MethodRoute.known (ctor Method.toolsList)) else (if (prim equal wire "tools/call" : Bool) then (ctor MethodRoute.known (ctor Method.toolsCall)) else (if (prim equal wire "resources/list" : Bool) then (ctor MethodRoute.known (ctor Method.resourcesList)) else (if (prim equal wire "resources/read" : Bool) then (ctor MethodRoute.known (ctor Method.resourcesRead)) else (if (prim equal wire "resources/templates/list" : Bool) then (ctor MethodRoute.known (ctor Method.resourcesTemplatesList)) else (if (prim equal wire "prompts/list" : Bool) then (ctor MethodRoute.known (ctor Method.promptsList)) else (if (prim equal wire "prompts/get" : Bool) then (ctor MethodRoute.known (ctor Method.promptsGet)) else (if (prim equal wire "completion/complete" : Bool) then (ctor MethodRoute.known (ctor Method.completionComplete)) else (if (prim equal wire "tasks/get" : Bool) then (ctor MethodRoute.known (ctor Method.tasksGet)) else (if (prim equal wire "tasks/update" : Bool) then (ctor MethodRoute.known (ctor Method.tasksUpdate)) else (if (prim equal wire "tasks/cancel" : Bool) then (ctor MethodRoute.known (ctor Method.tasksCancel)) else (ctor MethodRoute.unknown)))))))))))))
+}
+
+definition{
+  name: isKnownRoute,
+  parameters: [route : MethodRoute],
+  result: Bool,
+  body: (match route | MethodRoute.unknown => false | MethodRoute.known method => true)
+}
+
+definition{
+  name: isKnownMethod,
+  parameters: [wire : String],
+  result: Bool,
+  body: (isKnownRoute (routeOf wire))
+}
+
+theorem{
+  name: method_wire_round_trips,
+  parameters: [method : Method],
+  statement: ((routeOf (methodWire method)) = (ctor MethodRoute.known method)),
+  proof: cases{
+    branches: [
+      {proof: reflexivity{}, binders: [], constructor: serverDiscover},
+      {proof: reflexivity{}, binders: [], constructor: toolsList},
+      {proof: reflexivity{}, binders: [], constructor: toolsCall},
+      {proof: reflexivity{}, binders: [], constructor: resourcesList},
+      {proof: reflexivity{}, binders: [], constructor: resourcesRead},
+      {proof: reflexivity{}, binders: [], constructor: resourcesTemplatesList},
+      {proof: reflexivity{}, binders: [], constructor: promptsList},
+      {proof: reflexivity{}, binders: [], constructor: promptsGet},
+      {proof: reflexivity{}, binders: [], constructor: completionComplete},
+      {proof: reflexivity{}, binders: [], constructor: tasksGet},
+      {proof: reflexivity{}, binders: [], constructor: tasksUpdate},
+      {proof: reflexivity{}, binders: [], constructor: tasksCancel}
+    ],
+    scrutinee: method
+  }
+}
+
+theorem{
+  name: legacy_and_server_initiated_methods_are_unknown,
+  parameters: [],
+  statement: ((((isKnownMethod "initialize") = false) /\ ((isKnownMethod "ping") = false)) /\ ((((isKnownMethod "resources/subscribe") = false) /\ ((isKnownMethod "tasks/list") = false)) /\ (((isKnownMethod "tasks/result") = false) /\ ((isKnownMethod "logging/setLevel") = false)))),
+  proof: decide{}
+}
+
+definition{
+  name: supportsInputRequired,
+  parameters: [method : Method],
+  result: Bool,
+  body: (match method
+    | Method.serverDiscover => false
+    | Method.toolsList => false
+    | Method.toolsCall => true
+    | Method.resourcesList => false
+    | Method.resourcesRead => true
+    | Method.resourcesTemplatesList => false
+    | Method.promptsList => false
+    | Method.promptsGet => true
+    | Method.completionComplete => false
+    | Method.tasksGet => false
+    | Method.tasksUpdate => false
+    | Method.tasksCancel => false)
+}
+
+definition{
+  name: supportsTaskResult,
+  parameters: [method : Method],
+  result: Bool,
+  body: (match method
+    | Method.toolsCall => true
+    | Method.serverDiscover => false
+    | Method.toolsList => false
+    | Method.resourcesList => false
+    | Method.resourcesRead => false
+    | Method.resourcesTemplatesList => false
+    | Method.promptsList => false
+    | Method.promptsGet => false
+    | Method.completionComplete => false
+    | Method.tasksGet => false
+    | Method.tasksUpdate => false
+    | Method.tasksCancel => false)
+}
+
+inductive{
+  name: NameField,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: noName, fields: []},
+    {name: name, fields: []},
+    {name: uri, fields: []},
+    {name: taskId, fields: []}
+  ]
+}
+
+definition{
+  name: nameFieldOf,
+  parameters: [method : Method],
+  result: NameField,
+  body: (match method
+    | Method.serverDiscover => (ctor NameField.noName)
+    | Method.toolsList => (ctor NameField.noName)
+    | Method.toolsCall => (ctor NameField.name)
+    | Method.resourcesList => (ctor NameField.noName)
+    | Method.resourcesRead => (ctor NameField.uri)
+    | Method.resourcesTemplatesList => (ctor NameField.noName)
+    | Method.promptsList => (ctor NameField.noName)
+    | Method.promptsGet => (ctor NameField.name)
+    | Method.completionComplete => (ctor NameField.noName)
+    | Method.tasksGet => (ctor NameField.taskId)
+    | Method.tasksUpdate => (ctor NameField.taskId)
+    | Method.tasksCancel => (ctor NameField.taskId))
+}
+
+definition{
+  name: nameFieldOfWire,
+  parameters: [wire : String],
+  result: NameField,
+  body: (match (routeOf wire)
+    | MethodRoute.unknown => (ctor NameField.noName)
+    | MethodRoute.known method => (nameFieldOf method))
+}
+
+definition{
+  name: nameFieldKey,
+  parameters: [field : NameField],
+  result: String,
+  body: (match field
+    | NameField.noName => ""
+    | NameField.name => "name"
+    | NameField.uri => "uri"
+    | NameField.taskId => "taskId")
+}
+
+structure{
+  name: DiscoverParams,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: meta, type: Meta::RequestMeta}]
+}
+
+structure{
+  name: PaginatedParams,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: meta, type: Meta::RequestMeta}, {name: cursor, type: (Option String)}]
+}
+
+structure{
+  name: CallToolParams,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: meta, type: Meta::RequestMeta},
+    {name: name, type: String},
+    {name: arguments, type: (Option Json::JsonObject)},
+    {name: inputResponses, type: (Option Json::JsonObject)},
+    {name: requestState, type: (Option String)}
+  ]
+}
+
+structure{
+  name: ReadResourceParams,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: meta, type: Meta::RequestMeta},
+    {name: uri, type: String},
+    {name: inputResponses, type: (Option Json::JsonObject)},
+    {name: requestState, type: (Option String)}
+  ]
+}
+
+structure{
+  name: GetPromptParams,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: meta, type: Meta::RequestMeta},
+    {name: name, type: String},
+    {name: arguments, type: (Option (List (String * String)))},
+    {name: inputResponses, type: (Option Json::JsonObject)},
+    {name: requestState, type: (Option String)}
+  ]
+}
+
+structure{
+  name: PromptReference,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: name, type: String}, {name: title, type: (Option String)}]
+}
+
+inductive{
+  name: CompletionReference,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: prompt, fields: [PromptReference]},
+    {name: resourceTemplate, fields: [String]}
+  ]
+}
+
+structure{
+  name: CompletionArgument,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: name, type: String}, {name: value, type: String}]
+}
+
+structure{
+  name: CompletionContext,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: arguments, type: (Option (List (String * String)))}]
+}
+
+structure{
+  name: CompleteParams,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: meta, type: Meta::RequestMeta},
+    {name: reference, type: CompletionReference},
+    {name: argument, type: CompletionArgument},
+    {name: context, type: (Option CompletionContext)}
+  ]
+}
+
+structure{
+  name: GetTaskParams,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: meta, type: Meta::RequestMeta}, {name: taskId, type: String}]
+}
+
+structure{
+  name: UpdateTaskParams,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: meta, type: Meta::RequestMeta},
+    {name: taskId, type: String},
+    {name: inputResponses, type: Json::JsonObject}
+  ]
+}
+
+structure{
+  name: CancelTaskParams,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: meta, type: Meta::RequestMeta}, {name: taskId, type: String}]
+}
+
+inductive{
+  name: ClientRequest,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: serverDiscover, fields: [DiscoverParams]},
+    {name: toolsList, fields: [PaginatedParams]},
+    {name: toolsCall, fields: [CallToolParams]},
+    {name: resourcesList, fields: [PaginatedParams]},
+    {name: resourcesRead, fields: [ReadResourceParams]},
+    {name: resourcesTemplatesList, fields: [PaginatedParams]},
+    {name: promptsList, fields: [PaginatedParams]},
+    {name: promptsGet, fields: [GetPromptParams]},
+    {name: completionComplete, fields: [CompleteParams]},
+    {name: tasksGet, fields: [GetTaskParams]},
+    {name: tasksUpdate, fields: [UpdateTaskParams]},
+    {name: tasksCancel, fields: [CancelTaskParams]}
+  ]
+}
+
+definition{
+  name: methodOfRequest,
+  parameters: [request : ClientRequest],
+  result: Method,
+  body: (match request
+    | ClientRequest.serverDiscover params => (ctor Method.serverDiscover)
+    | ClientRequest.toolsList params => (ctor Method.toolsList)
+    | ClientRequest.toolsCall params => (ctor Method.toolsCall)
+    | ClientRequest.resourcesList params => (ctor Method.resourcesList)
+    | ClientRequest.resourcesRead params => (ctor Method.resourcesRead)
+    | ClientRequest.resourcesTemplatesList params => (ctor Method.resourcesTemplatesList)
+    | ClientRequest.promptsList params => (ctor Method.promptsList)
+    | ClientRequest.promptsGet params => (ctor Method.promptsGet)
+    | ClientRequest.completionComplete params => (ctor Method.completionComplete)
+    | ClientRequest.tasksGet params => (ctor Method.tasksGet)
+    | ClientRequest.tasksUpdate params => (ctor Method.tasksUpdate)
+    | ClientRequest.tasksCancel params => (ctor Method.tasksCancel))
+}
+
+structure{
+  name: DiscoverResult,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: cache, type: Common::CacheHint},
+    {name: supportedVersions, type: (List String)},
+    {name: capabilities, type: Capabilities::ServerCapabilities},
+    {name: instructions, type: (Option String)}
+  ]
+}
+
+structure{
+  name: ListToolsResult,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: cache, type: Common::CacheHint},
+    {name: nextCursor, type: (Option String)},
+    {name: tools, type: (List Content::Tool)}
+  ]
+}
+
+structure{
+  name: CallToolResult,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: content, type: (List Content::ContentBlock)},
+    {name: structuredContent, type: (Option Json::Json)},
+    {name: isError, type: (Option Bool)}
+  ]
+}
+
+structure{
+  name: ListResourcesResult,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: cache, type: Common::CacheHint},
+    {name: nextCursor, type: (Option String)},
+    {name: resources, type: (List Content::Resource)}
+  ]
+}
+
+structure{
+  name: ListResourceTemplatesResult,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: cache, type: Common::CacheHint},
+    {name: nextCursor, type: (Option String)},
+    {name: resourceTemplates, type: (List Content::ResourceTemplate)}
+  ]
+}
+
+structure{
+  name: ReadResourceResult,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: cache, type: Common::CacheHint},
+    {name: contents, type: (List Content::ResourceContents)}
+  ]
+}
+
+structure{
+  name: ListPromptsResult,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: cache, type: Common::CacheHint},
+    {name: nextCursor, type: (Option String)},
+    {name: prompts, type: (List Content::Prompt)}
+  ]
+}
+
+structure{
+  name: GetPromptResult,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: description, type: (Option String)},
+    {name: messages, type: (List Content::PromptMessage)}
+  ]
+}
+
+structure{
+  name: Completion,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: values, type: (List String)},
+    {name: total, type: (Option Nat)},
+    {name: hasMore, type: (Option Bool)}
+  ]
+}
+
+structure{
+  name: CompleteResult,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: completion, type: Completion}]
+}
+
+inductive{
+  name: ResultBody,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: discover, fields: [DiscoverResult]},
+    {name: listTools, fields: [ListToolsResult]},
+    {name: callTool, fields: [CallToolResult]},
+    {name: listResources, fields: [ListResourcesResult]},
+    {name: readResource, fields: [ReadResourceResult]},
+    {name: listResourceTemplates, fields: [ListResourceTemplatesResult]},
+    {name: listPrompts, fields: [ListPromptsResult]},
+    {name: getPrompt, fields: [GetPromptResult]},
+    {name: complete, fields: [CompleteResult]},
+    {name: getTask, fields: [Tasks::DetailedTask]},
+    {name: acknowledged, fields: []},
+    {name: inputRequired, fields: [Input::InputRequiredResult]},
+    {name: taskCreated, fields: [Tasks::CreateTaskResult]}
+  ]
+}
+
+definition{
+  name: resultTypeOf,
+  parameters: [body : ResultBody],
+  result: Meta::ResultType,
+  body: (match body
+    | ResultBody.discover result => (ctor Meta::ResultType.complete)
+    | ResultBody.listTools result => (ctor Meta::ResultType.complete)
+    | ResultBody.callTool result => (ctor Meta::ResultType.complete)
+    | ResultBody.listResources result => (ctor Meta::ResultType.complete)
+    | ResultBody.readResource result => (ctor Meta::ResultType.complete)
+    | ResultBody.listResourceTemplates result => (ctor Meta::ResultType.complete)
+    | ResultBody.listPrompts result => (ctor Meta::ResultType.complete)
+    | ResultBody.getPrompt result => (ctor Meta::ResultType.complete)
+    | ResultBody.complete result => (ctor Meta::ResultType.complete)
+    | ResultBody.getTask task => (ctor Meta::ResultType.complete)
+    | ResultBody.acknowledged => (ctor Meta::ResultType.complete)
+    | ResultBody.inputRequired pending => (ctor Meta::ResultType.input_required)
+    | ResultBody.taskCreated created => (ctor Meta::ResultType.task))
+}
+
+definition{
+  name: isInputRequired,
+  parameters: [body : ResultBody],
+  result: Bool,
+  body: (match (resultTypeOf body)
+    | Meta::ResultType.complete => false
+    | Meta::ResultType.input_required => true
+    | Meta::ResultType.task => false)
+}
+
+definition{
+  name: isTaskCreated,
+  parameters: [body : ResultBody],
+  result: Bool,
+  body: (match (resultTypeOf body)
+    | Meta::ResultType.complete => false
+    | Meta::ResultType.input_required => false
+    | Meta::ResultType.task => true)
+}
+
+definition{
+  name: isCacheable,
+  parameters: [body : ResultBody],
+  result: Bool,
+  body: (match body
+    | ResultBody.discover result => true
+    | ResultBody.listTools result => true
+    | ResultBody.callTool result => false
+    | ResultBody.listResources result => true
+    | ResultBody.readResource result => true
+    | ResultBody.listResourceTemplates result => true
+    | ResultBody.listPrompts result => true
+    | ResultBody.getPrompt result => false
+    | ResultBody.complete result => false
+    | ResultBody.getTask task => false
+    | ResultBody.acknowledged => false
+    | ResultBody.inputRequired pending => false
+    | ResultBody.taskCreated created => false)
+}
+
+theorem{
+  name: an_interim_result_is_never_cacheable,
+  parameters: [body : ResultBody],
+  statement: (((isInputRequired body) && (isCacheable body)) = false),
+  proof: cases{
+    branches: [
+      {proof: reflexivity{}, binders: [result], constructor: discover},
+      {proof: reflexivity{}, binders: [result], constructor: listTools},
+      {proof: reflexivity{}, binders: [result], constructor: callTool},
+      {proof: reflexivity{}, binders: [result], constructor: listResources},
+      {proof: reflexivity{}, binders: [result], constructor: readResource},
+      {proof: reflexivity{}, binders: [result], constructor: listResourceTemplates},
+      {proof: reflexivity{}, binders: [result], constructor: listPrompts},
+      {proof: reflexivity{}, binders: [result], constructor: getPrompt},
+      {proof: reflexivity{}, binders: [result], constructor: complete},
+      {proof: reflexivity{}, binders: [task], constructor: getTask},
+      {proof: reflexivity{}, binders: [], constructor: acknowledged},
+      {proof: reflexivity{}, binders: [pending], constructor: inputRequired},
+      {proof: reflexivity{}, binders: [created], constructor: taskCreated}
+    ],
+    scrutinee: body
+  }
+}
+\end{semanticmodule}
+\end{lexlean}
