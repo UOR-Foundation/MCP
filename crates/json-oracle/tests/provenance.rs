@@ -63,23 +63,40 @@ fn the_generated_package_is_the_recorded_export_of_the_codec_root_jc_12() {
     .expect("provenance.json is JSON");
     assert_eq!(provenance["name"], "mcp_json_codec");
     assert_eq!(provenance["profile"], "rust-std");
-    assert_eq!(provenance["spec"], "lexlean/rust-package/1");
+    assert_eq!(provenance["spec"], "lexlean/rust-provenance/1");
     let exports = provenance["exports"].as_array().expect("exports is a list");
     assert_eq!(exports.len(), 1, "one root is exported");
-    assert_eq!(exports[0]["name"], "code_run");
+    assert_eq!(exports[0]["name"], "run");
+    assert_eq!(
+        provenance["effects"],
+        serde_json::json!(["allocation", "overflow"])
+    );
 
+    // The export records the digest of every file it wrote; the oracle compiled
+    // exactly the recorded src/lib.rs, not an edited copy.
     let source =
         std::fs::read(dir.join("src").join("lib.rs")).expect("the package source is committed");
-    let recorded =
-        std::fs::read_to_string(dir.join("lib.rs.sha256")).expect("the digest is recorded");
+    let recorded = provenance["files"]["src/lib.rs"]
+        .as_str()
+        .expect("the export records src/lib.rs");
     assert_eq!(
-        recorded.trim(),
+        recorded,
         hex(&Sha256::digest(&source)),
         "src/lib.rs is not the file the export recorded: regenerate it, never edit it"
     );
-    assert!(
-        json_oracle::GENERATED_SOURCE_SHA256 == hex(&Sha256::digest(&source)),
+    assert_eq!(
+        recorded,
+        hex(&Sha256::digest(json_oracle::GENERATED_SOURCE.as_bytes())),
         "the oracle compiled a different file from the one recorded"
+    );
+    let manifest =
+        std::fs::read(dir.join("Cargo.toml")).expect("the package manifest is committed");
+    assert_eq!(
+        provenance["files"]["Cargo.toml"]
+            .as_str()
+            .expect("the export records Cargo.toml"),
+        hex(&Sha256::digest(&manifest)),
+        "Cargo.toml is not the file the export recorded"
     );
 }
 

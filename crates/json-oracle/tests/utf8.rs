@@ -159,7 +159,9 @@ fn the_parser_refuses_every_short_byte_string_that_is_not_utf8_jc_02() {
             _ => assert!(valid, "{bytes:02x?} is not UTF-8 yet not refused as UTF-8"),
         }
     }
-    assert!(refused > 60_000, "only {refused} refusals");
+    // 65 792 strings of one or two bytes, of which 128 + 128 * 128 + 30 * 64 = 18 432 are
+    // well-formed.
+    assert_eq!(refused, 47_360, "the number of refusals");
 }
 
 #[test]

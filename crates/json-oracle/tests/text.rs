@@ -199,7 +199,7 @@ fn malformed_numbers_are_refused_as_bad_number_jc_07() {
     assert_eq!(refusal(b"01"), (Refusal::BadNumber, 1));
     assert_eq!(refusal(b"[1.]"), (Refusal::BadNumber, 3));
     assert_eq!(refusal(b"[-]"), (Refusal::BadNumber, 2));
-    assert_eq!(refusal(b"1e+"), (Refusal::UnexpectedEnd, 3));
+    assert_eq!(refusal(b"1e+"), (Refusal::BadNumber, 3));
 }
 
 #[test]
