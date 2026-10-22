@@ -45,10 +45,10 @@ Feature: Stateless lifecycle
     Then the answer is HTTP 400 with -32021 and data.requiredCapabilities.sampling is an object
 
   @LC-08 @build
-  Scenario: Every refusal is a JSON-RPC error response that echoes the request id, or carries a null id when the text is not JSON (-32700) or is not a single request (-32600: batch, notification, response, bad id, bad version, missing or non-text method, non-object params).
+  Scenario: Every refusal is a JSON-RPC error response that echoes the request id, or has no id member when the text is not JSON (-32700) or is not a single request with a readable id (-32600: batch, notification, response, bad id, bad version, missing or non-text method, non-object params); the member is never null, and a kernel-checked theorem states that an error built without an id has none.
     Given refused requests with string, number and absent ids, and texts that are not requests
     When the root answers each
-    Then each error carries the id of its request, or null when none can be read
+    Then each error carries the id of its request, or has no id member when none can be read
 
   @LC-09 @build
   Scenario: The core decides the HTTP status of every outcome: 200 for a result, 400 for -32700, -32600, -32602, -32020, -32021 and -32022, 404 for -32601, 405 with Allow POST for any request method other than POST, and 500 for a frame it cannot read; a kernel-checked theorem states that the status follows the code.
@@ -85,3 +85,15 @@ Feature: Stateless lifecycle
     Given the request sites and check identifiers of the pinned scenario files
     When the oracle scans the vendored files
     Then each site and identifier is accounted for and each cited line contains its quoted text
+
+  @LC-15 @build
+  Scenario: The response bodies the root writes in the vector and boundary tests validate against the MCP 2026-07-28 JSON Schema at the pinned specification commit, whose vendored file has the recorded checksum: as a JSON-RPC response, as the typed result response of the request's method, and as the typed error of its code. A validator is falsifying evidence and not the oracle for the protocol, which MCP#6 binds.
+    Given the vendored schema of the pinned specification commit and every response the vector and boundary tests produce
+    When each response is validated as a JSON-RPC response, as the typed result of its method and as the typed error of its code
+    Then the schema accepts every response and refuses an error response with a null id, a discover result without serverInfo and an unsupported-version error without the supported list
+
+  @LC-16 @build
+  Scenario: The exported root needs no stack that grows with its input: its recorded effects do not include recursion, no function of the generated package is on a call cycle, and frames with fifty thousand header fields, a hundred thousand arguments, a two-mebibyte string, the deepest admitted JSON nesting and a long Base64 parameter header complete on a 2 MiB stack.
+    Given the generated package, its recorded effects and frames with fifty thousand header fields, a hundred thousand arguments, a two-mebibyte string, the deepest admitted nesting and a long Base64 header
+    When the call graph of the package is searched for a cycle and each frame runs on a thread with a 2 MiB stack
+    Then there is no cycle, the effects do not include recursion and every frame is answered

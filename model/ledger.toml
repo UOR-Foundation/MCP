@@ -23,4 +23,5 @@ claim = [
   { id = "AUTH-05", level = "some-true", statement = "RFC 9110 defines the case-insensitive field names, the optional whitespace and the 405 Allow requirement the header handling implements.", authority = "A-RFC9110" },
   { id = "AUTH-06", level = "some-true", statement = "RFC 4648 defines the Base64 alphabet, padding and canonical form the parameter header decoder implements.", authority = "A-RFC4648" },
   { id = "AUTH-07", level = "some-true", statement = "The pinned conformance suite lists server-stateless as required for 2026-07-28 and the two HTTP header scenarios as pending and not scored.", authority = "A-MCP-CONFORMANCE" },
+  { id = "AUTH-08", level = "some-true", statement = "The MCP schema for 2026-07-28 defines the JSON-RPC error response with an optional id of type string or number, and the typed results and errors of server/discover, tools/list, tools/call and the codes the lifecycle uses.", authority = "A-MCP-SCHEMA-2026-07-28" },
 ]

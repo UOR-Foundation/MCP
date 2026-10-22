@@ -3,7 +3,7 @@
 
 mod common;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use common::{hex, manifest_sha256, root, suite_root, suite_text, vector_file, PIN};
@@ -112,7 +112,8 @@ fn the_generated_package_is_the_recorded_export_of_the_lifecycle_root_lc_13() {
     assert_eq!(provenance["exports"][0]["name"], "run");
     assert_eq!(
         provenance["effects"],
-        serde_json::json!(["allocation", "overflow", "recursion"])
+        serde_json::json!(["allocation", "overflow"]),
+        "the export states no recursion effect (LC-16)"
     );
     let request: Value = serde_json::from_slice(
         &std::fs::read(
@@ -290,4 +291,163 @@ fn every_check_id_a_scenario_emits_is_covered_or_listed_lc_14() {
             "{id} is not an id the scenarios emit"
         );
     }
+}
+
+// ---- LC-16: no call cycle in the generated package ----
+
+/// The functions of the generated package, `f<number>`, and the functions each one
+/// calls. A function whose self calls were all tail calls is rendered as a loop and
+/// has no call to itself; a call through a function value goes through the `apply`
+/// method of its enum, so any function that calls `.apply(` is given an edge to every
+/// function an `apply` can reach.
+fn call_graph(source: &str) -> BTreeMap<String, BTreeSet<String>> {
+    fn name_at(line: &str) -> Option<String> {
+        let rest = line.strip_prefix("pub fn f")?;
+        let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+        (!digits.is_empty()).then(|| format!("f{digits}"))
+    }
+    fn callees(text: &str) -> BTreeSet<String> {
+        let bytes = text.as_bytes();
+        let mut out = BTreeSet::new();
+        let mut i = 0;
+        while i < bytes.len() {
+            let boundary =
+                i == 0 || !(bytes[i - 1].is_ascii_alphanumeric() || bytes[i - 1] == b'_');
+            if bytes[i] == b'f' && boundary {
+                let mut j = i + 1;
+                while j < bytes.len() && bytes[j].is_ascii_digit() {
+                    j += 1;
+                }
+                if j > i + 1 && j < bytes.len() && bytes[j] == b'(' {
+                    out.insert(text[i..j].to_owned());
+                }
+            }
+            i += 1;
+        }
+        out
+    }
+    let mut bodies: BTreeMap<String, String> = BTreeMap::new();
+    let mut current: Option<String> = None;
+    let mut applied: BTreeSet<String> = BTreeSet::new();
+    let mut in_apply = false;
+    for line in source.lines() {
+        if let Some(name) = name_at(line) {
+            current = Some(name.clone());
+            // the signature names the function; it is not a call
+            bodies.entry(name).or_default();
+            continue;
+        }
+        let top_level = !line.is_empty() && !line.starts_with(char::is_whitespace);
+        if top_level && !line.starts_with('}') {
+            current = None;
+        }
+        in_apply = if line.contains("pub fn apply(") {
+            true
+        } else if top_level {
+            false
+        } else {
+            in_apply
+        };
+        if in_apply {
+            applied.extend(callees(line));
+        }
+        if let Some(name) = &current {
+            bodies.get_mut(name).expect("open").push_str(line);
+            bodies.get_mut(name).expect("open").push('\n');
+        }
+    }
+    bodies
+        .into_iter()
+        .map(|(name, body)| {
+            let mut out = callees(&body);
+            if body.contains(".apply(") {
+                out.extend(applied.iter().cloned());
+            }
+            (name, out)
+        })
+        .collect()
+}
+
+/// A call cycle of the graph, if there is one: the names along it.
+fn find_cycle(graph: &BTreeMap<String, BTreeSet<String>>) -> Option<Vec<String>> {
+    #[derive(Clone, Copy, PartialEq)]
+    enum Mark {
+        Open,
+        Done,
+    }
+    let mut marks: BTreeMap<&str, Mark> = BTreeMap::new();
+    for start in graph.keys() {
+        if marks.contains_key(start.as_str()) {
+            continue;
+        }
+        // an explicit stack of (function, callees still to visit): the check itself
+        // must not recurse on a graph it is showing to be acyclic.
+        let mut stack: Vec<(&str, Vec<&str>)> =
+            vec![(start, graph[start].iter().map(String::as_str).collect())];
+        marks.insert(start, Mark::Open);
+        while let Some((name, todo)) = stack.last_mut() {
+            let name = *name;
+            match todo.pop() {
+                None => {
+                    marks.insert(name, Mark::Done);
+                    stack.pop();
+                }
+                Some(next) => match marks.get(next) {
+                    Some(Mark::Open) => {
+                        let mut cycle: Vec<String> = stack
+                            .iter()
+                            .map(|(n, _)| (*n).to_owned())
+                            .skip_while(|n| n != next)
+                            .collect();
+                        cycle.push(next.to_owned());
+                        return Some(cycle);
+                    }
+                    Some(Mark::Done) => {}
+                    None => {
+                        let Some(callees) = graph.get(next) else {
+                            continue;
+                        };
+                        marks.insert(next, Mark::Open);
+                        stack.push((next, callees.iter().map(String::as_str).collect()));
+                    }
+                },
+            }
+        }
+    }
+    None
+}
+
+#[test]
+fn no_function_of_the_generated_package_is_on_a_call_cycle_lc_16() {
+    let graph = call_graph(lifecycle_oracle::GENERATED_SOURCE);
+    assert!(
+        graph.len() > 300,
+        "the graph reads the package: {} functions",
+        graph.len()
+    );
+    assert!(graph.contains_key("f0"), "the root is in the graph");
+    if let Some(cycle) = find_cycle(&graph) {
+        panic!(
+            "the package recurses: {} (a function whose self calls are all tail calls is a loop; \
+             a call that is not one grows the stack with the input)",
+            cycle.join(" -> ")
+        );
+    }
+}
+
+#[test]
+fn the_call_cycle_check_finds_a_cycle_and_a_self_call_lc_16() {
+    let source = "pub fn f1(a: u64) -> u64 {\n    f2(a)\n}\n\npub fn f2(a: u64) -> u64 {\n    f1(a)\n}\n\npub fn f3(a: u64) -> u64 {\n    f3(a)\n}\n\npub fn f4(a: u64) -> u64 {\n    a\n}\n";
+    let graph = call_graph(source);
+    assert_eq!(graph.len(), 4);
+    let cycle = find_cycle(&graph).expect("a cycle");
+    assert!(cycle.len() >= 2, "{cycle:?}");
+    let acyclic =
+        "pub fn f1(a: u64) -> u64 {\n    f2(a)\n}\n\npub fn f2(a: u64) -> u64 {\n    a\n}\n";
+    assert!(find_cycle(&call_graph(acyclic)).is_none());
+    let through_apply = "pub enum Fn0 {\n    F2,\n}\n\nimpl Fn0 {\n    pub fn apply(&self, p0: u64) -> u64 {\n        match self {\n            Fn0::F2 => f2(p0),\n        }\n    }\n}\n\npub fn f2(a: u64) -> u64 {\n    let c: Fn0 = Fn0::F2;\n    c.apply(a)\n}\n";
+    assert!(
+        find_cycle(&call_graph(through_apply)).is_some(),
+        "a cycle through a function value is a cycle"
+    );
 }

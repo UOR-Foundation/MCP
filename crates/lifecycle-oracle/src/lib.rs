@@ -40,10 +40,12 @@ mod lifecycle;
 /// file the oracle ran against the digest the export recorded.
 pub const GENERATED_SOURCE: &str = include_str!("../generated/mcp_lifecycle/src/lib.rs");
 
-/// The stack the root runs on. The root recurses to a depth bounded only by its
-/// input (the export states the `recursion` effect), so the host gives it a stack
-/// its input fits; this is that stack for every input the vectors send.
-const STACK_BYTES: usize = 1 << 29;
+/// The stack the root runs on: 2 MiB, which is the size Rust gives a spawned thread
+/// when nothing says otherwise. The export states no `recursion` effect and no
+/// function of the package calls itself except as a loop, so the stack the root needs
+/// does not grow with the input; `tests/stress.rs` runs the largest frames the tests
+/// build on exactly this stack, and `LIFECYCLE.md` states the bound.
+pub const STACK_BYTES: usize = 2 * 1024 * 1024;
 
 /// One header field as the wire carries it: the name and the value as bytes.
 pub type Field = (Vec<u8>, Vec<u8>);
@@ -171,17 +173,27 @@ fn words_to_bytes(words: Vec<u64>) -> Vec<u8> {
 /// Run the generated root on an encoded request and return the encoded response.
 ///
 /// The root is the LexLean function `fixtureRun`: the exact bytes in, the exact
-/// bytes out. The call runs on a thread with the stack the export's `recursion`
-/// effect asks the host for.
+/// bytes out. The call runs on a thread with a [`STACK_BYTES`] stack.
 ///
 /// # Panics
 ///
 /// Panics when the realization reports an overflow, which the model does not admit
 /// for any frame the vectors send.
 pub fn exchange_frame(frame: &[u8]) -> Vec<u8> {
+    exchange_frame_on(frame, STACK_BYTES)
+}
+
+/// [`exchange_frame`] on a thread with `stack_bytes` of stack, so a measurement can
+/// ask how little the root needs.
+///
+/// # Panics
+///
+/// Panics when the realization reports an overflow, and aborts the process when the
+/// stack is too small for the frame.
+pub fn exchange_frame_on(frame: &[u8], stack_bytes: usize) -> Vec<u8> {
     let input = frame.to_vec();
     let worker = std::thread::Builder::new()
-        .stack_size(STACK_BYTES)
+        .stack_size(stack_bytes)
         .spawn(move || {
             let mut list = lifecycle::run(lifecycle::Bytes::lit(&input))
                 .expect("the lifecycle root does not overflow on this input");

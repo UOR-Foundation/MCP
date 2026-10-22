@@ -10,6 +10,7 @@ publish = false
 [dependencies]
 
 [dev-dependencies]
+boon = "0.6.1"
 repo-model = { workspace = true }
 serde_json = "1.0.151"
 sha2 = "0.10.9"

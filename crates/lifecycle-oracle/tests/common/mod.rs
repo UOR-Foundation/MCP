@@ -2,14 +2,21 @@
 //! generated root, and the pins the register records.
 #![allow(dead_code)]
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
-use lifecycle_oracle::{exchange, Request, Response};
+use boon::{Compiler, SchemaIndex, Schemas};
+use lifecycle_oracle::{decode_response, exchange_frame, FrameError, Request, Response};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 /// The commit of the conformance suite the vectors are taken from.
 pub const PIN: &str = "232a9014457eaf4c59559916e3d616d2f7f28f05";
+
+/// The commit of the MCP specification whose `schema/2026-07-28/schema.json` every
+/// response is checked against.
+pub const SPEC_PIN: &str = "80041ab0a139a8f4fb3adbc99f7ae9113ea59671";
 
 /// The workspace root.
 pub fn root() -> PathBuf {
@@ -48,21 +55,38 @@ fn walk(dir: &Path, base: &Path, out: &mut Vec<(String, Vec<u8>)>) {
     }
 }
 
-/// Every vendored suite file as (path under the pin directory, bytes), in byte order.
-pub fn suite_files() -> Vec<(String, Vec<u8>)> {
+/// Every vendored file under `dir` as (path under `dir`, bytes), in byte order.
+pub fn files_under(dir: &Path) -> Vec<(String, Vec<u8>)> {
     let mut out = Vec::new();
-    walk(&suite_root(), &suite_root(), &mut out);
+    walk(dir, dir, &mut out);
     out.sort();
     out
 }
 
-/// SHA-256 over the manifest: one `<sha256 of file>  <path>` line per vendored file.
-pub fn manifest_sha256() -> String {
+/// Every vendored suite file as (path under the pin directory, bytes), in byte order.
+pub fn suite_files() -> Vec<(String, Vec<u8>)> {
+    files_under(&suite_root())
+}
+
+/// SHA-256 over the manifest of `dir`: one `<sha256 of file>  <path>` line per file.
+pub fn manifest_of(dir: &Path) -> String {
     let mut manifest = String::new();
-    for (name, bytes) in suite_files() {
+    for (name, bytes) in files_under(dir) {
         manifest.push_str(&format!("{}  {name}\n", hex(&Sha256::digest(&bytes))));
     }
     hex(&Sha256::digest(manifest.as_bytes()))
+}
+
+/// SHA-256 over the manifest of the vendored conformance suite.
+pub fn manifest_sha256() -> String {
+    manifest_of(&suite_root())
+}
+
+/// The vendored copy of the specification's schema; its directory name carries the pin.
+pub fn spec_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("suite")
+        .join(format!("mcp-spec-{SPEC_PIN}"))
 }
 
 /// The text of one vendored suite file.
@@ -140,9 +164,173 @@ pub fn json_of(response: &Response) -> Value {
     })
 }
 
+/// The vendored schema, compiled once, with the definitions a response is checked against.
+struct Checker {
+    schemas: Schemas,
+    schema: Value,
+    defs: BTreeMap<String, SchemaIndex>,
+}
+
+const SCHEMA_URL: &str = "https://schema.invalid/mcp/2026-07-28/schema.json";
+
+fn checker() -> &'static Checker {
+    static CHECKER: OnceLock<Checker> = OnceLock::new();
+    CHECKER.get_or_init(|| {
+        let path = spec_root().join("schema/2026-07-28/schema.json");
+        let schema: Value = serde_json::from_slice(&std::fs::read(&path).expect("schema reads"))
+            .expect("the schema is JSON");
+        let mut schemas = Schemas::new();
+        let mut compiler = Compiler::new();
+        compiler
+            .add_resource(SCHEMA_URL, schema.clone())
+            .expect("the schema is a resource");
+        let mut defs = BTreeMap::new();
+        for name in schema["$defs"].as_object().expect("$defs").keys() {
+            let index = compiler
+                .compile(&format!("{SCHEMA_URL}#/$defs/{name}"), &mut schemas)
+                .unwrap_or_else(|e| panic!("{name} compiles: {e}"));
+            defs.insert(name.clone(), index);
+        }
+        Checker {
+            schemas,
+            schema,
+            defs,
+        }
+    })
+}
+
+/// Validate `value` against the definition `name` of the vendored schema.
+pub fn validate_against(name: &str, value: &Value) -> Result<(), String> {
+    let c = checker();
+    let index = *c
+        .defs
+        .get(name)
+        .unwrap_or_else(|| panic!("the schema defines {name}"));
+    c.schemas
+        .validate(value, index)
+        .map_err(|e| format!("{name}: {e:#}"))
+}
+
+/// The definition that types the error a response carries, by JSON-RPC code.
+fn error_def(code: i64) -> Option<&'static str> {
+    Some(match code {
+        -32700 => "ParseError",
+        -32600 => "InvalidRequestError",
+        -32601 => "MethodNotFoundError",
+        -32602 => "InvalidParamsError",
+        -32603 => "InternalError",
+        -32020 => "HeaderMismatchError",
+        -32021 => "MissingRequiredClientCapabilityError",
+        -32022 => "UnsupportedProtocolVersionError",
+        _ => return None,
+    })
+}
+
+/// The definition that types the success response to `method`, where the schema has one
+/// for a method this core answers.
+fn result_def(method: &str) -> Option<&'static str> {
+    Some(match method {
+        "server/discover" => "DiscoverResultResponse",
+        "tools/list" => "ListToolsResultResponse",
+        "tools/call" => "CallToolResultResponse",
+        _ => return None,
+    })
+}
+
+/// Check a response body against the specification's JSON Schema: as a JSON-RPC
+/// response, then as the typed response the schema names for the request's method (a
+/// success) or for the error code (a failure). `method` is the method of the request
+/// when it could be read.
+///
+/// This is falsifying evidence from a JSON Schema validator, not the oracle for the
+/// protocol (MCP#6 binds that).
+pub fn validate_body(method: Option<&str>, body: &Value) -> Result<(), String> {
+    validate_against("JSONRPCResponse", body)?;
+    if body.get("result").is_some() {
+        if let Some(def) = method.and_then(result_def) {
+            validate_against(def, body)?;
+        }
+        return Ok(());
+    }
+    let code = body
+        .pointer("/error/code")
+        .and_then(Value::as_i64)
+        .ok_or("an error response carries an integer code")?;
+    let def =
+        error_def(code).ok_or_else(|| format!("the schema types no error with code {code}"))?;
+    let wrapped = checker().schema["$defs"][def]["properties"]
+        .as_object()
+        .is_some_and(|p| p.contains_key("error"));
+    if wrapped {
+        validate_against(def, body)
+    } else {
+        validate_against(def, &body["error"])
+    }
+}
+
+/// The method of a request body, when it is a JSON object with a text `method`.
+fn method_of(request: &Request) -> Option<String> {
+    serde_json::from_slice::<Value>(&request.body)
+        .ok()?
+        .get("method")?
+        .as_str()
+        .map(str::to_owned)
+}
+
+/// When `SCHEMA_CHECK_LOG` names a file, append one line per response checked, so a
+/// run can state how many responses the schema saw.
+fn log_check(response: &Response) {
+    use std::io::Write;
+    if let Some(path) = std::env::var_os("SCHEMA_CHECK_LOG") {
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+        {
+            let _ = writeln!(file, "{}", response.status);
+        }
+    }
+}
+
+/// Check one response; a response the schema refuses fails the test that produced it.
+/// The 405 the core writes for a method other than POST has no body, which is the one
+/// response that is not a JSON-RPC message.
+pub fn check_response(method: Option<&str>, response: &Response) {
+    log_check(response);
+    if response.status == 405 {
+        assert!(response.body.is_empty(), "a 405 has no body");
+        return;
+    }
+    let body = json_of(response);
+    if let Err(why) = validate_body(method, &body) {
+        panic!(
+            "the schema refuses the root's response (status {}): {why}\nbody: {body}",
+            response.status
+        );
+    }
+}
+
+/// Run one request through the generated root, checking the response against the schema.
+///
+/// # Errors
+///
+/// Returns [`FrameError`] when the root's answer is not a response frame.
+pub fn exchange_checked(request: &Request) -> Result<Response, FrameError> {
+    let response = lifecycle_oracle::exchange(request)?;
+    check_response(method_of(request).as_deref(), &response);
+    Ok(response)
+}
+
+/// Run one frame through the generated root, checking the response against the schema.
+pub fn frame_checked(frame: &[u8]) -> Result<Response, FrameError> {
+    let response = decode_response(&exchange_frame(frame))?;
+    check_response(None, &response);
+    Ok(response)
+}
+
 /// Run one request through the generated root and parse the body.
 pub fn send(request: &Request) -> (Response, Value) {
-    let response = exchange(request).expect("the root writes a response frame");
+    let response = exchange_checked(request).expect("the root writes a response frame");
     let body = json_of(&response);
     (response, body)
 }

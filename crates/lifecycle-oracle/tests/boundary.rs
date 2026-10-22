@@ -8,7 +8,7 @@
 mod common;
 
 use common::{call, outcome, post, post_owned, rpc, send, standard, META};
-use lifecycle_oracle::{decode_response, exchange_frame, Request};
+use lifecycle_oracle::Request;
 use serde_json::{json, Value};
 
 fn discover(id: &str) -> String {
@@ -22,7 +22,7 @@ fn with_headers(method: &str, name: Option<&str>, body: &str) -> Request {
 // ---- LC-08: faults before a request exists, and the id every refusal echoes ----
 
 #[test]
-fn text_that_is_not_json_is_a_parse_error_with_a_null_id_lc_08() {
+fn text_that_is_not_json_is_a_parse_error_with_no_id_member_lc_08() {
     for body in [
         "",
         "{",
@@ -33,20 +33,20 @@ fn text_that_is_not_json_is_a_parse_error_with_a_null_id_lc_08() {
         let (response, json) = send(&post(&[("MCP-Protocol-Version", "2026-07-28")], body));
         assert_eq!(response.status, 400, "{body:?}");
         assert_eq!(json["error"]["code"], -32700, "{body:?}");
-        assert_eq!(json["id"], Value::Null, "{body:?}");
+        assert!(json.get("id").is_none(), "{body:?}");
         assert_eq!(json["jsonrpc"], "2.0");
     }
 }
 
 #[test]
-fn a_batch_is_an_invalid_request_with_a_null_id_lc_08() {
+fn a_batch_is_an_invalid_request_with_no_id_member_lc_08() {
     let body = format!("[{}]", discover("1"));
     let (response, json) = send(&with_headers("server/discover", None, &body));
     assert_eq!(
         (response.status, &json["error"]["code"]),
         (400, &json!(-32600))
     );
-    assert_eq!(json["id"], Value::Null);
+    assert!(json.get("id").is_none());
 }
 
 #[test]
@@ -57,7 +57,7 @@ fn a_notification_is_refused_because_the_core_defines_none_over_http_lc_08() {
         (response.status, &json["error"]["code"]),
         (400, &json!(-32600))
     );
-    assert_eq!(json["id"], Value::Null);
+    assert!(json.get("id").is_none());
 }
 
 #[test]
@@ -98,7 +98,7 @@ fn an_id_that_is_not_a_string_or_a_whole_number_is_an_invalid_request_lc_08() {
         let (response, json) = send(&with_headers("server/discover", None, &body));
         assert_eq!(response.status, 400, "id {id}");
         assert_eq!(json["error"]["code"], -32600, "id {id}");
-        assert_eq!(json["id"], Value::Null, "id {id}");
+        assert!(json.get("id").is_none(), "id {id}");
     }
 }
 
@@ -144,7 +144,7 @@ fn only_post_is_served_and_anything_else_is_405_with_allow_post_lc_09() {
             fields: vec![],
             body: discover("1").into_bytes(),
         };
-        let response = lifecycle_oracle::exchange(&request).expect("a response frame");
+        let response = common::exchange_checked(&request).expect("a response frame");
         assert_eq!(response.status, 405, "method {method:?}");
         assert_eq!(
             common::header(&response, "allow"),
@@ -216,11 +216,11 @@ fn a_frame_the_core_cannot_read_is_a_server_error_with_a_fixed_body_lc_09() {
     trailing.push(0);
     frames.push(trailing);
     for frame in frames {
-        let response = decode_response(&exchange_frame(&frame)).expect("a response frame");
+        let response = common::frame_checked(&frame).expect("a response frame");
         assert_eq!(response.status, 500, "frame of {} bytes", frame.len());
         let body: Value = serde_json::from_slice(&response.body).expect("JSON body");
         assert_eq!(body["error"]["code"], -32603);
-        assert_eq!(body["id"], Value::Null);
+        assert!(body.get("id").is_none());
     }
 }
 
@@ -332,12 +332,12 @@ fn the_target_and_unrelated_headers_do_not_change_the_response_lc_11() {
         None,
         &rpc("tools/list", &format!(r#"{{"_meta":{META}}}"#), "5"),
     );
-    let want = lifecycle_oracle::exchange(&base).expect("a response");
+    let want = common::exchange_checked(&base).expect("a response");
     for target in ["/", "", "/mcp?x=1", "/a/b/c", "*", "/\u{0}"] {
         let mut request = base.clone();
         request.target = target.as_bytes().to_vec();
         assert_eq!(
-            lifecycle_oracle::exchange(&request).unwrap(),
+            common::exchange_checked(&request).unwrap(),
             want,
             "{target:?}"
         );
@@ -350,13 +350,13 @@ fn the_target_and_unrelated_headers_do_not_change_the_response_lc_11() {
         (b"Authorization".to_vec(), b"Bearer x".to_vec()),
         (b"X-Anything".to_vec(), b"\x01\xff".to_vec()),
     ]);
-    assert_eq!(lifecycle_oracle::exchange(&request).unwrap(), want);
+    assert_eq!(common::exchange_checked(&request).unwrap(), want);
     let mut request = base;
     request
         .fields
         .insert(0, (b"Mcp-Param-Unknown".to_vec(), b"x".to_vec()));
     assert_eq!(
-        lifecycle_oracle::exchange(&request).unwrap(),
+        common::exchange_checked(&request).unwrap(),
         want,
         "an unrecognized Mcp-Param header is ignored"
     );
@@ -365,9 +365,9 @@ fn the_target_and_unrelated_headers_do_not_change_the_response_lc_11() {
 #[test]
 fn the_same_request_gets_the_same_bytes_every_time_lc_11() {
     let request = with_headers("server/discover", None, &discover("9"));
-    let first = lifecycle_oracle::exchange(&request).expect("a response");
+    let first = common::exchange_checked(&request).expect("a response");
     for _ in 0..3 {
-        assert_eq!(lifecycle_oracle::exchange(&request).unwrap(), first);
+        assert_eq!(common::exchange_checked(&request).unwrap(), first);
     }
 }
 
