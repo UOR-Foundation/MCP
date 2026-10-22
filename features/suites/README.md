@@ -20,6 +20,4 @@ The `suite` field of a row in `model/ids.toml` names the file its scenario
 lives in, and `just bdd` fails if an ID has no scenario, a scenario has no ID,
 or an ID has no test whose name ends in it lowercased with underscores.
 
-Empty. The first capability this repository builds starts with a row in
-`model/ids.toml`, then a scenario here, then a failing test --- in that order,
-because the order is the discipline (`AGENTS.md`).
+`json-codec.feature` is the first suite: the JSON text codec (issue #18), JC-01 to JC-12.

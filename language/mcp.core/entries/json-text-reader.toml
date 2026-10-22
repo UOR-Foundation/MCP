@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "json-text-reader"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "JsonRead"
+component = "JsonRead"
+
+[[form]]
+id = "json-text-reader"
+channel = "text"
+surface = "JSON text reader"
+canonical_source = true
+features = ["sentence-case", "singular"]

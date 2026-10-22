@@ -35,15 +35,16 @@ MCP's own oracles, so this repository makes no conformance claim.
 | `Validation` | per-request validation: the required `_meta` keys, header and body agreement, version support, and the order in which refusals are chosen |
 | `Extension` | the interface through which a tool layer contributes tools, resources, resource templates and prompts (the `Provider` record) |
 | `Dispatch` | dispatch from a validated request to a reply or a typed refusal, parameterized over the `Provider` |
+| `Utf8`, `JsonText`, `JsonRead`, `JsonWrite`, `JsonCodec` | the JSON text codec: RFC 3629 validation, a parser from bytes to `Json` and an encoder back, with typed refusals, against the pinned JSONTestSuite ([JSON-CODEC.md](JSON-CODEC.md)) |
+| `JsonGate`, `JsonExamples`, `JsonRoundTrip` | theorems about the codec |
 | `Envelope` | the result envelope: `resultType` and `_meta` `io.modelcontextprotocol/serverInfo` |
 
-What is not modeled: the JSON text codec (the LexLean stdlib has no JSON
-parser or printer), the JSON encoding of result bodies beyond the envelope,
+What is not modeled: the JSON encoding of result bodies beyond the envelope,
 the `subscriptions/listen` stream (its params and result types are declared,
 but the method is not dispatched), server notifications, and host effects.
 
-- The claim registers in `model/` are empty, so `CONFORMANCE.md` lists no
-  capability and this repository claims none.
+- The claim registers in `model/` hold the JSON text codec only (JC-01 to JC-12);
+  no protocol capability is registered and none is claimed.
 - The repository is not bound to a PrismPM SDK release (#4): `prismpm.lock` and
   `template.lock` are absent, so `just vv` and the devcontainer cannot run.
 - v0.1.0 is tracked in #16.

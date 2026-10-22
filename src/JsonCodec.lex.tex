@@ -1,0 +1,222 @@
+\begin{lexlean}{JsonCodec}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Json}
+\importmodule{JsonRead}
+\importmodule{JsonText}
+\importmodule{JsonWrite}
+\importmodule{Utf8}
+\title{JSON codec roots}
+\begin{semanticmodule}
+definition{
+  name: refusalCode,
+  parameters: [reason : JsonText::JsonRefusal],
+  result: Nat,
+  body: (match reason
+    | JsonText::JsonRefusal.invalidUtf8 at => 0
+    | JsonText::JsonRefusal.truncatedUtf8 at => 1
+    | JsonText::JsonRefusal.unexpectedByte at => 2
+    | JsonText::JsonRefusal.unexpectedEnd => 3
+    | JsonText::JsonRefusal.controlInString at => 4
+    | JsonText::JsonRefusal.badEscape at => 5
+    | JsonText::JsonRefusal.loneSurrogate at => 6
+    | JsonText::JsonRefusal.badNumber at => 7
+    | JsonText::JsonRefusal.numberOutOfRange at => 8
+    | JsonText::JsonRefusal.tooDeep at => 9
+    | JsonText::JsonRefusal.trailingContent at => 10
+    | JsonText::JsonRefusal.encodeNumberOutOfRange => 11
+    | JsonText::JsonRefusal.encodeTooDeep => 12
+    | JsonText::JsonRefusal.encodeBudget => 13
+    | JsonText::JsonRefusal.internalText => 14),
+  executable: true
+}
+
+definition{
+  name: refusalDetail,
+  parameters: [reason : JsonText::JsonRefusal],
+  result: Nat,
+  body: (match reason
+    | JsonText::JsonRefusal.invalidUtf8 at => at
+    | JsonText::JsonRefusal.truncatedUtf8 at => at
+    | JsonText::JsonRefusal.unexpectedByte at => at
+    | JsonText::JsonRefusal.unexpectedEnd => 0
+    | JsonText::JsonRefusal.controlInString at => at
+    | JsonText::JsonRefusal.badEscape at => at
+    | JsonText::JsonRefusal.loneSurrogate at => at
+    | JsonText::JsonRefusal.badNumber at => at
+    | JsonText::JsonRefusal.numberOutOfRange at => at
+    | JsonText::JsonRefusal.tooDeep at => at
+    | JsonText::JsonRefusal.trailingContent at => at
+    | JsonText::JsonRefusal.encodeNumberOutOfRange => 0
+    | JsonText::JsonRefusal.encodeTooDeep => 0
+    | JsonText::JsonRefusal.encodeBudget => 0
+    | JsonText::JsonRefusal.internalText => 0),
+  executable: true
+}
+
+definition{
+  name: refusalReport,
+  parameters: [tag : Nat, reason : JsonText::JsonRefusal],
+  result: (List Nat),
+  body: (cons tag (cons (refusalCode reason) (cons (refusalDetail reason) (nil Nat)))),
+  executable: true
+}
+
+definition{
+  name: canonicalReport,
+  parameters: [item : Json::Json],
+  result: (List Nat),
+  body: (match (JsonWrite::writeList item)
+    | Result.error reason => (refusalReport 2 reason)
+    | Result.ok produced => (cons 0 produced)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: parseReport,
+  parameters: [parsed : (Result Json::Json JsonText::JsonRefusal)],
+  result: (List Nat),
+  body: (match parsed
+    | Result.error reason => (refusalReport 1 reason)
+    | Result.ok item => (canonicalReport item)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: utf8Report,
+  parameters: [verdict : Utf8::Utf8Verdict],
+  result: (List Nat),
+  body: (match verdict
+    | Utf8::Utf8Verdict.valid => (cons 0 (nil Nat))
+    | Utf8::Utf8Verdict.invalidByte position => (cons 1 (cons 0 (cons position (nil Nat))))
+    | Utf8::Utf8Verdict.truncated position => (cons 1 (cons 1 (cons position (nil Nat))))),
+  executable: true
+}
+
+definition{
+  name: natToInt,
+  parameters: [count : Nat, total : Int],
+  result: Int,
+  body: (match count
+    | Nat.zero => total
+    | Nat.succ below => (natToInt below (JsonRead::intAdd total (1 : Int)))),
+  executable: true,
+  recursive_argument: count
+}
+
+definition{
+  name: nestedArrays,
+  parameters: [depth : Nat, inner : Json::Json],
+  result: Json::Json,
+  body: (match depth
+    | Nat.zero => inner
+    | Nat.succ below => (nestedArrays below (ctor Json::Json.array (cons inner (nil Json::Json))))),
+  executable: true,
+  recursive_argument: depth
+}
+
+definition{
+  name: tenPower,
+  parameters: [count : Nat, total : Int],
+  result: Int,
+  body: (match count
+    | Nat.zero => total
+    | Nat.succ below => (tenPower below (prim multiply total (10 : Int) : Int))),
+  executable: true,
+  recursive_argument: count
+}
+
+definition{
+  name: asciiDown,
+  parameters: [remaining : Nat, collected : (List Nat)],
+  result: (List Nat),
+  body: (match remaining
+    | Nat.zero => collected
+    | Nat.succ below => (asciiDown below (cons below collected))),
+  executable: true,
+  recursive_argument: remaining
+}
+
+definition{
+  name: asciiText,
+  parameters: [],
+  result: String,
+  body: (match (prim utf8_decode (JsonText::listToBytes (JsonText::emptyBytes) (asciiDown 128 (nil Nat))) : (Option String))
+    | Option.some content => content
+    | Option.none => ""),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: probeNumber,
+  parameters: [mantissa : Int, exponent : Int],
+  result: Json::Json,
+  body: (ctor Json::Json.number (record Json::Decimal {mantissa := mantissa, exponent := exponent})),
+  executable: true
+}
+
+definition{
+  name: probeValue,
+  parameters: [kind : Nat, size : Nat],
+  result: Json::Json,
+  body: (if (kind =? 0) then (nestedArrays size (ctor Json::Json.null)) else (if (kind =? 1) then (probeNumber (tenPower (prim subtract size 1 : Nat) (1 : Int)) (0 : Int)) else (if (kind =? 2) then (probeNumber (1 : Int) (natToInt size (0 : Int))) else (if (kind =? 3) then (probeNumber (1 : Int) (prim negate (natToInt size (0 : Int)) : Int)) else (if (kind =? 4) then (ctor Json::Json.text (asciiText)) else (nestedArrays 5 (ctor Json::Json.null))))))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: probeReport,
+  parameters: [input : Bytes],
+  result: (List Nat),
+  body: (let kind : Nat := (JsonText::byteAt input 0); (let size : Nat := ((prim multiply (JsonText::byteAt input 1) 256 : Nat) + (JsonText::byteAt input 2)); (match (JsonWrite::writeListWith (if (kind =? 5) then size else (JsonWrite::writeBudget)) (probeValue kind size))
+    | Result.error reason => (refusalReport 2 reason)
+    | Result.ok produced => (cons 0 produced)))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: firstNamed,
+  parameters: [name : String, members : (List (String * Json::Json))],
+  result: (Option Json::Json),
+  body: (match members
+    | List.nil => (ctor Option.none [Json::Json])
+    | List.cons entry rest => (if (prim equal (first entry) name : Bool) then (ctor Option.some [Json::Json] (second entry)) else (firstNamed name rest))),
+  executable: true,
+  recursive_argument: members
+}
+
+definition{
+  name: lookupReport,
+  parameters: [parsed : (Result Json::Json JsonText::JsonRefusal)],
+  result: (List Nat),
+  body: (match parsed
+    | Result.error reason => (refusalReport 1 reason)
+    | Result.ok item => (match item
+      | Json::Json.null => (cons 4 (nil Nat))
+      | Json::Json.bool flag => (cons 4 (nil Nat))
+      | Json::Json.number amount => (cons 4 (nil Nat))
+      | Json::Json.text content => (cons 4 (nil Nat))
+      | Json::Json.array items => (cons 4 (nil Nat))
+      | Json::Json.object members => (match (firstNamed "a" members)
+        | Option.none => (cons 3 (nil Nat))
+        | Option.some found => (canonicalReport found)))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: codecRun,
+  parameters: [mode : Nat, input : Bytes],
+  result: (List Nat),
+  body: (if (mode =? 0) then (parseReport (JsonRead::readJson input)) else (if (mode =? 1) then (utf8Report (Utf8::utf8Check (JsonText::bytesToList input))) else (if (mode =? 2) then (probeReport input) else (if (mode =? 3) then (lookupReport (JsonRead::readJson input)) else (parseReport (JsonRead::readListUngated (JsonText::bytesToList input))))))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true,
+  production: {effects: [allocation, overflow], targets: [rust-std]}
+}
+\end{semanticmodule}
+\end{lexlean}

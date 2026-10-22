@@ -1,0 +1,613 @@
+\begin{lexlean}{JsonRead}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Json}
+\importmodule{JsonText}
+\importmodule{Utf8}
+\title{JSON text reader}
+\begin{semanticmodule}
+inductive{
+  name: StrPhase,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: plain, fields: []},
+    {name: slash, fields: []},
+    {name: hex, fields: [Nat, Nat, Nat]},
+    {name: wantSlash, fields: [Nat]},
+    {name: wantU, fields: [Nat]}
+  ]
+}
+
+inductive{
+  name: NumPhase,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: minus, fields: []},
+    {name: zero, fields: []},
+    {name: whole, fields: []},
+    {name: dot, fields: []},
+    {name: frac, fields: []},
+    {name: expMark, fields: []},
+    {name: expSign, fields: []},
+    {name: expDigits, fields: []}
+  ]
+}
+
+structure{
+  name: NumState,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: negative, type: Bool},
+    {name: phase, type: NumPhase},
+    {name: mantissa, type: Int},
+    {name: significant, type: Nat},
+    {name: fraction, type: Int},
+    {name: expNegative, type: Bool},
+    {name: exponent, type: Int}
+  ]
+}
+
+inductive{
+  name: Mode,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: value, fields: []},
+    {name: valueOrClose, fields: []},
+    {name: afterValue, fields: []},
+    {name: keyOrClose, fields: []},
+    {name: key, fields: []},
+    {name: colon, fields: []},
+    {name: text, fields: [StrPhase, (List Nat), Bool]},
+    {name: literal, fields: [Nat, Nat]},
+    {name: number, fields: [NumState]},
+    {name: finished, fields: [Json::Json]}
+  ]
+}
+
+inductive{
+  name: Frame,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: array, fields: [(List Json::Json)]},
+    {name: object, fields: [(List (String * Json::Json)), (Option String)]}
+  ]
+}
+
+structure{
+  name: Machine,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: mode, type: Mode}, {name: stack, type: (List Frame)}, {name: depth, type: Nat}]
+}
+
+inductive{
+  name: ReadStep,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: refused, fields: [JsonText::JsonRefusal]}, {name: moved, fields: [Machine]}]
+}
+
+definition{name: maxDepth, parameters: [], result: Nat, body: 512, executable: true}
+
+definition{name: maxSignificant, parameters: [], result: Nat, body: 18, executable: true}
+
+definition{
+  name: isWhitespace,
+  parameters: [byte : Nat],
+  result: Bool,
+  body: ((byte =? 32) || ((byte =? 10) || ((byte =? 13) || (byte =? 9)))),
+  executable: true
+}
+
+definition{
+  name: isDigit,
+  parameters: [byte : Nat],
+  result: Bool,
+  body: (Utf8::inRange byte 48 57),
+  executable: true
+}
+
+definition{
+  name: digitInt,
+  parameters: [digit : Nat],
+  result: Int,
+  body: (if (digit =? 0) then (0 : Int) else (if (digit =? 1) then (1 : Int) else (if (digit =? 2) then (2 : Int) else (if (digit =? 3) then (3 : Int) else (if (digit =? 4) then (4 : Int) else (if (digit =? 5) then (5 : Int) else (if (digit =? 6) then (6 : Int) else (if (digit =? 7) then (7 : Int) else (if (digit =? 8) then (8 : Int) else (9 : Int)))))))))),
+  executable: true
+}
+
+definition{
+  name: hexValue,
+  parameters: [byte : Nat],
+  result: Nat,
+  body: (if (byte <? 48) then 16 else (if (byte <? 58) then (prim subtract byte 48 : Nat) else (if (byte <? 65) then 16 else (if (byte <? 71) then (prim subtract byte 55 : Nat) else (if (byte <? 97) then 16 else (if (byte <? 103) then (prim subtract byte 87 : Nat) else 16)))))),
+  executable: true
+}
+
+definition{
+  name: reverseOnto,
+  type_parameters: [Item],
+  parameters: [items : (List 'Item), onto : (List 'Item)],
+  result: (List 'Item),
+  body: (match items
+    | List.nil => onto
+    | List.cons head tail => (reverseOnto ['Item] tail (cons head onto))),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: divide,
+  parameters: [value : Nat, by : Nat],
+  result: Nat,
+  body: (prim quotient value by 0 : Nat),
+  executable: true
+}
+
+definition{
+  name: modulo,
+  parameters: [value : Nat, by : Nat],
+  result: Nat,
+  body: (prim remainder value by 0 : Nat),
+  executable: true
+}
+
+definition{
+  name: utf8Push,
+  parameters: [scalar : Nat, collected : (List Nat)],
+  result: (List Nat),
+  body: (if (scalar <? 128) then (cons scalar collected) else (if (scalar <? 2048) then (cons (128 + (modulo scalar 64)) (cons (192 + (divide scalar 64)) collected)) else (if (scalar <? 65536) then (cons (128 + (modulo scalar 64)) (cons (128 + (modulo (divide scalar 64) 64)) (cons (224 + (divide scalar 4096)) collected))) else (cons (128 + (modulo scalar 64)) (cons (128 + (modulo (divide scalar 64) 64)) (cons (128 + (modulo (divide scalar 4096) 64)) (cons (240 + (divide scalar 262144)) collected))))))),
+  executable: true
+}
+
+definition{
+  name: escapeByte,
+  parameters: [byte : Nat],
+  result: Nat,
+  body: (if (byte =? 34) then 34 else (if (byte =? 92) then 92 else (if (byte =? 47) then 47 else (if (byte =? 98) then 8 else (if (byte =? 102) then 12 else (if (byte =? 110) then 10 else (if (byte =? 114) then 13 else (if (byte =? 116) then 9 else 0)))))))),
+  executable: true
+}
+
+definition{
+  name: withMode,
+  parameters: [machine : Machine, mode : Mode],
+  result: Machine,
+  body: (record Machine {mode := mode, stack := (project machine stack), depth := (project machine depth)}),
+  executable: true
+}
+
+definition{
+  name: moveTo,
+  parameters: [machine : Machine, mode : Mode],
+  result: ReadStep,
+  body: (ctor ReadStep.moved (withMode machine mode)),
+  executable: true
+}
+
+definition{
+  name: refuse,
+  parameters: [reason : JsonText::JsonRefusal],
+  result: ReadStep,
+  body: (ctor ReadStep.refused reason),
+  executable: true
+}
+
+definition{
+  name: complete,
+  parameters: [item : Json::Json, stack : (List Frame), depth : Nat],
+  result: Machine,
+  body: (match stack
+    | List.nil => (record Machine {mode := (ctor Mode.finished item), stack := (nil Frame), depth := 0})
+    | List.cons top below => (match top
+      | Frame.array items => (record Machine {mode := (ctor Mode.afterValue), stack := (cons (ctor Frame.array (cons item items)) below), depth := depth})
+      | Frame.object members pending => (match pending
+        | Option.some name => (record Machine {mode := (ctor Mode.afterValue), stack := (cons (ctor Frame.object (cons (name, item) members) (ctor Option.none [String])) below), depth := depth})
+        | Option.none => (record Machine {mode := (ctor Mode.afterValue), stack := stack, depth := depth})))),
+  executable: true
+}
+
+definition{
+  name: completeStep,
+  parameters: [machine : Machine, item : Json::Json],
+  result: ReadStep,
+  body: (ctor ReadStep.moved (complete item (project machine stack) (project machine depth))),
+  executable: true
+}
+
+definition{
+  name: pushFrame,
+  parameters: [machine : Machine, frame : Frame, mode : Mode, offset : Nat],
+  result: ReadStep,
+  body: (if ((project machine depth) <? (maxDepth)) then (ctor ReadStep.moved (record Machine {mode := mode, stack := (cons frame (project machine stack)), depth := ((project machine depth) + 1)})) else (refuse (ctor JsonText::JsonRefusal.tooDeep offset))),
+  executable: true
+}
+
+definition{
+  name: numberMode,
+  parameters: [
+    negative : Bool,
+    phase : NumPhase,
+    mantissa : Int,
+    significant : Nat,
+    fraction : Int,
+    expNegative : Bool,
+    exponent : Int
+  ],
+  result: Mode,
+  body: (ctor Mode.number (record NumState {negative := negative, phase := phase, mantissa := mantissa, significant := significant, fraction := fraction, expNegative := expNegative, exponent := exponent})),
+  executable: true
+}
+
+definition{
+  name: startValue,
+  parameters: [machine : Machine, offset : Nat, byte : Nat],
+  result: ReadStep,
+  body: (if (byte =? 34) then (moveTo machine (ctor Mode.text (ctor StrPhase.plain) (nil Nat) false)) else (if (byte =? 123) then (pushFrame machine (ctor Frame.object (nil (String * Json::Json)) (ctor Option.none [String])) (ctor Mode.keyOrClose) offset) else (if (byte =? 91) then (pushFrame machine (ctor Frame.array (nil Json::Json)) (ctor Mode.valueOrClose) offset) else (if (byte =? 116) then (moveTo machine (ctor Mode.literal 0 1)) else (if (byte =? 102) then (moveTo machine (ctor Mode.literal 1 1)) else (if (byte =? 110) then (moveTo machine (ctor Mode.literal 2 1)) else (if (byte =? 45) then (moveTo machine (numberMode true (ctor NumPhase.minus) (0 : Int) 0 (0 : Int) false (0 : Int))) else (if (byte =? 48) then (moveTo machine (numberMode false (ctor NumPhase.zero) (0 : Int) 0 (0 : Int) false (0 : Int))) else (if (Utf8::inRange byte 49 57) then (moveTo machine (numberMode false (ctor NumPhase.whole) (digitInt (prim subtract byte 48 : Nat)) 1 (0 : Int) false (0 : Int))) else (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset))))))))))),
+  executable: true
+}
+
+definition{
+  name: closeArray,
+  parameters: [machine : Machine, offset : Nat],
+  result: ReadStep,
+  body: (match (project machine stack)
+    | List.nil => (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset))
+    | List.cons top below => (match top
+      | Frame.array items => (ctor ReadStep.moved (complete (ctor Json::Json.array (reverseOnto [Json::Json] items (nil Json::Json))) below (prim subtract (project machine depth) 1 : Nat)))
+      | Frame.object members pending => (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset)))),
+  executable: true
+}
+
+definition{
+  name: closeObject,
+  parameters: [machine : Machine, offset : Nat],
+  result: ReadStep,
+  body: (match (project machine stack)
+    | List.nil => (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset))
+    | List.cons top below => (match top
+      | Frame.array items => (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset))
+      | Frame.object members pending => (ctor ReadStep.moved (complete (ctor Json::Json.object (reverseOnto [(String * Json::Json)] members (nil (String * Json::Json)))) below (prim subtract (project machine depth) 1 : Nat))))),
+  executable: true
+}
+
+definition{
+  name: afterComma,
+  parameters: [machine : Machine, offset : Nat],
+  result: ReadStep,
+  body: (match (project machine stack)
+    | List.nil => (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset))
+    | List.cons top below => (match top
+      | Frame.array items => (moveTo machine (ctor Mode.value))
+      | Frame.object members pending => (moveTo machine (ctor Mode.key)))),
+  executable: true
+}
+
+definition{
+  name: settleStep,
+  parameters: [machine : Machine, offset : Nat, byte : Nat],
+  result: ReadStep,
+  body: (match (project machine mode)
+    | Mode.finished done => (if (isWhitespace byte) then (ctor ReadStep.moved machine) else (refuse (ctor JsonText::JsonRefusal.trailingContent offset)))
+    | Mode.afterValue => (if (isWhitespace byte) then (ctor ReadStep.moved machine) else (if (byte =? 44) then (afterComma machine offset) else (if (byte =? 93) then (closeArray machine offset) else (if (byte =? 125) then (closeObject machine offset) else (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset))))))
+    | Mode.value => (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset))
+    | Mode.valueOrClose => (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset))
+    | Mode.keyOrClose => (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset))
+    | Mode.key => (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset))
+    | Mode.colon => (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset))
+    | Mode.text phase collected isKey => (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset))
+    | Mode.literal which matched => (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset))
+    | Mode.number state => (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset))),
+  executable: true
+}
+
+definition{
+  name: literalBytes,
+  parameters: [which : Nat],
+  result: (List Nat),
+  body: (if (which =? 0) then (cons 116 (cons 114 (cons 117 (cons 101 (nil Nat))))) else (if (which =? 1) then (cons 102 (cons 97 (cons 108 (cons 115 (cons 101 (nil Nat)))))) else (cons 110 (cons 117 (cons 108 (cons 108 (nil Nat))))))),
+  executable: true
+}
+
+definition{
+  name: literalByte,
+  parameters: [which : Nat, position : Nat],
+  result: Nat,
+  body: (match (prim index (literalBytes which) position : (Option Nat))
+    | Option.some octet => octet
+    | Option.none => 0),
+  executable: true
+}
+
+definition{
+  name: literalValue,
+  parameters: [which : Nat],
+  result: Json::Json,
+  body: (if (which =? 0) then (ctor Json::Json.bool true) else (if (which =? 1) then (ctor Json::Json.bool false) else (ctor Json::Json.null))),
+  executable: true
+}
+
+definition{
+  name: literalStep,
+  parameters: [machine : Machine, offset : Nat, byte : Nat, which : Nat, matched : Nat],
+  result: ReadStep,
+  body: (if (byte =? (literalByte which matched)) then (if ((matched + 1) =? (prim length (literalBytes which) : Nat)) then (completeStep machine (literalValue which)) else (moveTo machine (ctor Mode.literal which (matched + 1)))) else (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset))),
+  executable: true
+}
+
+definition{
+  name: keyDone,
+  parameters: [machine : Machine, offset : Nat, name : String],
+  result: ReadStep,
+  body: (match (project machine stack)
+    | List.nil => (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset))
+    | List.cons top below => (match top
+      | Frame.array items => (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset))
+      | Frame.object members pending => (ctor ReadStep.moved (record Machine {mode := (ctor Mode.colon), stack := (cons (ctor Frame.object members (ctor Option.some [String] name)) below), depth := (project machine depth)})))),
+  executable: true
+}
+
+definition{
+  name: finishText,
+  parameters: [machine : Machine, offset : Nat, collected : (List Nat), isKey : Bool],
+  result: ReadStep,
+  body: (match (prim utf8_decode (JsonText::listToBytes (JsonText::emptyBytes) (reverseOnto [Nat] collected (nil Nat))) : (Option String))
+    | Option.none => (refuse (ctor JsonText::JsonRefusal.internalText))
+    | Option.some content => (if isKey then (keyDone machine offset content) else (completeStep machine (ctor Json::Json.text content)))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: unitDone,
+  parameters: [
+    machine : Machine,
+    offset : Nat,
+    unit : Nat,
+    high : Nat,
+    collected : (List Nat),
+    isKey : Bool
+  ],
+  result: ReadStep,
+  body: (if (high =? 0) then (if (Utf8::inRange unit 55296 56319) then (moveTo machine (ctor Mode.text (ctor StrPhase.wantSlash unit) collected isKey)) else (if (Utf8::inRange unit 56320 57343) then (refuse (ctor JsonText::JsonRefusal.loneSurrogate offset)) else (moveTo machine (ctor Mode.text (ctor StrPhase.plain) (utf8Push unit collected) isKey)))) else (if (Utf8::inRange unit 56320 57343) then (moveTo machine (ctor Mode.text (ctor StrPhase.plain) (utf8Push (65536 + ((prim multiply (prim subtract high 55296 : Nat) 1024 : Nat) + (prim subtract unit 56320 : Nat))) collected) isKey)) else (refuse (ctor JsonText::JsonRefusal.loneSurrogate offset)))),
+  executable: true
+}
+
+definition{
+  name: textStep,
+  parameters: [
+    machine : Machine,
+    offset : Nat,
+    byte : Nat,
+    phase : StrPhase,
+    collected : (List Nat),
+    isKey : Bool
+  ],
+  result: ReadStep,
+  body: (match phase
+    | StrPhase.plain => (if (byte =? 34) then (finishText machine offset collected isKey) else (if (byte =? 92) then (moveTo machine (ctor Mode.text (ctor StrPhase.slash) collected isKey)) else (if (byte <? 32) then (refuse (ctor JsonText::JsonRefusal.controlInString offset)) else (moveTo machine (ctor Mode.text (ctor StrPhase.plain) (cons byte collected) isKey)))))
+    | StrPhase.slash => (if (byte =? 117) then (moveTo machine (ctor Mode.text (ctor StrPhase.hex 0 0 0) collected isKey)) else (if ((escapeByte byte) =? 0) then (refuse (ctor JsonText::JsonRefusal.badEscape offset)) else (moveTo machine (ctor Mode.text (ctor StrPhase.plain) (cons (escapeByte byte) collected) isKey))))
+    | StrPhase.hex count unit high => (if (15 <? (hexValue byte)) then (refuse (ctor JsonText::JsonRefusal.badEscape offset)) else (if ((count + 1) =? 4) then (unitDone machine offset ((prim multiply unit 16 : Nat) + (hexValue byte)) high collected isKey) else (moveTo machine (ctor Mode.text (ctor StrPhase.hex (count + 1) ((prim multiply unit 16 : Nat) + (hexValue byte)) high) collected isKey))))
+    | StrPhase.wantSlash high => (if (byte =? 92) then (moveTo machine (ctor Mode.text (ctor StrPhase.wantU high) collected isKey)) else (refuse (ctor JsonText::JsonRefusal.loneSurrogate offset)))
+    | StrPhase.wantU high => (if (byte =? 117) then (moveTo machine (ctor Mode.text (ctor StrPhase.hex 0 0 high) collected isKey)) else (refuse (ctor JsonText::JsonRefusal.loneSurrogate offset)))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+inductive{
+  name: NumberValue,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: malformed, fields: []},
+    {name: outOfRange, fields: []},
+    {name: numeric, fields: [Json::Json]}
+  ]
+}
+
+definition{
+  name: isAccepting,
+  parameters: [phase : NumPhase],
+  result: Bool,
+  body: (match phase
+    | NumPhase.minus => false
+    | NumPhase.zero => true
+    | NumPhase.whole => true
+    | NumPhase.dot => false
+    | NumPhase.frac => true
+    | NumPhase.expMark => false
+    | NumPhase.expSign => false
+    | NumPhase.expDigits => true),
+  executable: true
+}
+
+definition{
+  name: numberValue,
+  parameters: [state : NumState],
+  result: NumberValue,
+  body: (if (isAccepting (project state phase)) then (let effective : Int := (prim subtract (if (project state expNegative) then (prim negate (project state exponent) : Int) else (project state exponent)) (project state fraction) : Int); (if ((prim less_than effective (-9999 : Int) : Bool) || (prim less_than (9999 : Int) effective : Bool)) then (ctor NumberValue.outOfRange) else (ctor NumberValue.numeric (ctor Json::Json.number (record Json::Decimal {mantissa := (if (project state negative) then (prim negate (project state mantissa) : Int) else (project state mantissa)), exponent := effective}))))) else (ctor NumberValue.malformed)),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: finishNumber,
+  parameters: [machine : Machine, offset : Nat, byte : Nat, state : NumState],
+  result: ReadStep,
+  body: (match (numberValue state)
+    | NumberValue.malformed => (refuse (ctor JsonText::JsonRefusal.badNumber offset))
+    | NumberValue.outOfRange => (refuse (ctor JsonText::JsonRefusal.numberOutOfRange offset))
+    | NumberValue.numeric item => (settleStep (complete item (project machine stack) (project machine depth)) offset byte)),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: intAdd,
+  parameters: [left : Int, right : Int],
+  result: Int,
+  body: (prim subtract left (prim negate right : Int) : Int),
+  executable: true
+}
+
+definition{
+  name: withNumber,
+  parameters: [machine : Machine, state : NumState, phase : NumPhase],
+  result: ReadStep,
+  body: (moveTo machine (ctor Mode.number (record NumState {negative := (project state negative), phase := phase, mantissa := (project state mantissa), significant := (project state significant), fraction := (project state fraction), expNegative := (project state expNegative), exponent := (project state exponent)}))),
+  executable: true
+}
+
+definition{
+  name: addDigit,
+  parameters: [machine : Machine, offset : Nat, byte : Nat, state : NumState, isFraction : Bool],
+  result: ReadStep,
+  body: (let grown : Nat := (if (((project state significant) =? 0) && (byte =? 48)) then 0 else ((project state significant) + 1)); (let moreFraction : Int := (if isFraction then (intAdd (project state fraction) (1 : Int)) else (project state fraction)); (if ((maxSignificant) <? grown) then (refuse (ctor JsonText::JsonRefusal.numberOutOfRange offset)) else (if (prim less_than (99999 : Int) moreFraction : Bool) then (refuse (ctor JsonText::JsonRefusal.numberOutOfRange offset)) else (moveTo machine (numberMode (project state negative) (if isFraction then (ctor NumPhase.frac) else (ctor NumPhase.whole)) (intAdd (prim multiply (project state mantissa) (10 : Int) : Int) (digitInt (prim subtract byte 48 : Nat))) grown moreFraction (project state expNegative) (project state exponent))))))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: addExponent,
+  parameters: [machine : Machine, offset : Nat, byte : Nat, state : NumState, negative : Bool],
+  result: ReadStep,
+  body: (let grown : Int := (intAdd (prim multiply (project state exponent) (10 : Int) : Int) (digitInt (prim subtract byte 48 : Nat))); (if (prim less_than (99999 : Int) grown : Bool) then (refuse (ctor JsonText::JsonRefusal.numberOutOfRange offset)) else (moveTo machine (numberMode (project state negative) (ctor NumPhase.expDigits) (project state mantissa) (project state significant) (project state fraction) negative grown)))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: isExponentMark,
+  parameters: [byte : Nat],
+  result: Bool,
+  body: ((byte =? 101) || (byte =? 69)),
+  executable: true
+}
+
+definition{
+  name: numberStep,
+  parameters: [machine : Machine, offset : Nat, byte : Nat, state : NumState],
+  result: ReadStep,
+  body: (match (project state phase)
+    | NumPhase.minus => (if (byte =? 48) then (withNumber machine state (ctor NumPhase.zero)) else (if (Utf8::inRange byte 49 57) then (addDigit machine offset byte state false) else (refuse (ctor JsonText::JsonRefusal.badNumber offset))))
+    | NumPhase.zero => (if (byte =? 46) then (withNumber machine state (ctor NumPhase.dot)) else (if (isExponentMark byte) then (withNumber machine state (ctor NumPhase.expMark)) else (if (isDigit byte) then (refuse (ctor JsonText::JsonRefusal.badNumber offset)) else (finishNumber machine offset byte state))))
+    | NumPhase.whole => (if (isDigit byte) then (addDigit machine offset byte state false) else (if (byte =? 46) then (withNumber machine state (ctor NumPhase.dot)) else (if (isExponentMark byte) then (withNumber machine state (ctor NumPhase.expMark)) else (finishNumber machine offset byte state))))
+    | NumPhase.dot => (if (isDigit byte) then (addDigit machine offset byte state true) else (refuse (ctor JsonText::JsonRefusal.badNumber offset)))
+    | NumPhase.frac => (if (isDigit byte) then (addDigit machine offset byte state true) else (if (isExponentMark byte) then (withNumber machine state (ctor NumPhase.expMark)) else (finishNumber machine offset byte state)))
+    | NumPhase.expMark => (if (byte =? 43) then (moveTo machine (numberMode (project state negative) (ctor NumPhase.expSign) (project state mantissa) (project state significant) (project state fraction) false (0 : Int))) else (if (byte =? 45) then (moveTo machine (numberMode (project state negative) (ctor NumPhase.expSign) (project state mantissa) (project state significant) (project state fraction) true (0 : Int))) else (if (isDigit byte) then (addExponent machine offset byte (record NumState {negative := (project state negative), phase := (project state phase), mantissa := (project state mantissa), significant := (project state significant), fraction := (project state fraction), expNegative := false, exponent := (0 : Int)}) false) else (refuse (ctor JsonText::JsonRefusal.badNumber offset)))))
+    | NumPhase.expSign => (if (isDigit byte) then (addExponent machine offset byte state (project state expNegative)) else (refuse (ctor JsonText::JsonRefusal.badNumber offset)))
+    | NumPhase.expDigits => (if (isDigit byte) then (addExponent machine offset byte state (project state expNegative)) else (finishNumber machine offset byte state))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: readStep,
+  parameters: [machine : Machine, offset : Nat, byte : Nat],
+  result: ReadStep,
+  body: (match (project machine mode)
+    | Mode.value => (if (isWhitespace byte) then (ctor ReadStep.moved machine) else (startValue machine offset byte))
+    | Mode.valueOrClose => (if (isWhitespace byte) then (ctor ReadStep.moved machine) else (if (byte =? 93) then (closeArray machine offset) else (startValue machine offset byte)))
+    | Mode.afterValue => (settleStep machine offset byte)
+    | Mode.keyOrClose => (if (isWhitespace byte) then (ctor ReadStep.moved machine) else (if (byte =? 125) then (closeObject machine offset) else (if (byte =? 34) then (moveTo machine (ctor Mode.text (ctor StrPhase.plain) (nil Nat) true)) else (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset)))))
+    | Mode.key => (if (isWhitespace byte) then (ctor ReadStep.moved machine) else (if (byte =? 34) then (moveTo machine (ctor Mode.text (ctor StrPhase.plain) (nil Nat) true)) else (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset))))
+    | Mode.colon => (if (isWhitespace byte) then (ctor ReadStep.moved machine) else (if (byte =? 58) then (moveTo machine (ctor Mode.value)) else (refuse (ctor JsonText::JsonRefusal.unexpectedByte offset))))
+    | Mode.text phase collected isKey => (textStep machine offset byte phase collected isKey)
+    | Mode.literal which matched => (literalStep machine offset byte which matched)
+    | Mode.number state => (numberStep machine offset byte state)
+    | Mode.finished done => (settleStep machine offset byte)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: readEnd,
+  parameters: [machine : Machine, offset : Nat],
+  result: (Result Json::Json JsonText::JsonRefusal),
+  body: (match (project machine mode)
+    | Mode.finished done => (ctor Result.ok [Json::Json, JsonText::JsonRefusal] done)
+    | Mode.number state => (match (numberValue state)
+      | NumberValue.malformed => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.badNumber offset))
+      | NumberValue.outOfRange => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.numberOutOfRange offset))
+      | NumberValue.numeric item => (match (project (complete item (project machine stack) (project machine depth)) mode)
+        | Mode.finished done => (ctor Result.ok [Json::Json, JsonText::JsonRefusal] done)
+        | Mode.value => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.unexpectedEnd))
+        | Mode.valueOrClose => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.unexpectedEnd))
+        | Mode.afterValue => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.unexpectedEnd))
+        | Mode.keyOrClose => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.unexpectedEnd))
+        | Mode.key => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.unexpectedEnd))
+        | Mode.colon => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.unexpectedEnd))
+        | Mode.text phase collected isKey => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.unexpectedEnd))
+        | Mode.literal which matched => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.unexpectedEnd))
+        | Mode.number inner => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.unexpectedEnd))))
+    | Mode.value => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.unexpectedEnd))
+    | Mode.valueOrClose => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.unexpectedEnd))
+    | Mode.afterValue => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.unexpectedEnd))
+    | Mode.keyOrClose => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.unexpectedEnd))
+    | Mode.key => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.unexpectedEnd))
+    | Mode.colon => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.unexpectedEnd))
+    | Mode.text phase collected isKey => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.unexpectedEnd))
+    | Mode.literal which matched => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.unexpectedEnd))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: readLoop,
+  parameters: [machine : Machine, offset : Nat, bytes : (List Nat)],
+  result: (Result Json::Json JsonText::JsonRefusal),
+  body: (match bytes
+    | List.nil => (match (readEnd machine offset)
+      | Result.ok parsed => (ctor Result.ok [Json::Json, JsonText::JsonRefusal] parsed)
+      | Result.error reason => (ctor Result.error [Json::Json, JsonText::JsonRefusal] reason))
+    | List.cons byte rest => (match (readStep machine offset byte)
+      | ReadStep.refused reason => (ctor Result.error [Json::Json, JsonText::JsonRefusal] reason)
+      | ReadStep.moved next => (readLoop next (offset + 1) rest))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true,
+  recursive_argument: bytes
+}
+
+definition{
+  name: initialMachine,
+  parameters: [],
+  result: Machine,
+  body: (record Machine {mode := (ctor Mode.value), stack := (nil Frame), depth := 0}),
+  executable: true
+}
+
+definition{
+  name: readList,
+  parameters: [bytes : (List Nat)],
+  result: (Result Json::Json JsonText::JsonRefusal),
+  body: (match (Utf8::utf8Check bytes)
+    | Utf8::Utf8Verdict.valid => (readLoop (initialMachine) 0 bytes)
+    | Utf8::Utf8Verdict.invalidByte position => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.invalidUtf8 position))
+    | Utf8::Utf8Verdict.truncated position => (ctor Result.error [Json::Json, JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.truncatedUtf8 position))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: readListUngated,
+  parameters: [bytes : (List Nat)],
+  result: (Result Json::Json JsonText::JsonRefusal),
+  body: (readLoop (initialMachine) 0 bytes),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: readJson,
+  parameters: [source : Bytes],
+  result: (Result Json::Json JsonText::JsonRefusal),
+  body: (readList (JsonText::bytesToList source)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

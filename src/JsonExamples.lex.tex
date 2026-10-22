@@ -1,0 +1,225 @@
+\begin{lexlean}{JsonExamples}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{JsonCodec}
+\importmodule{JsonRead}
+\title{JSON codec examples}
+\begin{semanticmodule}
+theorem{
+  name: example_null,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 110 (cons 117 (cons 108 (cons 108 (nil Nat))))))) = (cons 0 (cons 110 (cons 117 (cons 108 (cons 108 (nil Nat))))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_true,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 116 (cons 114 (cons 117 (cons 101 (nil Nat))))))) = (cons 0 (cons 116 (cons 114 (cons 117 (cons 101 (nil Nat))))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_false,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 102 (cons 97 (cons 108 (cons 115 (cons 101 (nil Nat)))))))) = (cons 0 (cons 102 (cons 97 (cons 108 (cons 115 (cons 101 (nil Nat)))))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_empty_array,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 91 (cons 93 (nil Nat))))) = (cons 0 (cons 91 (cons 93 (nil Nat))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_empty_object,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 123 (cons 125 (nil Nat))))) = (cons 0 (cons 123 (cons 125 (nil Nat))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_spaced_array,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 32 (cons 91 (cons 32 (cons 49 (cons 32 (cons 44 (cons 32 (cons 50 (cons 32 (cons 93 (cons 32 (nil Nat)))))))))))))) = (cons 0 (cons 91 (cons 49 (cons 44 (cons 50 (cons 93 (nil Nat)))))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_lone_high_surrogate,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 34 (cons 92 (cons 117 (cons 68 (cons 56 (cons 48 (cons 48 (cons 34 (nil Nat))))))))))) = (cons 1 (cons 6 (cons 7 (nil Nat))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_lone_low_surrogate,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 34 (cons 92 (cons 117 (cons 68 (cons 67 (cons 48 (cons 48 (cons 34 (nil Nat))))))))))) = (cons 1 (cons 6 (cons 6 (nil Nat))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_lone_surrogate_then_text,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 34 (cons 92 (cons 117 (cons 68 (cons 56 (cons 48 (cons 48 (cons 120 (cons 34 (nil Nat)))))))))))) = (cons 1 (cons 6 (cons 7 (nil Nat))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_bad_escape,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 34 (cons 92 (cons 120 (cons 34 (nil Nat))))))) = (cons 1 (cons 5 (cons 2 (nil Nat))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_decimal_fraction,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 49 (cons 46 (cons 53 (nil Nat)))))) = (cons 0 (cons 49 (cons 53 (cons 101 (cons 45 (cons 49 (nil Nat)))))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_negative_zero,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 45 (cons 48 (nil Nat))))) = (cons 0 (cons 48 (nil Nat)))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_exponent,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 49 (cons 69 (cons 50 (nil Nat)))))) = (cons 0 (cons 49 (cons 101 (cons 50 (nil Nat)))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_small_fraction,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 48 (cons 46 (cons 48 (cons 48 (cons 49 (nil Nat)))))))) = (cons 0 (cons 49 (cons 101 (cons 45 (cons 51 (nil Nat))))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_eighteen_digits,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (nil Nat))))))))))))))))))))) = (cons 0 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (nil Nat))))))))))))))))))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_nineteen_digits,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (cons 57 (nil Nat)))))))))))))))))))))) = (cons 1 (cons 8 (cons 18 (nil Nat))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_exponent_too_large,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 49 (cons 101 (cons 49 (cons 48 (cons 48 (cons 48 (cons 48 (nil Nat)))))))))) = (cons 1 (cons 8 (cons 7 (nil Nat))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_leading_zero,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 48 (cons 49 (nil Nat))))) = (cons 1 (cons 7 (cons 1 (nil Nat))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_trailing_comma,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 91 (cons 49 (cons 44 (cons 93 (nil Nat))))))) = (cons 1 (cons 2 (cons 3 (nil Nat))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_missing_comma,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 91 (cons 49 (cons 32 (cons 50 (cons 93 (nil Nat)))))))) = (cons 1 (cons 2 (cons 3 (nil Nat))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_trailing_content,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 49 (cons 32 (cons 50 (nil Nat)))))) = (cons 1 (cons 10 (cons 2 (nil Nat))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_empty_input,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (nil Nat))) = (cons 1 (cons 3 (cons 0 (nil Nat))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_overlong_two_byte,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 34 (cons 192 (cons 128 (cons 34 (nil Nat))))))) = (cons 1 (cons 0 (cons 1 (nil Nat))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_surrogate_bytes,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 34 (cons 237 (cons 160 (cons 128 (cons 34 (nil Nat)))))))) = (cons 1 (cons 0 (cons 2 (nil Nat))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_above_last_code_point,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 34 (cons 244 (cons 144 (cons 128 (cons 128 (cons 34 (nil Nat))))))))) = (cons 1 (cons 0 (cons 2 (nil Nat))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_truncated_sequence,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 34 (cons 226 (cons 130 (nil Nat)))))) = (cons 1 (cons 1 (cons 3 (nil Nat))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: example_invalid_lead_byte,
+  parameters: [],
+  statement: ((JsonCodec::parseReport (JsonRead::readList (cons 255 (nil Nat)))) = (cons 1 (cons 0 (cons 0 (nil Nat))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+\end{semanticmodule}
+\end{lexlean}

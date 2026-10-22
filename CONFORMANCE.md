@@ -18,14 +18,37 @@ The three honesty levels (R2):
 `cargo xtask audit-limits` fails if any code path returns an error the
 model does not sanction.
 
+## json-codec
+
+| ID | Level | Statement |
+| --- | --- | --- |
+| `JC-01` | `build` | Unicode byte validation admits exactly the byte strings RFC 3629 Table 3-7 admits, and refuses an overlong form, a surrogate code point, a value above the last code point and a truncated sequence, naming the offset of the first byte the table does not admit, or the end of the input when a sequence is cut short. |
+| `JC-02` | `build` | The parser refuses every byte string that is not well-formed UTF-8, with the typed refusals invalidUtf8 or truncatedUtf8 and an offset, before it reads any JSON structure. |
+| `JC-03` | `build` | The parser accepts every text of the RFC 8259 grammar that the pinned JSONTestSuite lists as must-accept (the y_ cases). |
+| `JC-04` | `build` | The parser refuses every text that the pinned JSONTestSuite lists as must-reject (the n_ cases) with a typed refusal, and each case's refusal kind equals the recorded table. |
+| `JC-05` | `build` | The parser's outcome on every implementation-defined case of the pinned JSONTestSuite (the i_ cases) equals the recorded table. |
+| `JC-06` | `build` | String escapes decode as RFC 8259 section 7 states, an escaped surrogate pair is one code point, a lone surrogate escape is refused as loneSurrogate, and an unescaped control character is refused. |
+| `JC-07` | `build` | The RFC 8259 section 6 number grammar maps to a Decimal exactly, and a number with more than 18 significant digits or an effective exponent outside -9999..9999 is refused as numberOutOfRange. |
+| `JC-08` | `build` | Nesting of arrays and objects to depth 512 is accepted and depth 513 is refused as tooDeep, without exhausting the stack. |
+| `JC-09` | `build` | Duplicate member names are kept in source order, so the parsed object has every member and Json.lookup answers with the first. |
+| `JC-10` | `build` | The encoder writes compact RFC 8259 text, escapes quotation mark, reverse solidus and control characters, and refuses a number or nesting outside the declared bounds with encodeNumberOutOfRange or encodeTooDeep. |
+| `JC-11` | `build` | For every text of the pinned JSONTestSuite the parser accepts, encoding the parsed value and parsing the result gives the same canonical bytes; the universal statement over all values is not claimed here. |
+| `JC-12` | `build` | The oracle executes the package generated from the LexLean codec root, whose recorded digest and provenance match the committed files, over the corpus whose pin and checksum match the recorded authority. |
+
 ## Cited authorities
 
 Never re-derived, vendored, or gated on.
 
 | Authority | Citation | Evidence here |
 | --- | --- | --- |
+| `A-RFC8259` | T. Bray (ed.), RFC 8259 (STD 90), December 2017, https://www.rfc-editor.org/rfc/rfc8259 | `JC-03`, `JC-04`, `JC-06`, `JC-07` |
+| `A-RFC3629` | F. Yergeau, RFC 3629 (STD 63), November 2003, section 4 syntax and Table 3-7 of the Unicode Standard, https://www.rfc-editor.org/rfc/rfc3629 | `JC-01`, `JC-02` |
+| `A-JSONTESTSUITE` | N. Seriot, https://github.com/nst/JSONTestSuite at commit 1ef36fa01286573e846ac449e8683f8833c5b26a, directory test_parsing (git tree b936f9acdd24b9f5fefe68b90b9beab2c681137a), MIT licence | `JC-03`, `JC-04`, `JC-05`, `JC-12` |
 
 ## Claims that are not conformance IDs
 
 | ID | Level | Claim |
 | --- | --- | --- |
+| `AUTH-01` | `some-true` | RFC 8259 defines the JSON text grammar the parser implements. |
+| `AUTH-02` | `some-true` | RFC 3629 defines the well-formed UTF-8 byte sequences the validator implements. |
+| `AUTH-03` | `some-true` | The pinned JSONTestSuite classifies each of its 318 files as must-accept, must-reject or implementation-defined. |

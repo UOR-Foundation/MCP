@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "json-examples"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "JsonExamples"
+component = "JsonExamples"
+
+[[form]]
+id = "json-examples"
+channel = "text"
+surface = "JSON codec examples"
+canonical_source = true
+features = ["sentence-case", "singular"]
