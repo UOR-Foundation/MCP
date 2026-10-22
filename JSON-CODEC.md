@@ -92,14 +92,16 @@ Each was planted alone in the sources of a clean tree, run, and reverted.
 | --- | --- | --- | --- | --- |
 | a lone high surrogate is dropped instead of refused | `JsonRead` `wantSlash` | kernel | `lexlean verify` | `Tactic rfl failed` for `JsonCodec.parseReport (JsonRead.readList [34, 92, 117, 68, 56, 48, 48, 34])` against `[1, 6, 7]` |
 | overlong leads C0 and C1 accepted | `Utf8` first lead test `byte <? 194` made `192` | kernel | `lexlean verify` | `omega could not prove the goal`, counterexample `192 <= byte <= 193`, in `bad_lead_refused` |
+| a high surrogate followed by a non-surrogate escape is accepted | `JsonRead` `unitDone`, last branch | oracle | `cargo test -p json-oracle` | `i_string_1st_valid_surrogate_2nd_invalid.json: expected refused:loneSurrogate, got accepted` (`every_i_case_matches_the_recorded_table_jc_05`), `n_string_incomplete_surrogate_escape_invalid.json: expected refused:loneSurrogate, got refused:badEscape` (`..._jc_04`), and `a_lone_surrogate_is_refused_as_lone_surrogate_jc_06` |
 | the third byte of a four-byte sequence may be up to 255 | `Utf8` phase three bound `191` made `255` | oracle | `cargo test -p json-oracle` | `class of [f0, 90, c0]`: left `"truncated"`, right `"invalid"` (`the_validator_agrees_with_table_3_7_and_the_standard_library_jc_01`) |
 | the solidus escape is dropped | `JsonRead` `escapeByte` | oracle | `cargo test -p json-oracle` | `y_string_allowed_escapes.json: refused:badEscape` (`every_y_case_is_accepted_jc_03`) and `string_escapes_decode_and_encode_jc_06` |
 | the generated package is edited by hand | `generated/.../src/lib.rs` | provenance | `cargo test -p json-oracle --test provenance` | `src/lib.rs is not the file the export recorded: regenerate it, never edit it` |
 | a corpus file is altered | `test_parsing/y_structure_lonely_null.json` | pin and checksum | same | `the vendored files are not the files the authority records` |
 | a test is renamed so no test ends in `jc_11` | `tests/corpus.rs` | meta-gate | `cargo test -p repo-conformance` | `CM-02: JC-11 is registered but no test name ends in jc_11` |
 
-The first two were stopped by `lexlean verify` before an export was possible; the next two
-pass `verify` because no theorem covers them and are stopped by the oracle.
+The first two were stopped by `lexlean verify` before an export was possible; the next three
+pass `verify` because no theorem covers them (a successful string parse cannot be
+kernel-evaluated) and are stopped by the oracle after `lexlean production build` re-exported the package.
 
 ## Not met
 
