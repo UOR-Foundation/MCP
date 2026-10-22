@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "json-codec-roots"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "JsonCodec"
+component = "JsonCodec"
+
+[[form]]
+id = "json-codec-roots"
+channel = "text"
+surface = "JSON codec roots"
+canonical_source = true
+features = ["sentence-case", "singular"]
