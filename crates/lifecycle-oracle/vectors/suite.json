@@ -1,0 +1,2218 @@
+{
+ "spec": "lifecycle-vectors/1",
+ "suite": {
+  "repository": "https://github.com/modelcontextprotocol/conformance",
+  "commit": "232a9014457eaf4c59559916e3d616d2f7f28f05",
+  "version": "0.2.0-alpha.10 (requirements/2026-07-28.yaml unchanged since its introduction at this commit)",
+  "requirements_sha256": "ae2f4f6210fd729e2e318edd5bbfa31a43cee0bc608e48052fa26dbf1d939b57"
+ },
+ "vectors": [
+  {
+   "id": "ST-01",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 354,
+   "quote": "const metaProbe = await sendRpc(",
+   "suite_checks": [
+    "sep-2575-request-meta-invalid-missing-meta",
+    "sep-2575-http-server-meta-invalid-400",
+    "sep-2575-http-server-error-jsonrpc-id"
+   ],
+   "register": [
+    "LC-01",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "server/discover"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":101,\"method\":\"server/discover\",\"params\":{}}"
+   },
+   "expect": {
+    "status": 400,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32602
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 101
+     }
+    ]
+   },
+   "note": "slug missing-meta"
+  },
+  {
+   "id": "ST-02",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 354,
+   "quote": "const metaProbe = await sendRpc(",
+   "suite_checks": [
+    "sep-2575-request-meta-invalid-missing-protocol-version",
+    "sep-2575-http-server-meta-invalid-400",
+    "sep-2575-http-server-error-jsonrpc-id"
+   ],
+   "register": [
+    "LC-01",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "server/discover"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":102,\"method\":\"server/discover\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 400,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32602
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 102
+     }
+    ]
+   },
+   "note": "slug missing-protocol-version"
+  },
+  {
+   "id": "ST-03",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 354,
+   "quote": "const metaProbe = await sendRpc(",
+   "suite_checks": [
+    "sep-2575-request-meta-invalid-missing-client-capabilities",
+    "sep-2575-http-server-meta-invalid-400",
+    "sep-2575-http-server-error-jsonrpc-id"
+   ],
+   "register": [
+    "LC-01",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "server/discover"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":104,\"method\":\"server/discover\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"}}}}"
+   },
+   "expect": {
+    "status": 400,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32602
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 104
+     }
+    ]
+   },
+   "note": "slug missing-client-capabilities"
+  },
+  {
+   "id": "ST-04",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 405,
+   "quote": "const noClientInfoProbe = await sendRpc(",
+   "suite_checks": [
+    "sep-2575-request-meta-client-info-optional"
+   ],
+   "register": [
+    "LC-03",
+    "LC-05"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "server/discover"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":105,\"method\":\"server/discover\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/id",
+      "eq": 105
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "present": true
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/version",
+      "present": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "ST-05",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 451,
+   "quote": "const { data } = await sendRpc(",
+   "suite_checks": [
+    "sep-2575-server-implements-discover",
+    "sep-2575-server-identifies-in-result-meta"
+   ],
+   "register": [
+    "LC-02",
+    "LC-05"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "server/discover"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":201,\"method\":\"server/discover\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/id",
+      "eq": 201
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "present": true
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/version",
+      "present": true
+     },
+     {
+      "at": "/result/supportedVersions",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/capabilities",
+      "present": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "ST-06",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 534,
+   "quote": "const { data: promptsData } = await sendRpc(",
+   "suite_checks": [
+    "sep-2575-server-declares-prompts-in-discover"
+   ],
+   "register": [
+    "LC-06",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "prompts/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":203,\"method\":\"prompts/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 404,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32601
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 203
+     },
+     {
+      "at": "/result/prompts",
+      "absent": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "ST-07",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 556,
+   "quote": "const toolsListResponse = await sendRpc(",
+   "suite_checks": [
+    "sep-2575-discover-capabilities-match-handlers"
+   ],
+   "register": [
+    "LC-02",
+    "LC-05"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":202,\"method\":\"tools/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/id",
+      "eq": 202
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "present": true
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/version",
+      "present": true
+     },
+     {
+      "at": "/result/tools",
+      "nonempty_array": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "ST-08",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 611,
+   "quote": "const response301 = await sendRpc(",
+   "suite_checks": [
+    "sep-2575-server-unsupported-version-error",
+    "sep-2575-http-server-unsupported-version-400",
+    "sep-2575-http-server-error-jsonrpc-id"
+   ],
+   "register": [
+    "LC-04",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "Mcp-Method",
+      "server/discover"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "v999.0.0"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":301,\"method\":\"server/discover\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"v999.0.0\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 400,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32022
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 301
+     },
+     {
+      "at": "/error/data/supported",
+      "nonempty_array": true
+     },
+     {
+      "at": "/error/data/supported",
+      "each_in_result_of": "ST-05",
+      "result_at": "/result/supportedVersions"
+     },
+     {
+      "at": "/error/data/requested",
+      "eq": "v999.0.0"
+     }
+    ]
+   }
+  },
+  {
+   "id": "ST-09",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 676,
+   "quote": "const responseAbsent = await sendRpc(",
+   "suite_checks": [
+    "sep-2575-http-server-header-mismatch-400"
+   ],
+   "register": [
+    "HH-01",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "Mcp-Method",
+      "server/discover"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":302,\"method\":\"server/discover\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"v999.0.0\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 400,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32020
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 302
+     }
+    ]
+   }
+  },
+  {
+   "id": "ST-10",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 704,
+   "quote": "const response401 = await sendRpc(",
+   "suite_checks": [
+    "sep-2575-server-rejects-undeclared-capability",
+    "sep-2575-missing-capability-http-400",
+    "sep-2575-http-server-error-jsonrpc-id"
+   ],
+   "register": [
+    "LC-07",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ],
+     [
+      "Mcp-Name",
+      "test_missing_capability"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":401,\"method\":\"tools/call\",\"params\":{\"name\":\"test_missing_capability\",\"arguments\":{},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 400,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32021
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 401
+     },
+     {
+      "at": "/error/data/requiredCapabilities/sampling",
+      "is_object": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "ST-11",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 825,
+   "quote": "const response500 = await sendRpc(",
+   "suite_checks": [
+    "sep-2575-http-server-method-not-found-404-initialize"
+   ],
+   "register": [
+    "LC-06",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "initialize"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":500,\"method\":\"initialize\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 404,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32601
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 500
+     }
+    ]
+   },
+   "note": "removed method initialize"
+  },
+  {
+   "id": "ST-12",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 825,
+   "quote": "const response500 = await sendRpc(",
+   "suite_checks": [
+    "sep-2575-http-server-method-not-found-404-ping"
+   ],
+   "register": [
+    "LC-06",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "ping"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":500,\"method\":\"ping\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 404,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32601
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 500
+     }
+    ]
+   },
+   "note": "removed method ping"
+  },
+  {
+   "id": "ST-13",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 825,
+   "quote": "const response500 = await sendRpc(",
+   "suite_checks": [
+    "sep-2575-http-server-method-not-found-404-logging-setlevel"
+   ],
+   "register": [
+    "LC-06",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "logging/setLevel"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":500,\"method\":\"logging/setLevel\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 404,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32601
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 500
+     }
+    ]
+   },
+   "note": "removed method logging/setLevel"
+  },
+  {
+   "id": "ST-14",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 825,
+   "quote": "const response500 = await sendRpc(",
+   "suite_checks": [
+    "sep-2575-http-server-method-not-found-404-resources-subscribe"
+   ],
+   "register": [
+    "LC-06",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "resources/subscribe"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":500,\"method\":\"resources/subscribe\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 404,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32601
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 500
+     }
+    ]
+   },
+   "note": "removed method resources/subscribe"
+  },
+  {
+   "id": "ST-15",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 825,
+   "quote": "const response500 = await sendRpc(",
+   "suite_checks": [
+    "sep-2575-http-server-method-not-found-404-resources-unsubscribe"
+   ],
+   "register": [
+    "LC-06",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "resources/unsubscribe"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":500,\"method\":\"resources/unsubscribe\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 404,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32601
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 500
+     }
+    ]
+   },
+   "note": "removed method resources/unsubscribe"
+  },
+  {
+   "id": "ST-16",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 855,
+   "quote": "const response601 = await sendRpc(",
+   "suite_checks": [
+    "sep-2575-http-server-method-not-found-404"
+   ],
+   "register": [
+    "LC-06",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "unknown/method"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":601,\"method\":\"unknown/method\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 404,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32601
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 601
+     }
+    ]
+   }
+  },
+  {
+   "id": "HV-00",
+   "scenario": "http-header-validation",
+   "file": "src/scenarios/server/http-standard-headers.ts",
+   "line": 317,
+   "quote": "const toolsResponse = await sendStatelessRequest(serverUrl, 'tools/list');",
+   "suite_checks": [
+    "sep-2243-server-standard-setup"
+   ],
+   "register": [
+    "LC-02",
+    "LC-05"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/id",
+      "eq": 1
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "present": true
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/version",
+      "present": true
+     },
+     {
+      "at": "/result/tools",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/tools/0/name",
+      "eq": "echo"
+     }
+    ]
+   },
+   "note": "the setup call; tools[0] is the tool the later cases call"
+  },
+  {
+   "id": "HV-01",
+   "scenario": "http-header-validation",
+   "file": "src/scenarios/server/http-standard-headers.ts",
+   "line": 356,
+   "quote": "await this.testCase(",
+   "suite_checks": [
+    "sep-2243-server-reject-invalid-headers",
+    "sep-2243-server-reject-error-code"
+   ],
+   "register": [
+    "HH-02",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "Content-Length",
+      "321"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "prompts/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":100,\"method\":\"tools/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 400,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32020
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 100
+     }
+    ]
+   }
+  },
+  {
+   "id": "HV-02",
+   "scenario": "http-header-validation",
+   "file": "src/scenarios/server/http-standard-headers.ts",
+   "line": 371,
+   "quote": "await this.testCase(",
+   "suite_checks": [
+    "sep-2243-server-reject-invalid-headers",
+    "sep-2243-server-reject-error-code"
+   ],
+   "register": [
+    "HH-03",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "Content-Length",
+      "321"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":101,\"method\":\"tools/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 400,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32020
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 101
+     }
+    ]
+   }
+  },
+  {
+   "id": "HV-03",
+   "scenario": "http-header-validation",
+   "file": "src/scenarios/server/http-standard-headers.ts",
+   "line": 389,
+   "quote": "await this.testCase(",
+   "suite_checks": [
+    "sep-2243-server-reject-invalid-headers",
+    "sep-2243-server-reject-error-code"
+   ],
+   "register": [
+    "HH-04",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "Content-Length",
+      "350"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ],
+     [
+      "Mcp-Name",
+      "wrong_tool_name"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":102,\"method\":\"tools/call\",\"params\":{\"name\":\"echo\",\"arguments\":{},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 400,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32020
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 102
+     }
+    ]
+   }
+  },
+  {
+   "id": "HV-04",
+   "scenario": "http-header-validation",
+   "file": "src/scenarios/server/http-standard-headers.ts",
+   "line": 411,
+   "quote": "await this.testCase(",
+   "suite_checks": [
+    "sep-2243-server-accepts-whitespace-header-value"
+   ],
+   "register": [
+    "HH-05",
+    "LC-05"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "Content-Length",
+      "350"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ],
+     [
+      "Mcp-Name",
+      "  echo  "
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":103,\"method\":\"tools/call\",\"params\":{\"name\":\"echo\",\"arguments\":{},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/id",
+      "eq": 103
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "present": true
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/version",
+      "present": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "HV-05",
+   "scenario": "http-header-validation",
+   "file": "src/scenarios/server/http-standard-headers.ts",
+   "line": 440,
+   "quote": "await this.testCase(",
+   "suite_checks": [
+    "sep-2243-server-reject-invalid-headers",
+    "sep-2243-server-reject-error-code"
+   ],
+   "register": [
+    "HH-06",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "Content-Length",
+      "350"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":104,\"method\":\"tools/call\",\"params\":{\"name\":\"echo\",\"arguments\":{},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 400,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32020
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 104
+     }
+    ]
+   }
+  },
+  {
+   "id": "HV-06",
+   "scenario": "http-header-validation",
+   "file": "src/scenarios/server/http-standard-headers.ts",
+   "line": 476,
+   "quote": "await this.testCase(",
+   "suite_checks": [
+    "sep-2243-header-name-case-insensitive"
+   ],
+   "register": [
+    "HH-07",
+    "LC-05"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "Content-Length",
+      "321"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "mcp-method",
+      "tools/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":105,\"method\":\"tools/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/id",
+      "eq": 105
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "present": true
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/version",
+      "present": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "HV-07",
+   "scenario": "http-header-validation",
+   "file": "src/scenarios/server/http-standard-headers.ts",
+   "line": 491,
+   "quote": "await this.testCase(",
+   "suite_checks": [
+    "sep-2243-header-name-case-insensitive"
+   ],
+   "register": [
+    "HH-07",
+    "LC-05"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "Content-Length",
+      "321"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "MCP-METHOD",
+      "tools/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":106,\"method\":\"tools/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/id",
+      "eq": 106
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "present": true
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/version",
+      "present": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "HV-08",
+   "scenario": "http-header-validation",
+   "file": "src/scenarios/server/http-standard-headers.ts",
+   "line": 506,
+   "quote": "await this.testCase(",
+   "suite_checks": [
+    "sep-2243-server-reject-invalid-headers",
+    "sep-2243-server-reject-error-code"
+   ],
+   "register": [
+    "HH-08",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "Content-Length",
+      "321"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "TOOLS/LIST"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":107,\"method\":\"tools/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 400,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32020
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 107
+     }
+    ]
+   }
+  },
+  {
+   "id": "HC-00",
+   "scenario": "http-custom-header-server-validation",
+   "file": "src/scenarios/server/http-standard-headers.ts",
+   "line": 625,
+   "quote": "const toolsResponse = await sendStatelessRequest(serverUrl, 'tools/list');",
+   "suite_checks": [
+    "sep-2243-server-custom-setup"
+   ],
+   "register": [
+    "LC-02",
+    "LC-05"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/id",
+      "eq": 2
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "present": true
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/version",
+      "present": true
+     },
+     {
+      "at": "/result/tools/1/name",
+      "eq": "execute_sql"
+     },
+     {
+      "at": "/result/tools/1/inputSchema/properties/region/x-mcp-header",
+      "eq": "Region"
+     },
+     {
+      "at": "/result/tools/1/inputSchema/required",
+      "eq": [
+       "region",
+       "query"
+      ]
+     }
+    ]
+   },
+   "note": "the setup call; the first tool with an x-mcp-header property is execute_sql, whose first annotated string property is region"
+  },
+  {
+   "id": "HC-01",
+   "scenario": "http-custom-header-server-validation",
+   "file": "src/scenarios/server/http-standard-headers.ts",
+   "line": 744,
+   "quote": "await this.testBase64Case(",
+   "suite_checks": [
+    "sep-2243-server-decode-base64"
+   ],
+   "register": [
+    "HH-09",
+    "LC-05"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "Content-Length",
+      "396"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ],
+     [
+      "Mcp-Name",
+      "execute_sql"
+     ],
+     [
+      "Mcp-Param-Region",
+      "=?base64?SGVsbG8=?="
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":200,\"method\":\"tools/call\",\"params\":{\"name\":\"execute_sql\",\"arguments\":{\"query\":\"test-default\",\"region\":\"Hello\"},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/id",
+      "eq": 200
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "present": true
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/version",
+      "present": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "HC-02",
+   "scenario": "http-custom-header-server-validation",
+   "file": "src/scenarios/server/http-standard-headers.ts",
+   "line": 768,
+   "quote": "await this.testBase64Case(",
+   "suite_checks": [
+    "sep-2243-server-reject-invalid-param-chars",
+    "sep-2243-server-reject-param-mismatch"
+   ],
+   "register": [
+    "HH-10",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "Content-Length",
+      "396"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ],
+     [
+      "Mcp-Name",
+      "execute_sql"
+     ],
+     [
+      "Mcp-Param-Region",
+      "=?base64?SGVsbG8?="
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":201,\"method\":\"tools/call\",\"params\":{\"name\":\"execute_sql\",\"arguments\":{\"query\":\"test-default\",\"region\":\"Hello\"},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 400,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32020
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 201
+     }
+    ]
+   }
+  },
+  {
+   "id": "HC-03",
+   "scenario": "http-custom-header-server-validation",
+   "file": "src/scenarios/server/http-standard-headers.ts",
+   "line": 787,
+   "quote": "await this.testBase64Case(",
+   "suite_checks": [
+    "sep-2243-server-reject-invalid-param-chars",
+    "sep-2243-server-reject-param-mismatch"
+   ],
+   "register": [
+    "HH-10",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "Content-Length",
+      "396"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ],
+     [
+      "Mcp-Name",
+      "execute_sql"
+     ],
+     [
+      "Mcp-Param-Region",
+      "=?base64?SGVs!!!bG8=?="
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":202,\"method\":\"tools/call\",\"params\":{\"name\":\"execute_sql\",\"arguments\":{\"query\":\"test-default\",\"region\":\"Hello\"},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 400,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32020
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 202
+     }
+    ]
+   }
+  },
+  {
+   "id": "HC-04",
+   "scenario": "http-custom-header-server-validation",
+   "file": "src/scenarios/server/http-standard-headers.ts",
+   "line": 806,
+   "quote": "await this.testBase64Case(",
+   "suite_checks": [
+    "sep-2243-server-validate-param-match"
+   ],
+   "register": [
+    "HH-11",
+    "LC-05"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "Content-Length",
+      "399"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ],
+     [
+      "Mcp-Name",
+      "execute_sql"
+     ],
+     [
+      "Mcp-Param-Region",
+      "SGVsbG8="
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":203,\"method\":\"tools/call\",\"params\":{\"name\":\"execute_sql\",\"arguments\":{\"query\":\"test-default\",\"region\":\"SGVsbG8=\"},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/id",
+      "eq": 203
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "present": true
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/version",
+      "present": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "HC-05",
+   "scenario": "http-custom-header-server-validation",
+   "file": "src/scenarios/server/http-standard-headers.ts",
+   "line": 825,
+   "quote": "await this.testBase64Case(",
+   "suite_checks": [
+    "sep-2243-server-validate-param-match"
+   ],
+   "register": [
+    "HH-11",
+    "LC-05"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "Content-Length",
+      "408"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ],
+     [
+      "Mcp-Name",
+      "execute_sql"
+     ],
+     [
+      "Mcp-Param-Region",
+      "=?base64?SGVsbG8="
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":204,\"method\":\"tools/call\",\"params\":{\"name\":\"execute_sql\",\"arguments\":{\"query\":\"test-default\",\"region\":\"=?base64?SGVsbG8=\"},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/id",
+      "eq": 204
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "present": true
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/version",
+      "present": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "HC-06",
+   "scenario": "http-custom-header-server-validation",
+   "file": "src/scenarios/server/http-standard-headers.ts",
+   "line": 845,
+   "quote": "await this.testMissingCustomHeader(",
+   "suite_checks": [
+    "sep-2243-server-validate-param-match",
+    "sep-2243-server-reject-param-mismatch"
+   ],
+   "register": [
+    "HH-12",
+    "LC-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "Content-Length",
+      "401"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ],
+     [
+      "Mcp-Name",
+      "execute_sql"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":205,\"method\":\"tools/call\",\"params\":{\"name\":\"execute_sql\",\"arguments\":{\"query\":\"test-default\",\"region\":\"test-value\"},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 400,
+    "checks": [
+     {
+      "at": "/error/code",
+      "eq": -32020
+     },
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/id",
+      "eq": 205
+     }
+    ]
+   }
+  }
+ ],
+ "not_run": [
+  {
+   "line": 887,
+   "quote": "const frames = await listenToStream(",
+   "scenario": "server-stateless",
+   "checks": [
+    "sep-2575-http-server-no-independent-requests-on-stream"
+   ],
+   "reason": "a response stream the connection holds open; the core answers one body per request and streams belong to the transport (issue 11)",
+   "owner": "#11"
+  },
+  {
+   "line": 947,
+   "quote": "const frames = await listenToStream(",
+   "scenario": "server-stateless",
+   "checks": [
+    "sep-2575-server-no-log-without-loglevel"
+   ],
+   "reason": "a response stream the connection holds open; the core answers one body per request and streams belong to the transport; the fixture declares no logging capability (issue 11)",
+   "owner": "#11"
+  },
+  {
+   "line": 1037,
+   "quote": "streamFrames = await listenToStream(",
+   "scenario": "server-stateless",
+   "checks": [
+    "sep-2575-server-sends-subscription-ack",
+    "sep-2575-server-tags-subscription-id"
+   ],
+   "reason": "a response stream the connection holds open; the core answers one body per request and streams belong to the transport and the subscriptions/listen method, which the core does not register (issue 11)",
+   "owner": "#11"
+  },
+  {
+   "line": 1043,
+   "quote": "await sendRpc('tools/call', {",
+   "scenario": "server-stateless",
+   "checks": [
+    "sep-2575-server-sends-subscription-ack",
+    "sep-2575-server-tags-subscription-id"
+   ],
+   "reason": "the trigger the stream at line 1037 observes (issue 11)",
+   "owner": "#11"
+  },
+  {
+   "line": 1144,
+   "quote": "const narrowFrames = await listenToStream(",
+   "scenario": "server-stateless",
+   "checks": [
+    "sep-2575-server-honors-notification-filter"
+   ],
+   "reason": "a response stream the connection holds open; the core answers one body per request and streams belong to the transport (issue 11)",
+   "owner": "#11"
+  },
+  {
+   "line": 1150,
+   "quote": "await sendRpc('tools/call', {",
+   "scenario": "server-stateless",
+   "checks": [
+    "sep-2575-server-honors-notification-filter"
+   ],
+   "reason": "the trigger the stream at line 1144 observes (issue 11)",
+   "owner": "#11"
+  },
+  {
+   "line": 1209,
+   "quote": "const frames = await listenToStream(",
+   "scenario": "server-stateless",
+   "checks": [
+    "sep-2575-server-sends-prompts-list-changed-on-subscription"
+   ],
+   "reason": "a response stream the connection holds open; the core answers one body per request and streams belong to the transport and a trigger that changes the prompt list (issues 9 and 11)",
+   "owner": "#11"
+  },
+  {
+   "line": 1215,
+   "quote": "trigger = await sendRpc('tools/call', {",
+   "scenario": "server-stateless",
+   "checks": [
+    "sep-2575-server-sends-prompts-list-changed-on-subscription"
+   ],
+   "reason": "the trigger the stream at line 1209 observes (issues 9 and 11)",
+   "owner": "#11"
+  },
+  {
+   "line": 1279,
+   "quote": "const frames = await listenToStream(",
+   "scenario": "server-stateless",
+   "checks": [
+    "sep-2575-server-sends-tools-list-changed-on-subscription"
+   ],
+   "reason": "a response stream the connection holds open; the core answers one body per request and streams belong to the transport and a trigger that changes the tool list (issues 8 and 11)",
+   "owner": "#11"
+  },
+  {
+   "line": 1285,
+   "quote": "trigger = await sendRpc('tools/call', {",
+   "scenario": "server-stateless",
+   "checks": [
+    "sep-2575-server-sends-tools-list-changed-on-subscription"
+   ],
+   "reason": "the trigger the stream at line 1279 observes (issues 8 and 11)",
+   "owner": "#11"
+  }
+ ],
+ "unreached": [
+  {
+   "id": "sep-2243-server-no-xmcp-tool",
+   "reason": "emitted only when no listed tool has an x-mcp-header property; the fixture lists execute_sql, which has three"
+  },
+  {
+   "id": "sep-2243-server-no-string-param",
+   "reason": "emitted only when no x-mcp-header property is a string; region is one"
+  }
+ ]
+}

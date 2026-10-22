@@ -10,8 +10,8 @@
 # The meta-gate proves the suite never asserts an `open` claim as established,
 # and `CM-03` proves every `some-true` row cites an authority that exists.
 #
-# The three claims below are facts the codec reproduces from the standards and the
-# corpus it cites; the level of each is some-true.
+# The claims below are facts the codec and the stateless lifecycle reproduce from the
+# standards, the specification and the corpus they cite; the level of each is some-true.
 
 spec = "template/1"
 
@@ -19,4 +19,8 @@ claim = [
   { id = "AUTH-01", level = "some-true", statement = "RFC 8259 defines the JSON text grammar the parser implements.", authority = "A-RFC8259" },
   { id = "AUTH-02", level = "some-true", statement = "RFC 3629 defines the well-formed UTF-8 byte sequences the validator implements.", authority = "A-RFC3629" },
   { id = "AUTH-03", level = "some-true", statement = "The pinned JSONTestSuite classifies each of its 318 files as must-accept, must-reject or implementation-defined.", authority = "A-JSONTESTSUITE" },
+  { id = "AUTH-04", level = "some-true", statement = "The MCP specification revision 2026-07-28 defines the per-request _meta, the discovery result, the header checks and the HTTP statuses the lifecycle implements.", authority = "A-MCP-SPEC-2026-07-28" },
+  { id = "AUTH-05", level = "some-true", statement = "RFC 9110 defines the case-insensitive field names, the optional whitespace and the 405 Allow requirement the header handling implements.", authority = "A-RFC9110" },
+  { id = "AUTH-06", level = "some-true", statement = "RFC 4648 defines the Base64 alphabet, padding and canonical form the parameter header decoder implements.", authority = "A-RFC4648" },
+  { id = "AUTH-07", level = "some-true", statement = "The pinned conformance suite lists server-stateless as required for 2026-07-28 and the two HTTP header scenarios as pending and not scored.", authority = "A-MCP-CONFORMANCE" },
 ]
