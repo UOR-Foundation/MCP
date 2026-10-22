@@ -262,7 +262,7 @@ fn every_complete_four_byte_sequence_is_judged_as_table_3_7_judges_it_jc_14() {
     // fourth bytes, and over the lead, the second byte and the fourth byte with six
     // third bytes; the 2^32 sequences themselves are the theorems' work.
     let mut accepted = 0usize;
-    let mut judge = |sequence: [u8; 4]| {
+    let judge = |sequence: [u8; 4]| {
         let got = utf8(&sequence);
         assert_eq!(class(&got), standard(&sequence), "class of {sequence:02x?}");
         match first_refused(&sequence) {

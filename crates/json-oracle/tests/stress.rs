@@ -25,8 +25,9 @@ const LENGTHS: [usize; 3] = [256 * 1024, 1024 * 1024, 2 * 1024 * 1024];
 /// The fixed part of the bound, for thread start and allocator warm-up.
 const FIXED: Duration = Duration::from_millis(500);
 
-/// The per-byte part of the bound. The measured reads take about a tenth of it.
-const PER_BYTE: Duration = Duration::from_nanos(20_000);
+/// The per-byte part of the bound. The measured reads take under a seventh of it
+/// (0.7 microseconds a byte at most, in the dev profile at opt-level 1).
+const PER_BYTE: Duration = Duration::from_nanos(5_000);
 
 /// The largest factor by which one read may exceed the one before it, as a multiple
 /// of the factor by which the length grew. A linear read has 1, a read with a

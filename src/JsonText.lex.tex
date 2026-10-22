@@ -48,14 +48,44 @@ definition{
 }
 
 definition{
+  name: pushBlock,
+  parameters: [block : Bytes, stack : (List Bytes)],
+  result: (List Bytes),
+  body: (match stack
+    | List.nil => (cons block (nil Bytes))
+    | List.cons below rest => (if ((prim length below : Nat) =? (prim length block : Nat)) then (pushBlock (prim append below block : Bytes) rest) else (cons block (cons below rest)))),
+  executable: true,
+  recursive_argument: stack
+}
+
+definition{
+  name: gatherBlocks,
+  parameters: [stack : (List Bytes), items : (List Nat)],
+  result: (List Bytes),
+  body: (match items
+    | List.nil => stack
+    | List.cons head tail => (gatherBlocks (pushBlock (byteOf head) stack) tail)),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: joinBlocks,
+  parameters: [built : Bytes, stack : (List Bytes)],
+  result: Bytes,
+  body: (match stack
+    | List.nil => built
+    | List.cons head rest => (joinBlocks (prim append head built : Bytes) rest)),
+  executable: true,
+  recursive_argument: stack
+}
+
+definition{
   name: listToBytes,
   parameters: [built : Bytes, items : (List Nat)],
   result: Bytes,
-  body: (match items
-    | List.nil => built
-    | List.cons head tail => (listToBytes (prim append built (byteOf head) : Bytes) tail)),
-  executable: true,
-  recursive_argument: items
+  body: (prim append built (joinBlocks (emptyBytes) (gatherBlocks (nil Bytes) items)) : Bytes),
+  executable: true
 }
 
 definition{

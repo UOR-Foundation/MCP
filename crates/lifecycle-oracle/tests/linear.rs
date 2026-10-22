@@ -24,7 +24,7 @@ const LENGTHS: [usize; 3] = [256 * 1024, 1024 * 1024, 2 * 1024 * 1024];
 const FIXED: Duration = Duration::from_millis(500);
 
 /// The per-byte part of the bound.
-const PER_BYTE: Duration = Duration::from_nanos(20_000);
+const PER_BYTE: Duration = Duration::from_nanos(5_000);
 
 /// The largest factor by which one request may exceed the one before it, as a
 /// multiple of the factor by which the string grew (4, then 2).
