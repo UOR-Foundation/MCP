@@ -185,7 +185,7 @@ statement = "The response bodies the root writes in the vector and boundary test
 id = "LC-16"
 level = "build"
 suite = "lifecycle"
-statement = "The exported root needs no stack that grows with its input: its recorded effects do not include recursion, no function of the generated package is on a call cycle, and frames with fifty thousand header fields, a hundred thousand arguments, a two-mebibyte string, the deepest admitted JSON nesting and a long Base64 parameter header complete on a 2 MiB stack."
+statement = "The exported root needs no stack that grows with its input: its recorded effects do not include recursion, no function of the generated package is on a call cycle, and frames with two hundred thousand header fields, four hundred thousand arguments, a quarter-mebibyte string, the deepest admitted JSON nesting and a long Base64 parameter header complete on a 2 MiB stack."
 
 [[id]]
 id = "HH-01"

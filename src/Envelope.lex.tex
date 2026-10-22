@@ -8,6 +8,7 @@
 \importmodule{Tasks}
 \importmodule{Input}
 \importmodule{Json}
+\importmodule{JsonRead}
 \importmodule{Meta}
 \importmodule{Methods}
 \importmodule{Refusal}
@@ -52,14 +53,22 @@ definition{
 }
 
 definition{
+  name: iconsOnto,
+  parameters: [icons : (List Common::Icon), built : (List Json::Json)],
+  result: (List Json::Json),
+  body: (match icons
+    | List.nil => built
+    | List.cons head tail => (iconsOnto tail (cons (iconJson head) built))),
+  executable: true,
+  recursive_argument: icons
+}
+
+definition{
   name: iconsJson,
   parameters: [icons : (List Common::Icon)],
   result: (List Json::Json),
-  body: (match icons
-    | List.nil => (nil Json::Json)
-    | List.cons head tail => (cons (iconJson head) (iconsJson tail))),
-  executable: true,
-  recursive_argument: icons
+  body: (JsonRead::reverseOnto [Json::Json] (iconsOnto icons (nil Json::Json)) (nil Json::Json)),
+  executable: true
 }
 
 definition{

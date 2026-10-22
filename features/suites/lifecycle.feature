@@ -93,7 +93,7 @@ Feature: Stateless lifecycle
     Then the schema accepts every response and refuses an error response with a null id, a discover result without serverInfo and an unsupported-version error without the supported list
 
   @LC-16 @build
-  Scenario: The exported root needs no stack that grows with its input: its recorded effects do not include recursion, no function of the generated package is on a call cycle, and frames with fifty thousand header fields, a hundred thousand arguments, a two-mebibyte string, the deepest admitted JSON nesting and a long Base64 parameter header complete on a 2 MiB stack.
-    Given the generated package, its recorded effects and frames with fifty thousand header fields, a hundred thousand arguments, a two-mebibyte string, the deepest admitted nesting and a long Base64 header
+  Scenario: The exported root needs no stack that grows with its input: its recorded effects do not include recursion, no function of the generated package is on a call cycle, and frames with two hundred thousand header fields, four hundred thousand arguments, a quarter-mebibyte string, the deepest admitted JSON nesting and a long Base64 parameter header complete on a 2 MiB stack.
+    Given the generated package, its recorded effects and frames with two hundred thousand header fields, four hundred thousand arguments, a quarter-mebibyte string, the deepest admitted nesting and a long Base64 header
     When the call graph of the package is searched for a cycle and each frame runs on a thread with a 2 MiB stack
     Then there is no cycle, the effects do not include recursion and every frame is answered

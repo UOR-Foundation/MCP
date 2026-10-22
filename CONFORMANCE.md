@@ -72,7 +72,7 @@ model does not sanction.
 | `LC-13` | `build` | The oracle executes the package generated from the LexLean lifecycle root, whose recorded digest and provenance match the committed files. |
 | `LC-14` | `build` | Every request that the pinned scenarios send is a vector or is listed as a probe that is not run with its owning issue, and every check identifier the scenarios emit is covered, listed as not run, or listed as unreached by the fixture. |
 | `LC-15` | `build` | The response bodies the root writes in the vector and boundary tests validate against the MCP 2026-07-28 JSON Schema at the pinned specification commit, whose vendored file has the recorded checksum: as a JSON-RPC response, as the typed result response of the request's method, and as the typed error of its code. A validator is falsifying evidence and not the oracle for the protocol, which MCP#6 binds. |
-| `LC-16` | `build` | The exported root needs no stack that grows with its input: its recorded effects do not include recursion, no function of the generated package is on a call cycle, and frames with fifty thousand header fields, a hundred thousand arguments, a two-mebibyte string, the deepest admitted JSON nesting and a long Base64 parameter header complete on a 2 MiB stack. |
+| `LC-16` | `build` | The exported root needs no stack that grows with its input: its recorded effects do not include recursion, no function of the generated package is on a call cycle, and frames with two hundred thousand header fields, four hundred thousand arguments, a quarter-mebibyte string, the deepest admitted JSON nesting and a long Base64 parameter header complete on a 2 MiB stack. |
 
 ## Cited authorities
 

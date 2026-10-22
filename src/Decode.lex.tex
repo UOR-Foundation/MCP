@@ -3,6 +3,7 @@
 \useglossary{lexlean.std.nat@1.2.0}
 \useglossary{mcp.core@1.0.0}
 \importmodule{Json}
+\importmodule{JsonRead}
 \importmodule{Meta}
 \importmodule{Methods}
 \importmodule{Refusal}
@@ -57,18 +58,30 @@ definition{
 }
 
 definition{
+  name: textMembersOnto,
+  parameters: [
+    key : String,
+    members : (List (String * Json::Json)),
+    built : (List (String * String))
+  ],
+  result: (Result (List (String * String)) Refusal::ParamsProblem),
+  body: (match members
+    | List.nil => (ctor Result.ok [(List (String * String)), Refusal::ParamsProblem] built)
+    | List.cons entry rest => (match (Json::asText (second entry))
+      | Option.none => (ctor Result.error [(List (String * String)), Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedField key))
+      | Option.some text => (textMembersOnto key rest (cons ((first entry), text) built)))),
+  executable: true,
+  recursive_argument: members
+}
+
+definition{
   name: textMembers,
   parameters: [key : String, members : (List (String * Json::Json))],
   result: (Result (List (String * String)) Refusal::ParamsProblem),
-  body: (match members
-    | List.nil => (ctor Result.ok [(List (String * String)), Refusal::ParamsProblem] (nil (String * String)))
-    | List.cons entry rest => (match (Json::asText (second entry))
-      | Option.none => (ctor Result.error [(List (String * String)), Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedField key))
-      | Option.some text => (match (textMembers key rest)
-        | Result.ok tail => (ctor Result.ok [(List (String * String)), Refusal::ParamsProblem] (cons ((first entry), text) tail))
-        | Result.error problem => (ctor Result.error [(List (String * String)), Refusal::ParamsProblem] problem)))),
-  executable: true,
-  recursive_argument: members
+  body: (match (textMembersOnto key members (nil (String * String)))
+    | Result.ok built => (ctor Result.ok [(List (String * String)), Refusal::ParamsProblem] (JsonRead::reverseOnto [(String * String)] built (nil (String * String))))
+    | Result.error problem => (ctor Result.error [(List (String * String)), Refusal::ParamsProblem] problem)),
+  executable: true
 }
 
 definition{

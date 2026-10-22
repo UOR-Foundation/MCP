@@ -138,7 +138,7 @@ definition{
   body: (Serve::serve (fixtureInfo) (ref fixtureAnswer) input),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true,
-  production: {effects: [allocation, overflow, recursion], targets: [rust-std]}
+  production: {effects: [allocation, overflow], targets: [rust-std]}
 }
 \end{semanticmodule}
 \end{lexlean}

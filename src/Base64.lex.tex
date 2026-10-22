@@ -2,6 +2,7 @@
 \useglossary{lexlean.std.bool@1.2.0}
 \useglossary{lexlean.std.nat@1.2.0}
 \useglossary{mcp.core@1.0.0}
+\importmodule{JsonRead}
 \title{MCP header encoding}
 \begin{semanticmodule}
 definition{
@@ -110,7 +111,7 @@ definition{
             | List.nil => (ctor Option.none [(List Nat)])
             | List.cons d rest => (match (group a b c d (isEmpty rest))
               | Option.none => (ctor Option.none [(List Nat)])
-              | Option.some produced => (groups below rest (prim append built produced : (List Nat))))))))),
+              | Option.some produced => (groups below rest (JsonRead::reverseOnto [Nat] produced built)))))))),
   executable: true,
   recursive_argument: fuel
 }
@@ -119,7 +120,9 @@ definition{
   name: decode,
   parameters: [chars : (List Nat)],
   result: (Option (List Nat)),
-  body: (groups (prim length chars : Nat) chars (nil Nat)),
+  body: (match (groups (prim length chars : Nat) chars (nil Nat))
+    | Option.none => (ctor Option.none [(List Nat)])
+    | Option.some reversed => (ctor Option.some [(List Nat)] (JsonRead::reverseOnto [Nat] reversed (nil Nat)))),
   executable: true
 }
 \end{semanticmodule}

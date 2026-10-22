@@ -8,6 +8,7 @@
 \importmodule{Dispatch}
 \importmodule{Envelope}
 \importmodule{Json}
+\importmodule{JsonRead}
 \importmodule{Methods}
 \importmodule{Refusal}
 \title{MCP result bodies as JSON}
@@ -96,14 +97,22 @@ definition{
 }
 
 definition{
+  name: rolesOnto,
+  parameters: [roles : (List Common::Role), built : (List Json::Json)],
+  result: (List Json::Json),
+  body: (match roles
+    | List.nil => built
+    | List.cons head tail => (rolesOnto tail (cons (ctor Json::Json.text (Common::roleWire head)) built))),
+  executable: true,
+  recursive_argument: roles
+}
+
+definition{
   name: rolesJson,
   parameters: [roles : (List Common::Role)],
   result: (List Json::Json),
-  body: (match roles
-    | List.nil => (nil Json::Json)
-    | List.cons head tail => (cons (ctor Json::Json.text (Common::roleWire head)) (rolesJson tail))),
-  executable: true,
-  recursive_argument: roles
+  body: (JsonRead::reverseOnto [Json::Json] (rolesOnto roles (nil Json::Json)) (nil Json::Json)),
+  executable: true
 }
 
 definition{
@@ -166,18 +175,26 @@ definition{
 }
 
 definition{
+  name: blocksOnto,
+  parameters: [blocks : (List Content::ContentBlock), built : (List Json::Json)],
+  result: (Option (List Json::Json)),
+  body: (match blocks
+    | List.nil => (ctor Option.some [(List Json::Json)] built)
+    | List.cons head tail => (match (blockJson head)
+      | Option.none => (ctor Option.none [(List Json::Json)])
+      | Option.some encoded => (blocksOnto tail (cons encoded built)))),
+  executable: true,
+  recursive_argument: blocks
+}
+
+definition{
   name: blocksJson,
   parameters: [blocks : (List Content::ContentBlock)],
   result: (Option (List Json::Json)),
-  body: (match blocks
-    | List.nil => (ctor Option.some [(List Json::Json)] (nil Json::Json))
-    | List.cons head tail => (match (blockJson head)
-      | Option.none => (ctor Option.none [(List Json::Json)])
-      | Option.some encoded => (match (blocksJson tail)
-        | Option.none => (ctor Option.none [(List Json::Json)])
-        | Option.some more => (ctor Option.some [(List Json::Json)] (cons encoded more))))),
-  executable: true,
-  recursive_argument: blocks
+  body: (match (blocksOnto blocks (nil Json::Json))
+    | Option.none => (ctor Option.none [(List Json::Json)])
+    | Option.some built => (ctor Option.some [(List Json::Json)] (JsonRead::reverseOnto [Json::Json] built (nil Json::Json)))),
+  executable: true
 }
 
 definition{
@@ -199,14 +216,22 @@ definition{
 }
 
 definition{
+  name: toolsOnto,
+  parameters: [tools : (List Content::Tool), built : (List Json::Json)],
+  result: (List Json::Json),
+  body: (match tools
+    | List.nil => built
+    | List.cons head tail => (toolsOnto tail (cons (toolJson head) built))),
+  executable: true,
+  recursive_argument: tools
+}
+
+definition{
   name: toolsJson,
   parameters: [tools : (List Content::Tool)],
   result: (List Json::Json),
-  body: (match tools
-    | List.nil => (nil Json::Json)
-    | List.cons head tail => (cons (toolJson head) (toolsJson tail))),
-  executable: true,
-  recursive_argument: tools
+  body: (JsonRead::reverseOnto [Json::Json] (toolsOnto tools (nil Json::Json)) (nil Json::Json)),
+  executable: true
 }
 
 definition{

@@ -6,6 +6,7 @@
 \importmodule{Common}
 \importmodule{Extension}
 \importmodule{Json}
+\importmodule{JsonRead}
 \importmodule{JsonText}
 \importmodule{Methods}
 \importmodule{Param}
@@ -382,15 +383,29 @@ definition{
 }
 
 definition{
-  name: paramHeaders,
-  parameters: [fields : (List Field), rules : (List Extension::ParamRule), tool : (Option String)],
+  name: paramHeadersOnto,
+  parameters: [
+    fields : (List Field),
+    rules : (List Extension::ParamRule),
+    tool : (Option String),
+    built : (List Param::ParamHeader)
+  ],
   result: (List Param::ParamHeader),
   body: (match rules
-    | List.nil => (nil Param::ParamHeader)
-    | List.cons rule rest => (if (ruleApplies rule tool) then (cons (record Param::ParamHeader {header := (project rule header), path := (project rule path), kind := (project rule kind), seen := (paramSeen fields (project rule header))}) (paramHeaders fields rest tool)) else (paramHeaders fields rest tool))),
+    | List.nil => built
+    | List.cons rule rest => (if (ruleApplies rule tool) then (paramHeadersOnto fields rest tool (cons (record Param::ParamHeader {header := (project rule header), path := (project rule path), kind := (project rule kind), seen := (paramSeen fields (project rule header))}) built)) else (paramHeadersOnto fields rest tool built))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true,
   recursive_argument: rules
+}
+
+definition{
+  name: paramHeaders,
+  parameters: [fields : (List Field), rules : (List Extension::ParamRule), tool : (Option String)],
+  result: (List Param::ParamHeader),
+  body: (JsonRead::reverseOnto [Param::ParamHeader] (paramHeadersOnto fields rules tool (nil Param::ParamHeader)) (nil Param::ParamHeader)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
 }
 
 definition{

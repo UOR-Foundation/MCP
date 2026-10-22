@@ -3,6 +3,7 @@
 \useglossary{lexlean.std.nat@1.2.0}
 \useglossary{mcp.core@1.0.0}
 \importmodule{Http}
+\importmodule{JsonRead}
 \importmodule{JsonText}
 \title{MCP exchange frames}
 \begin{semanticmodule}
@@ -132,14 +133,22 @@ definition{
 }
 
 definition{
+  name: fieldsListOnto,
+  parameters: [reversed : (List Http::Field), built : (List Nat)],
+  result: (List Nat),
+  body: (match reversed
+    | List.nil => built
+    | List.cons head tail => (fieldsListOnto tail (prim append (fieldList head) built : (List Nat)))),
+  executable: true,
+  recursive_argument: reversed
+}
+
+definition{
   name: fieldsList,
   parameters: [fields : (List Http::Field)],
   result: (List Nat),
-  body: (match fields
-    | List.nil => (nil Nat)
-    | List.cons head tail => (prim append (fieldList head) (fieldsList tail) : (List Nat))),
-  executable: true,
-  recursive_argument: fields
+  body: (fieldsListOnto (JsonRead::reverseOnto [Http::Field] fields (nil Http::Field)) (nil Nat)),
+  executable: true
 }
 
 definition{

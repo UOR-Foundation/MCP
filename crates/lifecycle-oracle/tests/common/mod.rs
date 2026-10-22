@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use boon::{Compiler, SchemaIndex, Schemas};
-use lifecycle_oracle::{decode_response, exchange_frame, FrameError, Request, Response};
+use lifecycle_oracle::{decode_response, exchange_frame_on, FrameError, Request, Response};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
@@ -323,7 +323,12 @@ pub fn exchange_checked(request: &Request) -> Result<Response, FrameError> {
 
 /// Run one frame through the generated root, checking the response against the schema.
 pub fn frame_checked(frame: &[u8]) -> Result<Response, FrameError> {
-    let response = decode_response(&exchange_frame(frame))?;
+    frame_checked_on(frame, lifecycle_oracle::STACK_BYTES)
+}
+
+/// [`frame_checked`] on a thread with `stack_bytes` of stack.
+pub fn frame_checked_on(frame: &[u8], stack_bytes: usize) -> Result<Response, FrameError> {
+    let response = decode_response(&exchange_frame_on(frame, stack_bytes))?;
     check_response(None, &response);
     Ok(response)
 }

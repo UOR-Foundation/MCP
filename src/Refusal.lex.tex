@@ -5,6 +5,7 @@
 \importmodule{Capabilities}
 \importmodule{Json}
 \importmodule{JsonRpc}
+\importmodule{JsonRead}
 \title{MCP typed refusals}
 \begin{semanticmodule}
 inductive{
@@ -153,14 +154,22 @@ definition{
 }
 
 definition{
+  name: textListOnto,
+  parameters: [items : (List String), built : (List Json::Json)],
+  result: (List Json::Json),
+  body: (match items
+    | List.nil => built
+    | List.cons head tail => (textListOnto tail (cons (ctor Json::Json.text head) built))),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
   name: textList,
   parameters: [items : (List String)],
   result: (List Json::Json),
-  body: (match items
-    | List.nil => (nil Json::Json)
-    | List.cons head tail => (cons (ctor Json::Json.text head) (textList tail))),
-  executable: true,
-  recursive_argument: items
+  body: (JsonRead::reverseOnto [Json::Json] (textListOnto items (nil Json::Json)) (nil Json::Json)),
+  executable: true
 }
 
 definition{

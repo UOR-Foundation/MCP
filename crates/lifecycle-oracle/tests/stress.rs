@@ -2,11 +2,14 @@
 //!
 //! Every test here runs the generated root on `lifecycle_oracle::STACK_BYTES`, which
 //! is 2 MiB, the size Rust gives a spawned thread when nothing says otherwise, on a
-//! frame built to be as large as the tests can afford in each dimension the core
-//! reads: header fields, repeated standard headers, a body object with a hundred
-//! thousand members, one very long string, JSON nested as deep as the codec admits,
-//! and a very long Base64 parameter header. A stack overflow aborts the process, so a
-//! passing run is the evidence; `LIFECYCLE.md` gives the argument that it must pass.
+//! frame built to be large in each dimension the core reads: header fields, repeated
+//! standard headers, a body object with four hundred thousand members, a long
+//! string, JSON nested as deep as the codec admits, and a long Base64 parameter
+//! header. A stack overflow aborts the process, so a passing run is the evidence;
+//! `LIFECYCLE.md` gives the argument that it must pass. The long strings are a
+//! quarter of a mebibyte and less because reading a JSON string is quadratic in its
+//! length in the codec of #20 (`JsonText.listToBytes`): a two-mebibyte string took
+//! five minutes, and `LIFECYCLE.md` records it as a finding.
 //!
 //! The argument is a property of the package, checked in `provenance.rs`: no function
 //! of it calls itself except as a loop, and its recorded effects do not include
@@ -19,13 +22,25 @@ use lifecycle_oracle::{Request, STACK_BYTES};
 use serde_json::{json, Value};
 
 /// Header fields a stress request carries besides the standard ones.
-const PAD_HEADERS: usize = 50_000;
+const PAD_HEADERS: usize = 200_000;
 /// Members of the `arguments` object of the large tool call.
-const ARGUMENT_MEMBERS: usize = 100_000;
+const ARGUMENT_MEMBERS: usize = 400_000;
 /// Bytes of the one long text argument.
-const LONG_TEXT: usize = 2 * 1024 * 1024;
+const LONG_TEXT: usize = 256 * 1024;
 /// Bytes decoded from the long Base64 parameter header.
-const LONG_PARAM: usize = 768 * 1024;
+const LONG_PARAM: usize = 96 * 1024;
+
+/// The size of a stress dimension, divided by `STRESS_DIVISOR` when that is set. The
+/// stack the root needs does not depend on the size, so the stack-floor probe, which
+/// runs many times, shrinks the frames; the tests do not set it.
+fn sized(full: usize) -> usize {
+    let divisor: usize = std::env::var("STRESS_DIVISOR")
+        .ok()
+        .and_then(|d| d.parse().ok())
+        .filter(|d| *d > 0)
+        .unwrap_or(1);
+    (full / divisor).max(1)
+}
 /// The deepest nesting the JSON codec admits (`JsonRead.maxDepth`).
 const MAX_DEPTH: usize = 512;
 
@@ -39,7 +54,7 @@ mod shapes {
 
     pub fn many_header_fields() -> Request {
         let mut headers = echo_headers();
-        for i in 0..PAD_HEADERS {
+        for i in 0..sized(PAD_HEADERS) {
             headers.push((format!("X-Pad-{i}"), "v".to_owned()));
         }
         post_owned(&headers, &call("echo", "{}", "1"))
@@ -47,7 +62,7 @@ mod shapes {
 
     pub fn repeated_standard_header() -> Request {
         let mut headers = echo_headers();
-        for _ in 0..PAD_HEADERS {
+        for _ in 0..sized(PAD_HEADERS) {
             headers.push(("MCP-Protocol-Version".to_owned(), "2026-07-28".to_owned()));
         }
         post_owned(&headers, &call("echo", "{}", "1"))
@@ -55,7 +70,7 @@ mod shapes {
 
     pub fn many_arguments() -> Request {
         let mut arguments = String::from("{");
-        for i in 0..ARGUMENT_MEMBERS {
+        for i in 0..sized(ARGUMENT_MEMBERS) {
             if i > 0 {
                 arguments.push(',');
             }
@@ -66,7 +81,7 @@ mod shapes {
     }
 
     pub fn long_text() -> Request {
-        let text = "a".repeat(LONG_TEXT);
+        let text = "a".repeat(sized(LONG_TEXT));
         let arguments = format!(r#"{{"query":"{text}"}}"#);
         post_owned(&echo_headers(), &call("echo", &arguments, "1"))
     }
@@ -82,7 +97,7 @@ mod shapes {
 
     pub fn long_base64_parameter() -> Request {
         // execute_sql mirrors `region` in Mcp-Param-Region.
-        let region = "r".repeat(LONG_PARAM);
+        let region = "r".repeat(sized(LONG_PARAM));
         const ALPHABET: &[u8; 64] =
             b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         let mut encoded = String::new();
@@ -113,7 +128,7 @@ mod shapes {
 
     pub fn padded_tools_list() -> Request {
         let mut headers = standard("tools/list", None);
-        for i in 0..PAD_HEADERS {
+        for i in 0..sized(PAD_HEADERS) {
             headers.push((format!("X-Pad-{i}"), "v".to_owned()));
         }
         post_owned(
@@ -139,25 +154,25 @@ fn the_stack_is_the_default_thread_stack_lc_16() {
 }
 
 #[test]
-fn fifty_thousand_header_fields_are_read_on_the_default_stack_lc_16() {
+fn two_hundred_thousand_header_fields_are_read_on_the_default_stack_lc_16() {
     let (status, body) = run(&shapes::many_header_fields());
     assert_ok(status, &body, "many header fields");
 }
 
 #[test]
-fn fifty_thousand_repeats_of_a_standard_header_are_one_refusal_lc_16() {
+fn two_hundred_thousand_repeats_of_a_standard_header_are_one_refusal_lc_16() {
     let (status, body) = run(&shapes::repeated_standard_header());
     assert_eq!((status, &body["error"]["code"]), (400, &json!(-32020)));
 }
 
 #[test]
-fn an_arguments_object_of_a_hundred_thousand_members_is_decoded_lc_16() {
+fn an_arguments_object_of_four_hundred_thousand_members_is_decoded_lc_16() {
     let (status, body) = run(&shapes::many_arguments());
     assert_ok(status, &body, "many arguments");
 }
 
 #[test]
-fn a_two_mebibyte_text_argument_is_decoded_lc_16() {
+fn a_quarter_mebibyte_text_argument_is_decoded_lc_16() {
     let (status, body) = run(&shapes::long_text());
     assert_ok(status, &body, "long text");
 }
@@ -188,7 +203,8 @@ fn a_tools_list_with_a_padded_header_set_answers_on_the_default_stack_lc_16() {
 
 /// How little stack the stress frames need: run with `STACK_PROBE_BYTES=<n>`, for
 /// example
-/// `STACK_PROBE_BYTES=65536 cargo test -p lifecycle-oracle --test stress -- --ignored`.
+/// `STACK_PROBE_BYTES=65536 STRESS_DIVISOR=50 cargo test -p lifecycle-oracle --test stress -- --ignored`;
+/// `STRESS_ONLY=<shape>` runs one shape.
 /// A stack that is too small aborts the process, so the probe is run once per size,
 /// outside the suite.
 #[test]
@@ -210,12 +226,19 @@ fn the_stack_floor_probe() {
         ("long_base64_parameter", shapes::long_base64_parameter()),
         ("padded_tools_list", shapes::padded_tools_list()),
     ];
+    let only = std::env::var("STRESS_ONLY").ok();
     for (name, request) in frames {
+        if only.as_deref().is_some_and(|wanted| wanted != name) {
+            continue;
+        }
         let frame = lifecycle_oracle::encode_request(&request);
-        let out = lifecycle_oracle::exchange_frame_on(&frame, bytes);
+        let started = std::time::Instant::now();
+        let response = common::frame_checked_on(&frame, bytes).expect("a response frame");
         eprintln!(
-            "{name}: {} response bytes on {bytes} bytes of stack",
-            out.len()
+            "{name}: frame of {} bytes, status {}, {} ms, on {bytes} bytes of stack",
+            frame.len(),
+            response.status,
+            started.elapsed().as_millis()
         );
     }
 }

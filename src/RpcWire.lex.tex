@@ -220,12 +220,12 @@ definition{
 }
 
 definition{
-  name: optionalIdJson,
+  name: idMember,
   parameters: [ident : (Option JsonRpc::RequestId)],
-  result: Json::Json,
+  result: (List (String * Json::Json)),
   body: (match ident
-    | Option.none => (ctor Json::Json.null)
-    | Option.some present => (idJson present)),
+    | Option.none => (nil (String * Json::Json))
+    | Option.some present => (cons ("id", (idJson present)) (nil (String * Json::Json)))),
   executable: true
 }
 
@@ -248,10 +248,18 @@ definition{
 }
 
 definition{
+  name: errorMembers,
+  parameters: [ident : (Option JsonRpc::RequestId), error : JsonRpc::ErrorObject],
+  result: (List (String * Json::Json)),
+  body: (cons ("jsonrpc", (ctor Json::Json.text (JsonRpc::jsonrpcVersion))) (prim append (idMember ident) (cons ("error", (errorObjectJson error)) (nil (String * Json::Json))) : (List (String * Json::Json)))),
+  executable: true
+}
+
+definition{
   name: errorResponse,
   parameters: [ident : (Option JsonRpc::RequestId), error : JsonRpc::ErrorObject],
   result: Json::Json,
-  body: (ctor Json::Json.object (cons ("jsonrpc", (ctor Json::Json.text (JsonRpc::jsonrpcVersion))) (cons ("id", (optionalIdJson ident)) (cons ("error", (errorObjectJson error)) (nil (String * Json::Json)))))),
+  body: (ctor Json::Json.object (errorMembers ident error)),
   executable: true
 }
 
@@ -261,6 +269,27 @@ definition{
   result: Json::Json,
   body: (ctor Json::Json.object (cons ("jsonrpc", (ctor Json::Json.text (JsonRpc::jsonrpcVersion))) (cons ("id", (idJson ident)) (cons ("result", (ctor Json::Json.object (project result members))) (nil (String * Json::Json)))))),
   executable: true
+}
+
+theorem{
+  name: an_error_without_an_id_has_no_id_member,
+  parameters: [error : JsonRpc::ErrorObject],
+  statement: ((Json::lookupIn "id" (errorMembers (ctor Option.none [JsonRpc::RequestId]) error)) = (ctor Json::Lookup.absent)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_error_with_an_id_carries_that_id,
+  parameters: [ident : JsonRpc::RequestId, error : JsonRpc::ErrorObject],
+  statement: ((Json::lookupIn "id" (errorMembers (ctor Option.some [JsonRpc::RequestId] ident) error)) = (ctor Json::Lookup.present (idJson ident))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_error_response_is_an_object_of_its_members,
+  parameters: [ident : (Option JsonRpc::RequestId), error : JsonRpc::ErrorObject],
+  statement: ((errorResponse ident error) = (ctor Json::Json.object (errorMembers ident error))),
+  proof: reflexivity{}
 }
 \end{semanticmodule}
 \end{lexlean}
