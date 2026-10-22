@@ -24,10 +24,34 @@ structure{
 }
 
 structure{
-  name: ValidRequest,
+  name: Admitted,
   type_parameters: [],
   parameters: [],
-  fields: [{name: id, type: JsonRpc::RequestId}, {name: request, type: Methods::ClientRequest}]
+  fields: [
+    {name: id, type: JsonRpc::RequestId},
+    {name: wire, type: String},
+    {name: meta, type: Meta::RequestMeta},
+    {name: params, type: Json::JsonObject}
+  ]
+}
+
+inductive{
+  name: Admission,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: admitted, fields: [Admitted]}, {name: refused, fields: [Refusal::Refusal]}]
+}
+
+structure{
+  name: Routed,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: id, type: JsonRpc::RequestId},
+    {name: method, type: Methods::Method},
+    {name: meta, type: Meta::RequestMeta},
+    {name: params, type: Json::JsonObject}
+  ]
 }
 
 definition{
@@ -245,7 +269,7 @@ definition{
   name: headerCheck,
   parameters: [
     headers : (Option Headers),
-    method : Methods::Method,
+    field : Methods::NameField,
     wireMethod : String,
     version : String,
     params : Json::JsonObject
@@ -257,7 +281,7 @@ definition{
       | Option.none => (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.missingProtocolVersionHeader))
       | Option.some headerVersion => (if (prim equal headerVersion version : Bool) then (match (project present method)
         | Option.none => (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.missingMethodHeader))
-        | Option.some headerMethod => (if (prim equal headerMethod wireMethod : Bool) then (nameHeaderCheck (project present name) (Methods::nameFieldOf method) params) else (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.methodDiffers)))) else (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.protocolVersionDiffers)))))
+        | Option.some headerMethod => (if (prim equal headerMethod wireMethod : Bool) then (nameHeaderCheck (project present name) field params) else (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.methodDiffers)))) else (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.protocolVersionDiffers)))))
 }
 
 definition{
@@ -275,29 +299,16 @@ definition{
 }
 
 definition{
-  name: afterDecode,
-  parameters: [
-    request : JsonRpc::Request,
-    decoded : (Result Methods::ClientRequest Refusal::ParamsProblem)
-  ],
-  result: (Result ValidRequest Refusal::Refusal),
-  body: (match decoded
-    | Result.error problem => (ctor Result.error [ValidRequest, Refusal::Refusal] (ctor Refusal::Refusal.invalidParams problem))
-    | Result.ok typed => (ctor Result.ok [ValidRequest, Refusal::Refusal] (record ValidRequest {id := (project request id), request := typed})))
-}
-
-definition{
   name: afterVersion,
   parameters: [
     request : JsonRpc::Request,
-    method : Methods::Method,
     meta : Meta::RequestMeta,
     gated : (Option Refusal::Refusal)
   ],
-  result: (Result ValidRequest Refusal::Refusal),
+  result: Admission,
   body: (match gated
-    | Option.some refusal => (ctor Result.error [ValidRequest, Refusal::Refusal] refusal)
-    | Option.none => (afterDecode request (Decode::decodeParams method meta (paramsObject (project request params)))))
+    | Option.some refusal => (ctor Admission.refused refusal)
+    | Option.none => (ctor Admission.admitted (record Admitted {id := (project request id), wire := (project request method), meta := meta, params := (paramsObject (project request params))})))
 }
 
 definition{
@@ -305,14 +316,13 @@ definition{
   parameters: [
     versions : (List String),
     request : JsonRpc::Request,
-    method : Methods::Method,
     meta : Meta::RequestMeta,
     header : (Option Refusal::HeaderProblem)
   ],
-  result: (Result ValidRequest Refusal::Refusal),
+  result: Admission,
   body: (match header
-    | Option.some problem => (ctor Result.error [ValidRequest, Refusal::Refusal] (ctor Refusal::Refusal.headerMismatch problem))
-    | Option.none => (afterVersion request method meta (versionGate (project meta protocolVersion) versions)))
+    | Option.some problem => (ctor Admission.refused (ctor Refusal::Refusal.headerMismatch problem))
+    | Option.none => (afterVersion request meta (versionGate (project meta protocolVersion) versions)))
 }
 
 definition{
@@ -321,48 +331,45 @@ definition{
     headers : (Option Headers),
     versions : (List String),
     request : JsonRpc::Request,
-    method : Methods::Method,
     read : (Result Meta::RequestMeta Refusal::ParamsProblem)
   ],
-  result: (Result ValidRequest Refusal::Refusal),
+  result: Admission,
   body: (match read
-    | Result.error problem => (ctor Result.error [ValidRequest, Refusal::Refusal] (ctor Refusal::Refusal.invalidParams problem))
-    | Result.ok meta => (afterHeaders versions request method meta (headerCheck headers method (project request method) (project meta protocolVersion) (paramsObject (project request params)))))
+    | Result.error problem => (ctor Admission.refused (ctor Refusal::Refusal.invalidParams problem))
+    | Result.ok meta => (afterHeaders versions request meta (headerCheck headers (Methods::nameFieldOfWire (project request method)) (project request method) (project meta protocolVersion) (paramsObject (project request params)))))
 }
 
 definition{
-  name: validateKnown,
-  parameters: [
-    headers : (Option Headers),
-    versions : (List String),
-    request : JsonRpc::Request,
-    method : Methods::Method
-  ],
-  result: (Result ValidRequest Refusal::Refusal),
-  body: (afterMeta headers versions request method (metaOf (project request params))),
+  name: admissionOf,
+  parameters: [headers : (Option Headers), versions : (List String), request : JsonRpc::Request],
+  result: Admission,
+  body: (afterMeta headers versions request (metaOf (project request params))),
   axioms: [propext]
 }
 
 definition{
   name: afterRoute,
-  parameters: [
-    headers : (Option Headers),
-    versions : (List String),
-    request : JsonRpc::Request,
-    route : Methods::MethodRoute
-  ],
-  result: (Result ValidRequest Refusal::Refusal),
+  parameters: [admitted : Admitted, route : Methods::MethodRoute],
+  result: (Result Routed Refusal::Refusal),
   body: (match route
-    | Methods::MethodRoute.unknown => (ctor Result.error [ValidRequest, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound (project request method)))
-    | Methods::MethodRoute.known method => (validateKnown headers versions request method)),
-  axioms: [propext]
+    | Methods::MethodRoute.unknown => (ctor Result.error [Routed, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound (project admitted wire)))
+    | Methods::MethodRoute.known method => (ctor Result.ok [Routed, Refusal::Refusal] (record Routed {id := (project admitted id), method := method, meta := (project admitted meta), params := (project admitted params)})))
+}
+
+definition{
+  name: afterAdmit,
+  parameters: [route : Methods::MethodRoute, admission : Admission],
+  result: (Result Routed Refusal::Refusal),
+  body: (match admission
+    | Admission.refused refusal => (ctor Result.error [Routed, Refusal::Refusal] refusal)
+    | Admission.admitted admitted => (afterRoute admitted route))
 }
 
 definition{
   name: validate,
   parameters: [headers : (Option Headers), versions : (List String), request : JsonRpc::Request],
-  result: (Result ValidRequest Refusal::Refusal),
-  body: (afterRoute headers versions request (Methods::routeOf (project request method))),
+  result: (Result Routed Refusal::Refusal),
+  body: (afterAdmit (Methods::routeOf (project request method)) (admissionOf headers versions request)),
   axioms: [propext]
 }
 
@@ -489,19 +496,19 @@ theorem{
 
 definition{
   name: methodOfOutcome,
-  parameters: [outcome : (Result ValidRequest Refusal::Refusal)],
+  parameters: [outcome : (Result Routed Refusal::Refusal)],
   result: (Option Methods::Method),
   body: (match outcome
-    | Result.ok valid => (ctor Option.some [Methods::Method] (Methods::methodOfRequest (project valid request)))
+    | Result.ok routed => (ctor Option.some [Methods::Method] (project routed method))
     | Result.error refusal => (ctor Option.none [Methods::Method]))
 }
 
 definition{
   name: codeOfOutcome,
-  parameters: [outcome : (Result ValidRequest Refusal::Refusal)],
+  parameters: [outcome : (Result Routed Refusal::Refusal)],
   result: (Option Int),
   body: (match outcome
-    | Result.ok valid => (ctor Option.none [Int])
+    | Result.ok routed => (ctor Option.none [Int])
     | Result.error refusal => (ctor Option.some [Int] (Refusal::codeOf refusal)))
 }
 
@@ -541,87 +548,6 @@ definition{
 }
 
 theorem{
-  name: validation_routes_by_method_name,
-  parameters: [headers : (Option Headers), versions : (List String), request : JsonRpc::Request],
-  statement: ((validate headers versions request) = (afterRoute headers versions request (Methods::routeOf (project request method)))),
-  proof: reflexivity{},
-  axioms: [propext]
-}
-
-theorem{
-  name: unknown_method_is_method_not_found,
-  parameters: [headers : (Option Headers), versions : (List String), request : JsonRpc::Request],
-  statement: ((afterRoute headers versions request (ctor Methods::MethodRoute.unknown)) = (ctor Result.error [ValidRequest, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound (project request method)))),
-  proof: reflexivity{},
-  axioms: [propext]
-}
-
-theorem{
-  name: known_method_continues_with_its_meta,
-  parameters: [
-    headers : (Option Headers),
-    versions : (List String),
-    request : JsonRpc::Request,
-    method : Methods::Method
-  ],
-  statement: ((afterRoute headers versions request (ctor Methods::MethodRoute.known method)) = (afterMeta headers versions request method (metaOf (project request params)))),
-  proof: reflexivity{},
-  axioms: [propext]
-}
-
-theorem{
-  name: unreadable_meta_is_invalid_params,
-  parameters: [
-    headers : (Option Headers),
-    versions : (List String),
-    request : JsonRpc::Request,
-    method : Methods::Method,
-    problem : Refusal::ParamsProblem
-  ],
-  statement: ((afterMeta headers versions request method (ctor Result.error [Meta::RequestMeta, Refusal::ParamsProblem] problem)) = (ctor Result.error [ValidRequest, Refusal::Refusal] (ctor Refusal::Refusal.invalidParams problem))),
-  proof: reflexivity{}
-}
-
-theorem{
-  name: header_problem_is_header_mismatch,
-  parameters: [
-    versions : (List String),
-    request : JsonRpc::Request,
-    method : Methods::Method,
-    meta : Meta::RequestMeta,
-    problem : Refusal::HeaderProblem
-  ],
-  statement: ((afterHeaders versions request method meta (ctor Option.some [Refusal::HeaderProblem] problem)) = (ctor Result.error [ValidRequest, Refusal::Refusal] (ctor Refusal::Refusal.headerMismatch problem))),
-  proof: reflexivity{}
-}
-
-theorem{
-  name: gated_version_is_refused,
-  parameters: [
-    request : JsonRpc::Request,
-    method : Methods::Method,
-    meta : Meta::RequestMeta,
-    refusal : Refusal::Refusal
-  ],
-  statement: ((afterVersion request method meta (ctor Option.some [Refusal::Refusal] refusal)) = (ctor Result.error [ValidRequest, Refusal::Refusal] refusal)),
-  proof: reflexivity{}
-}
-
-theorem{
-  name: undecodable_params_are_invalid_params,
-  parameters: [request : JsonRpc::Request, problem : Refusal::ParamsProblem],
-  statement: ((afterDecode request (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)) = (ctor Result.error [ValidRequest, Refusal::Refusal] (ctor Refusal::Refusal.invalidParams problem))),
-  proof: reflexivity{}
-}
-
-theorem{
-  name: decoded_params_keep_the_request_id,
-  parameters: [request : JsonRpc::Request, typed : Methods::ClientRequest],
-  statement: ((afterDecode request (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] typed)) = (ctor Result.ok [ValidRequest, Refusal::Refusal] (record ValidRequest {id := (project request id), request := typed}))),
-  proof: reflexivity{}
-}
-
-theorem{
   name: unsupported_version_is_refused_with_the_supported_list,
   parameters: [version : String, versions : (List String)],
   statement: ((gate false version versions) = (ctor Option.some [Refusal::Refusal] (ctor Refusal::Refusal.unsupportedProtocolVersion version versions))),
@@ -656,55 +582,202 @@ theorem{
   proof: reflexivity{}
 }
 
+definition{
+  name: isRefused,
+  parameters: [outcome : (Result Routed Refusal::Refusal)],
+  result: Bool,
+  body: (match outcome | Result.ok routed => false | Result.error refusal => true)
+}
+
+definition{
+  name: neverRoutesUnknown,
+  parameters: [route : Methods::MethodRoute, outcome : (Result Routed Refusal::Refusal)],
+  result: Bool,
+  body: (match route
+    | Methods::MethodRoute.known method => true
+    | Methods::MethodRoute.unknown => (isRefused outcome))
+}
+
+theorem{
+  name: validation_admits_before_it_routes,
+  parameters: [headers : (Option Headers), versions : (List String), request : JsonRpc::Request],
+  statement: ((validate headers versions request) = (afterAdmit (Methods::routeOf (project request method)) (admissionOf headers versions request))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: admission_starts_with_the_meta,
+  parameters: [headers : (Option Headers), versions : (List String), request : JsonRpc::Request],
+  statement: ((admissionOf headers versions request) = (afterMeta headers versions request (metaOf (project request params)))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: unreadable_meta_is_invalid_params,
+  parameters: [
+    headers : (Option Headers),
+    versions : (List String),
+    request : JsonRpc::Request,
+    problem : Refusal::ParamsProblem
+  ],
+  statement: ((afterMeta headers versions request (ctor Result.error [Meta::RequestMeta, Refusal::ParamsProblem] problem)) = (ctor Admission.refused (ctor Refusal::Refusal.invalidParams problem))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: readable_meta_continues_with_the_header_check,
+  parameters: [
+    headers : (Option Headers),
+    versions : (List String),
+    request : JsonRpc::Request,
+    meta : Meta::RequestMeta
+  ],
+  statement: ((afterMeta headers versions request (ctor Result.ok [Meta::RequestMeta, Refusal::ParamsProblem] meta)) = (afterHeaders versions request meta (headerCheck headers (Methods::nameFieldOfWire (project request method)) (project request method) (project meta protocolVersion) (paramsObject (project request params))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: header_problem_is_header_mismatch,
+  parameters: [
+    versions : (List String),
+    request : JsonRpc::Request,
+    meta : Meta::RequestMeta,
+    problem : Refusal::HeaderProblem
+  ],
+  statement: ((afterHeaders versions request meta (ctor Option.some [Refusal::HeaderProblem] problem)) = (ctor Admission.refused (ctor Refusal::Refusal.headerMismatch problem))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: matching_headers_continue_with_the_version_gate,
+  parameters: [versions : (List String), request : JsonRpc::Request, meta : Meta::RequestMeta],
+  statement: ((afterHeaders versions request meta (ctor Option.none [Refusal::HeaderProblem])) = (afterVersion request meta (versionGate (project meta protocolVersion) versions))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: gated_version_is_refused,
+  parameters: [request : JsonRpc::Request, meta : Meta::RequestMeta, refusal : Refusal::Refusal],
+  statement: ((afterVersion request meta (ctor Option.some [Refusal::Refusal] refusal)) = (ctor Admission.refused refusal)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: admitted_request_keeps_its_id_and_method,
+  parameters: [request : JsonRpc::Request, meta : Meta::RequestMeta],
+  statement: ((afterVersion request meta (ctor Option.none [Refusal::Refusal])) = (ctor Admission.admitted (record Admitted {id := (project request id), wire := (project request method), meta := meta, params := (paramsObject (project request params))}))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: unknown_method_is_method_not_found,
+  parameters: [admitted : Admitted],
+  statement: ((afterRoute admitted (ctor Methods::MethodRoute.unknown)) = (ctor Result.error [Routed, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound (project admitted wire)))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: known_method_is_routed,
+  parameters: [admitted : Admitted, method : Methods::Method],
+  statement: ((afterRoute admitted (ctor Methods::MethodRoute.known method)) = (ctor Result.ok [Routed, Refusal::Refusal] (record Routed {id := (project admitted id), method := method, meta := (project admitted meta), params := (project admitted params)}))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_refused_admission_is_never_routed,
+  parameters: [route : Methods::MethodRoute, refusal : Refusal::Refusal],
+  statement: ((afterAdmit route (ctor Admission.refused refusal)) = (ctor Result.error [Routed, Refusal::Refusal] refusal)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_unknown_method_never_validates,
+  parameters: [route : Methods::MethodRoute, admission : Admission],
+  statement: ((neverRoutesUnknown route (afterAdmit route admission)) = true),
+  proof: cases{
+    branches: [
+      {proof: reflexivity{}, binders: [method], constructor: known},
+      {
+        proof: cases{
+          branches: [
+            {proof: reflexivity{}, binders: [admitted], constructor: admitted},
+            {proof: reflexivity{}, binders: [refusal], constructor: refused}
+          ],
+          scrutinee: admission
+        },
+        binders: [],
+        constructor: unknown
+      }
+    ],
+    scrutinee: route
+  }
+}
+
+theorem{
+  name: an_unknown_method_never_validates_for_any_request,
+  parameters: [headers : (Option Headers), versions : (List String), request : JsonRpc::Request],
+  statement: ((neverRoutesUnknown (Methods::routeOf (project request method)) (validate headers versions request)) = true),
+  proof: apply{
+    arguments: [
+      (Methods::routeOf (project request method)),
+      (admissionOf headers versions request)
+    ],
+    theorem: an_unknown_method_never_validates
+  },
+  axioms: [propext]
+}
+
 theorem{
   name: no_headers_means_no_header_check,
   parameters: [
-    method : Methods::Method,
+    field : Methods::NameField,
     wire : String,
     version : String,
     params : Json::JsonObject
   ],
-  statement: ((headerCheck (ctor Option.none [Headers]) method wire version params) = (ctor Option.none [Refusal::HeaderProblem])),
+  statement: ((headerCheck (ctor Option.none [Headers]) field wire version params) = (ctor Option.none [Refusal::HeaderProblem])),
   proof: reflexivity{}
 }
 
 theorem{
   name: missing_version_header_is_refused,
   parameters: [
-    method : Methods::Method,
+    field : Methods::NameField,
     wire : String,
     version : String,
     params : Json::JsonObject,
     headerMethod : (Option String),
     headerName : (Option String)
   ],
-  statement: ((headerCheck (ctor Option.some [Headers] (record Headers {protocolVersion := (ctor Option.none [String]), method := headerMethod, name := headerName})) method wire version params) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.missingProtocolVersionHeader))),
+  statement: ((headerCheck (ctor Option.some [Headers] (record Headers {protocolVersion := (ctor Option.none [String]), method := headerMethod, name := headerName})) field wire version params) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.missingProtocolVersionHeader))),
   proof: reflexivity{}
 }
 
 theorem{
   name: differing_version_header_is_refused,
-  parameters: [method : Methods::Method, params : Json::JsonObject],
-  statement: ((headerCheck (headersFor "2025-11-25" "tools/list" (ctor Option.none [String])) method "tools/list" "2026-07-28" params) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.protocolVersionDiffers))),
+  parameters: [field : Methods::NameField, params : Json::JsonObject],
+  statement: ((headerCheck (headersFor "2025-11-25" "tools/list" (ctor Option.none [String])) field "tools/list" "2026-07-28" params) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.protocolVersionDiffers))),
   proof: reflexivity{}
 }
 
 theorem{
   name: differing_method_header_is_refused,
   parameters: [params : Json::JsonObject],
-  statement: ((headerCheck (headersFor "2026-07-28" "tools/list" (ctor Option.none [String])) (ctor Methods::Method.toolsCall) "tools/call" "2026-07-28" params) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.methodDiffers))),
+  statement: ((headerCheck (headersFor "2026-07-28" "tools/list" (ctor Option.none [String])) (Methods::nameFieldOf (ctor Methods::Method.toolsCall)) "tools/call" "2026-07-28" params) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.methodDiffers))),
   proof: reflexivity{}
 }
 
 theorem{
   name: missing_method_header_is_refused,
   parameters: [
-    method : Methods::Method,
+    field : Methods::NameField,
     wire : String,
     params : Json::JsonObject,
     headerName : (Option String)
   ],
-  statement: ((headerCheck (ctor Option.some [Headers] (record Headers {protocolVersion := (ctor Option.some [String] "2026-07-28"), method := (ctor Option.none [String]), name := headerName})) method wire "2026-07-28" params) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.missingMethodHeader))),
+  statement: ((headerCheck (ctor Option.some [Headers] (record Headers {protocolVersion := (ctor Option.some [String] "2026-07-28"), method := (ctor Option.none [String]), name := headerName})) field wire "2026-07-28" params) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.missingMethodHeader))),
   proof: reflexivity{}
 }
 
@@ -718,70 +791,70 @@ definition{
 theorem{
   name: tools_call_needs_its_name_header,
   parameters: [],
-  statement: ((headerCheck (headersFor "2026-07-28" "tools/call" (ctor Option.none [String])) (ctor Methods::Method.toolsCall) "tools/call" "2026-07-28" (bodyWith "name" "echo")) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.missingNameHeader))),
+  statement: ((headerCheck (headersFor "2026-07-28" "tools/call" (ctor Option.none [String])) (Methods::nameFieldOf (ctor Methods::Method.toolsCall)) "tools/call" "2026-07-28" (bodyWith "name" "echo")) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.missingNameHeader))),
   proof: reflexivity{}
 }
 
 theorem{
   name: tools_call_name_header_must_equal_the_body_name,
   parameters: [],
-  statement: ((headerCheck (headersFor "2026-07-28" "tools/call" (ctor Option.some [String] "foo")) (ctor Methods::Method.toolsCall) "tools/call" "2026-07-28" (bodyWith "name" "bar")) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.nameDiffers))),
+  statement: ((headerCheck (headersFor "2026-07-28" "tools/call" (ctor Option.some [String] "foo")) (Methods::nameFieldOf (ctor Methods::Method.toolsCall)) "tools/call" "2026-07-28" (bodyWith "name" "bar")) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.nameDiffers))),
   proof: reflexivity{}
 }
 
 theorem{
   name: tools_call_name_header_may_equal_the_body_name,
   parameters: [],
-  statement: ((headerCheck (headersFor "2026-07-28" "tools/call" (ctor Option.some [String] "echo")) (ctor Methods::Method.toolsCall) "tools/call" "2026-07-28" (bodyWith "name" "echo")) = (ctor Option.none [Refusal::HeaderProblem])),
+  statement: ((headerCheck (headersFor "2026-07-28" "tools/call" (ctor Option.some [String] "echo")) (Methods::nameFieldOf (ctor Methods::Method.toolsCall)) "tools/call" "2026-07-28" (bodyWith "name" "echo")) = (ctor Option.none [Refusal::HeaderProblem])),
   proof: reflexivity{}
 }
 
 theorem{
   name: prompts_get_name_header_must_equal_the_body_name,
   parameters: [],
-  statement: ((headerCheck (headersFor "2026-07-28" "prompts/get" (ctor Option.some [String] "foo")) (ctor Methods::Method.promptsGet) "prompts/get" "2026-07-28" (bodyWith "name" "bar")) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.nameDiffers))),
+  statement: ((headerCheck (headersFor "2026-07-28" "prompts/get" (ctor Option.some [String] "foo")) (Methods::nameFieldOf (ctor Methods::Method.promptsGet)) "prompts/get" "2026-07-28" (bodyWith "name" "bar")) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.nameDiffers))),
   proof: reflexivity{}
 }
 
 theorem{
   name: resources_read_name_header_is_the_uri,
   parameters: [],
-  statement: ((headerCheck (headersFor "2026-07-28" "resources/read" (ctor Option.some [String] "file:///a")) (ctor Methods::Method.resourcesRead) "resources/read" "2026-07-28" (bodyWith "uri" "file:///a")) = (ctor Option.none [Refusal::HeaderProblem])),
+  statement: ((headerCheck (headersFor "2026-07-28" "resources/read" (ctor Option.some [String] "file:///a")) (Methods::nameFieldOf (ctor Methods::Method.resourcesRead)) "resources/read" "2026-07-28" (bodyWith "uri" "file:///a")) = (ctor Option.none [Refusal::HeaderProblem])),
   proof: reflexivity{}
 }
 
 theorem{
   name: resources_read_uri_header_must_equal_the_body_uri,
   parameters: [],
-  statement: ((headerCheck (headersFor "2026-07-28" "resources/read" (ctor Option.some [String] "file:///b")) (ctor Methods::Method.resourcesRead) "resources/read" "2026-07-28" (bodyWith "uri" "file:///a")) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.nameDiffers))),
+  statement: ((headerCheck (headersFor "2026-07-28" "resources/read" (ctor Option.some [String] "file:///b")) (Methods::nameFieldOf (ctor Methods::Method.resourcesRead)) "resources/read" "2026-07-28" (bodyWith "uri" "file:///a")) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.nameDiffers))),
   proof: reflexivity{}
 }
 
 theorem{
   name: tasks_get_name_header_is_the_task_id,
   parameters: [],
-  statement: ((headerCheck (headersFor "2026-07-28" "tasks/get" (ctor Option.some [String] "t1")) (ctor Methods::Method.tasksGet) "tasks/get" "2026-07-28" (bodyWith "taskId" "t1")) = (ctor Option.none [Refusal::HeaderProblem])),
+  statement: ((headerCheck (headersFor "2026-07-28" "tasks/get" (ctor Option.some [String] "t1")) (Methods::nameFieldOf (ctor Methods::Method.tasksGet)) "tasks/get" "2026-07-28" (bodyWith "taskId" "t1")) = (ctor Option.none [Refusal::HeaderProblem])),
   proof: reflexivity{}
 }
 
 theorem{
   name: tasks_cancel_name_header_must_equal_the_task_id,
   parameters: [],
-  statement: ((headerCheck (headersFor "2026-07-28" "tasks/cancel" (ctor Option.some [String] "t2")) (ctor Methods::Method.tasksCancel) "tasks/cancel" "2026-07-28" (bodyWith "taskId" "t1")) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.nameDiffers))),
+  statement: ((headerCheck (headersFor "2026-07-28" "tasks/cancel" (ctor Option.some [String] "t2")) (Methods::nameFieldOf (ctor Methods::Method.tasksCancel)) "tasks/cancel" "2026-07-28" (bodyWith "taskId" "t1")) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.nameDiffers))),
   proof: reflexivity{}
 }
 
 theorem{
   name: tasks_update_needs_its_name_header,
   parameters: [],
-  statement: ((headerCheck (headersFor "2026-07-28" "tasks/update" (ctor Option.none [String])) (ctor Methods::Method.tasksUpdate) "tasks/update" "2026-07-28" (bodyWith "taskId" "t1")) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.missingNameHeader))),
+  statement: ((headerCheck (headersFor "2026-07-28" "tasks/update" (ctor Option.none [String])) (Methods::nameFieldOf (ctor Methods::Method.tasksUpdate)) "tasks/update" "2026-07-28" (bodyWith "taskId" "t1")) = (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.missingNameHeader))),
   proof: reflexivity{}
 }
 
 theorem{
   name: tools_list_has_no_name_header,
   parameters: [],
-  statement: ((headerCheck (headersFor "2026-07-28" "tools/list" (ctor Option.none [String])) (ctor Methods::Method.toolsList) "tools/list" "2026-07-28" (bodyWith "cursor" "c")) = (ctor Option.none [Refusal::HeaderProblem])),
+  statement: ((headerCheck (headersFor "2026-07-28" "tools/list" (ctor Option.none [String])) (Methods::nameFieldOf (ctor Methods::Method.toolsList)) "tools/list" "2026-07-28" (bodyWith "cursor" "c")) = (ctor Option.none [Refusal::HeaderProblem])),
   proof: reflexivity{}
 }
 
@@ -842,17 +915,57 @@ theorem{
 }
 
 theorem{
-  name: tools_call_without_a_name_is_invalid_params,
+  name: tools_list_with_only_meta_validates_as_tools_list,
   parameters: [],
-  statement: ((codeOfOutcome (validate (ctor Option.none [Headers]) (supportedVersions) (sampleCallMetaOnly "tools/call"))) = (ctor Option.some [Int] (-32602 : Int))),
+  statement: ((methodOfOutcome (validate (ctor Option.none [Headers]) (supportedVersions) (sampleCallMetaOnly "tools/list"))) = (ctor Option.some [Methods::Method] (ctor Methods::Method.toolsList))),
   proof: reflexivity{},
   axioms: [propext]
 }
 
 theorem{
-  name: tools_list_with_only_meta_validates_as_tools_list,
+  name: a_missing_meta_beats_an_unknown_method,
   parameters: [],
-  statement: ((methodOfOutcome (validate (ctor Option.none [Headers]) (supportedVersions) (sampleCallMetaOnly "tools/list"))) = (ctor Option.some [Methods::Method] (ctor Methods::Method.toolsList))),
+  statement: ((codeOfOutcome (validate (ctor Option.none [Headers]) (supportedVersions) (sampleCallWithoutMeta "initialize"))) = (ctor Option.some [Int] (-32602 : Int))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_header_mismatch_beats_an_unknown_method,
+  parameters: [],
+  statement: ((codeOfOutcome (validate (headersFor "2025-11-25" "initialize" (ctor Option.none [String])) (supportedVersions) (sampleCall "initialize" "2026-07-28"))) = (ctor Option.some [Int] (-32020 : Int))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: an_unsupported_version_beats_an_unknown_method,
+  parameters: [],
+  statement: ((codeOfOutcome (validate (ctor Option.none [Headers]) (supportedVersions) (sampleCall "initialize" "2025-11-25"))) = (ctor Option.some [Int] (-32022 : Int))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_header_mismatch_beats_an_unsupported_version,
+  parameters: [],
+  statement: ((codeOfOutcome (validate (headersFor "2026-07-28" "tools/list" (ctor Option.none [String])) (supportedVersions) (sampleCall "tools/list" "2025-11-25"))) = (ctor Option.some [Int] (-32020 : Int))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_missing_meta_beats_a_header_mismatch,
+  parameters: [],
+  statement: ((codeOfOutcome (validate (headersFor "2025-11-25" "tools/list" (ctor Option.none [String])) (supportedVersions) (sampleCallWithoutMeta "tools/list"))) = (ctor Option.some [Int] (-32602 : Int))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: an_unknown_method_with_everything_else_valid_is_method_not_found,
+  parameters: [],
+  statement: ((codeOfOutcome (validate (headersFor "2026-07-28" "initialize" (ctor Option.none [String])) (supportedVersions) (sampleCall "initialize" "2026-07-28"))) = (ctor Option.some [Int] (-32601 : Int))),
   proof: reflexivity{},
   axioms: [propext]
 }
