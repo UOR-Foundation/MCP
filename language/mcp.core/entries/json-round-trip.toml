@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "json-round-trip"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "JsonRoundTrip"
+component = "JsonRoundTrip"
+
+[[form]]
+id = "json-round-trip"
+channel = "text"
+surface = "JSON round trip"
+canonical_source = true
+features = ["sentence-case", "singular"]

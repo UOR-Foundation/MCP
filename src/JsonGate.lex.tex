@@ -1,0 +1,64 @@
+\begin{lexlean}{JsonGate}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Json}
+\importmodule{JsonRead}
+\importmodule{JsonText}
+\importmodule{Utf8}
+\title{JSON codec theorems}
+\begin{semanticmodule}
+definition{
+  name: outcomeClass,
+  parameters: [outcome : (Result Json::Json JsonText::JsonRefusal)],
+  result: Nat,
+  body: (match outcome
+    | Result.ok item => 0
+    | Result.error reason => (match reason
+      | JsonText::JsonRefusal.invalidUtf8 at => 1
+      | JsonText::JsonRefusal.truncatedUtf8 at => 2
+      | JsonText::JsonRefusal.unexpectedByte at => 3
+      | JsonText::JsonRefusal.unexpectedEnd => 3
+      | JsonText::JsonRefusal.controlInString at => 3
+      | JsonText::JsonRefusal.badEscape at => 3
+      | JsonText::JsonRefusal.loneSurrogate at => 3
+      | JsonText::JsonRefusal.badNumber at => 3
+      | JsonText::JsonRefusal.numberOutOfRange at => 3
+      | JsonText::JsonRefusal.tooDeep at => 3
+      | JsonText::JsonRefusal.trailingContent at => 3
+      | JsonText::JsonRefusal.encodeNumberOutOfRange => 3
+      | JsonText::JsonRefusal.encodeTooDeep => 3
+      | JsonText::JsonRefusal.encodeBudget => 3
+      | JsonText::JsonRefusal.internalText => 3))
+}
+
+definition{
+  name: gateAgrees,
+  parameters: [verdict : Utf8::Utf8Verdict, outcome : (Result Json::Json JsonText::JsonRefusal)],
+  result: Bool,
+  body: (match verdict
+    | Utf8::Utf8Verdict.valid => true
+    | Utf8::Utf8Verdict.invalidByte at => ((outcomeClass outcome) =? 1)
+    | Utf8::Utf8Verdict.truncated at => ((outcomeClass outcome) =? 2))
+}
+
+theorem{
+  name: gate_refuses_every_invalid_input,
+  parameters: [bytes : (List Nat)],
+  statement: ((gateAgrees (Utf8::utf8Check bytes) (JsonRead::readList bytes)) = true),
+  proof: term_cases{
+    definitions: [JsonRead::readList, gateAgrees, outcomeClass],
+    scrutinee: (Utf8::utf8Check bytes)
+  },
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: parse_null,
+  parameters: [],
+  statement: ((JsonRead::readList (cons 110 (cons 117 (cons 108 (cons 108 (nil Nat)))))) = (ctor Result.ok [Json::Json, JsonText::JsonRefusal] (ctor Json::Json.null))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+\end{semanticmodule}
+\end{lexlean}
