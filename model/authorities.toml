@@ -9,9 +9,13 @@
 # realizes the cited fact. Evidence is not proof, and the meta-gate fails the
 # build if any document blurs the two registers.
 #
-# Empty. The first authority this repository cites goes here, before any claim
-# is allowed to say `some-true`.
+# The JSON text codec cites the two standards it implements and the corpus it is
+# measured against.
 
 spec = "template/1"
 
-authority = []
+authority = [
+  { id = "A-RFC8259", name = "RFC 8259: The JavaScript Object Notation (JSON) Data Interchange Format", citation = "T. Bray (ed.), RFC 8259 (STD 90), December 2017, https://www.rfc-editor.org/rfc/rfc8259", checksum = "none", checksum_reason = "A published standard; no copy of it is committed here, so there is no artifact to checksum.", statement = "The grammar of a JSON text: whitespace, the three literals, numbers, strings with escapes and surrogate pairs, arrays and objects; a JSON text is UTF-8.", realized_by = ["JC-03", "JC-04", "JC-06", "JC-07"] },
+  { id = "A-RFC3629", name = "RFC 3629: UTF-8, a transformation format of ISO 10646", citation = "F. Yergeau, RFC 3629 (STD 63), November 2003, section 4 syntax and Table 3-7 of the Unicode Standard, https://www.rfc-editor.org/rfc/rfc3629", checksum = "none", checksum_reason = "A published standard; no copy of it is committed here, so there is no artifact to checksum.", statement = "Well-formed UTF-8 forbids overlong forms, the surrogate range U+D800..U+DFFF and values above U+10FFFF.", realized_by = ["JC-01", "JC-02"] },
+  { id = "A-JSONTESTSUITE", name = "JSONTestSuite test_parsing corpus", citation = "N. Seriot, https://github.com/nst/JSONTestSuite at commit 1ef36fa01286573e846ac449e8683f8833c5b26a, directory test_parsing (git tree b936f9acdd24b9f5fefe68b90b9beab2c681137a), MIT licence", checksum = "abc15ec8c3df7ff6fa771b051a8950012403b241af2688e82374e0bcafcdd21c", checksum_reason = "", statement = "318 files: 95 y_ must-accept, 188 n_ must-reject, 35 i_ implementation-defined. The checksum is SHA-256 over the manifest, one `<sha256 of file>  <name>` line per file in byte order of the names.", realized_by = ["JC-03", "JC-04", "JC-05", "JC-12"] },
+]
