@@ -47,7 +47,7 @@ What is not modeled: the JSON encoding of result bodies other than those of
 the `subscriptions/listen` stream (its params and result types are declared,
 but the method is not dispatched), server notifications, and host effects.
 
-- The claim registers in `model/` hold the JSON text codec (JC-01 to JC-12) and the
+- The claim registers in `model/` hold the JSON text codec (JC-01 to JC-14) and the
   stateless lifecycle and HTTP header capabilities of #7 (LC-01 to LC-16, HH-01 to HH-13).
   No other protocol capability is registered and none is claimed, and the conformance
   scenarios have not been run against a conformance build (#13).

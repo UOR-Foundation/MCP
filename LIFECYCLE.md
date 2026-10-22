@@ -43,12 +43,11 @@ with that request naming root `UorMcp.Fixture.fixtureRun`, package `mcp_lifecycl
 1.0.0, target `rust-std`. Copy `Cargo.toml`, `package.json`, `provenance.json` and
 `src/lib.rs` from `.lexlean/production/<id>/packages/rust-std/mcp_lifecycle` to
 `crates/lifecycle-oracle/generated/mcp_lifecycle`. A re-export of the committed sources
-reproduces the committed package byte for byte: the build of the final sources reported
-export `de95b46f40108eac03ec4537548d948c7a68986c76c8ed57252b5f7d3320dc15`, `diff -r
-.lexlean/production/<id>/packages/rust-std/mcp_lifecycle
-crates/lifecycle-oracle/generated/mcp_lifecycle` was empty, and a second build of the same
-tree reproduced it. The package records the semantic ID of the sources it states
-(`1f330123dc16a2128aea4c8363b56dfc15acdaf2922c5f822d8a2aac3cb1a26d`). The lock was made
+reproduces the committed package byte for byte: the build of the final sources (the
+codec of #23 included) reported export `9c92f312995db81415b1fb650080a51f69c00cd5a54448fea048ee2a9546249a`
+and `diff -r .lexlean/production/<id>/packages/rust-std/mcp_lifecycle
+crates/lifecycle-oracle/generated/mcp_lifecycle` was empty. The package records the semantic ID of the sources it states
+(`aad8fdc8e49153c7fceed7c181eae54878d0df7cd76db57119523b713c5a339a`). The lock was made
 with LexLean `release/v0.4` at `9796067`.
 
 ## The boundary encoding
@@ -345,9 +344,6 @@ and `cargo clippy --workspace --all-targets -- -D warnings` pass.
   sees it. Here every response is validated against the specification's JSON Schema
   (LC-15) by another validator, which is falsifying evidence; the suite's validator has
   not been run on the answers since the by-hand check was removed.
-* Reading a JSON string is quadratic in its length (the codec of #20; see Findings), so
-  until that is fixed the adapter's body bound limits the cost, and the stress frames
-  keep their strings short.
 * The tools in the fixture are a test double for the pinned scenarios. The tool layer is
   #8; `ParamRule`s are given, not derived from `x-mcp-header`.
 * The universal statement "every request the root accepts has every check true" is not
@@ -368,14 +364,15 @@ and `cargo clippy --workspace --all-targets -- -D warnings` pass.
   byte-list literal of 60 or more elements is a nested `cons` chain and tripped it
   (`LLI9001`, "recursion limit exceeded"); the 78-byte fixed internal-error body is three
   shorter lists appended.
-* Reading a JSON string is quadratic in its length. `JsonText.listToBytes` builds the
-  bytes of a string with one `append` per byte, and an `append` of `Bytes` copies. In the
-  stress run a frame with a 2 MiB string took 301 s and one with a 768 KiB string 41 s
-  (0.07 s per 10^6 bytes squared); a 256 KiB string takes a few seconds. This is the
-  codec of #20, not this issue, and it is not changed here. The adapter's body bound is
-  what limits the cost until the codec builds `Bytes` in linear time (a balanced merge of
-  chunks is O(n log n)). `Base64.groups` had the same shape in this issue's own code and
-  is fixed.
+* Reading a JSON string was quadratic in its length, and is not now (#23). `JsonText.listToBytes`
+  built the bytes of a string with one `append` per byte, and an `append` of `Bytes` copies:
+  in the stress run a frame with a 2 MiB string took 301 s and one with a 768 KiB string 41 s
+  (0.07 s per 10^6 bytes squared). It now merges blocks the way a binary counter carries
+  (`pushBlock`, `gatherBlocks`, `joinBlocks`): O(n log n) copying, and every self call is still
+  a tail call. `crates/lifecycle-oracle/tests/linear.rs` (JC-13) sends a string of 256 KiB,
+  1 MiB and 2 MiB, as an argument value and as an argument name, through this root and states
+  the bound; `JSON-CODEC.md` gives the figures and the control.
+  `Base64.groups` had the same shape in this issue's own code and was fixed earlier.
 * `lexlean verify` peaks near 5.6 GB because it loads the JSON modules; it was run one
   module at a time, and an out-of-memory kill (exit 137) is the symptom of running two.
 * `utf8_encode` and `utf8_decode` are opaque to the kernel, so header laws are stated
