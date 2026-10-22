@@ -1,0 +1,212 @@
+\begin{lexlean}{Param}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Common}
+\importmodule{Json}
+\importmodule{JsonRead}
+\importmodule{JsonText}
+\importmodule{Refusal}
+\title{MCP parameter headers}
+\begin{semanticmodule}
+inductive{
+  name: ParamSeen,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: absent, fields: []},
+    {name: malformed, fields: []},
+    {name: value, fields: [String]}
+  ]
+}
+
+structure{
+  name: ParamHeader,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: header, type: String},
+    {name: path, type: (List String)},
+    {name: kind, type: Common::ParamKind},
+    {name: seen, type: ParamSeen}
+  ]
+}
+
+definition{
+  name: lookupPath,
+  parameters: [path : (List String), object : Json::JsonObject],
+  result: Json::Lookup,
+  body: (match path
+    | List.nil => (ctor Json::Lookup.absent)
+    | List.cons key rest => (match (Json::lookup key object)
+      | Json::Lookup.absent => (ctor Json::Lookup.absent)
+      | Json::Lookup.present found => (match rest
+        | List.nil => (ctor Json::Lookup.present found)
+        | List.cons next more => (match (Json::asObject found)
+          | Option.none => (ctor Json::Lookup.absent)
+          | Option.some inner => (lookupPath rest inner))))),
+  executable: true,
+  recursive_argument: path
+}
+
+definition{
+  name: digitValue,
+  parameters: [byte : Nat],
+  result: (Option Nat),
+  body: (if ((byte <? 48) || (57 <? byte)) then (ctor Option.none [Nat]) else (ctor Option.some [Nat] (prim subtract byte 48 : Nat))),
+  executable: true
+}
+
+definition{
+  name: digitsValue,
+  parameters: [bytes : (List Nat), total : Int],
+  result: (Option Int),
+  body: (match bytes
+    | List.nil => (ctor Option.some [Int] total)
+    | List.cons head tail => (match (digitValue head)
+      | Option.none => (ctor Option.none [Int])
+      | Option.some digit => (digitsValue tail (JsonRead::intAdd (prim multiply total (10 : Int) : Int) (JsonRead::digitInt digit))))),
+  executable: true,
+  recursive_argument: bytes
+}
+
+definition{
+  name: parseInteger,
+  parameters: [bytes : (List Nat)],
+  result: (Option Int),
+  body: (match bytes
+    | List.nil => (ctor Option.none [Int])
+    | List.cons head tail => (if (head =? 45) then (match tail
+      | List.nil => (ctor Option.none [Int])
+      | List.cons next more => (match (digitsValue tail (0 : Int))
+        | Option.none => (ctor Option.none [Int])
+        | Option.some magnitude => (ctor Option.some [Int] (prim negate magnitude : Int)))) else (digitsValue bytes (0 : Int)))),
+  executable: true
+}
+
+definition{
+  name: settleDecimal,
+  parameters: [fuel : Nat, mantissa : Int, exponent : Int],
+  result: (Option Int),
+  body: (match fuel
+    | Nat.zero => (ctor Option.none [Int])
+    | Nat.succ below => (if (Json::isZero exponent) then (ctor Option.some [Int] mantissa) else (if (prim less_than exponent (0 : Int) : Bool) then (if (Json::isZero (prim remainder mantissa (10 : Int) (0 : Int) : Int)) then (settleDecimal below (prim quotient mantissa (10 : Int) (0 : Int) : Int) (JsonRead::intAdd exponent (1 : Int))) else (ctor Option.none [Int])) else (settleDecimal below (prim multiply mantissa (10 : Int) : Int) (prim subtract exponent (1 : Int) : Int))))),
+  axioms: [propext],
+  executable: true,
+  recursive_argument: fuel
+}
+
+definition{
+  name: safeInteger,
+  parameters: [whole : Int],
+  result: (Option Int),
+  body: (if ((prim less_than (9007199254740991 : Int) whole : Bool) || (prim less_than whole (-9007199254740991 : Int) : Bool)) then (ctor Option.none [Int]) else (ctor Option.some [Int] whole)),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: wholeNumber,
+  parameters: [amount : Json::Decimal],
+  result: (Option Int),
+  body: (match (settleDecimal 40 (project amount mantissa) (project amount exponent))
+    | Option.none => (ctor Option.none [Int])
+    | Option.some whole => (safeInteger whole)),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: sameInteger,
+  parameters: [seen : String, value : Json::Json],
+  result: Bool,
+  body: (match (Json::asNumber value)
+    | Option.none => false
+    | Option.some amount => (match (wholeNumber amount)
+      | Option.none => false
+      | Option.some body => (match (parseInteger (JsonText::bytesToList (prim utf8_encode seen : Bytes)))
+        | Option.none => false
+        | Option.some header => (Json::isZero (prim subtract body header : Int))))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: sameParam,
+  parameters: [kind : Common::ParamKind, seen : String, value : Json::Json],
+  result: Bool,
+  body: (match kind
+    | Common::ParamKind.text => (match (Json::asText value)
+      | Option.none => false
+      | Option.some content => (prim equal seen content : Bool))
+    | Common::ParamKind.integer => (sameInteger seen value)
+    | Common::ParamKind.boolean => (match (Json::asBool value)
+      | Option.none => false
+      | Option.some flag => (if flag then (prim equal seen "true" : Bool) else (prim equal seen "false" : Bool)))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: isNull,
+  parameters: [value : Json::Json],
+  result: Bool,
+  body: (match value
+    | Json::Json.null => true
+    | Json::Json.bool flag => false
+    | Json::Json.number amount => false
+    | Json::Json.text content => false
+    | Json::Json.array items => false
+    | Json::Json.object members => false),
+  executable: true
+}
+
+definition{
+  name: paramAbsentProblem,
+  parameters: [expected : ParamHeader],
+  result: (Option Refusal::HeaderProblem),
+  body: (match (project expected seen)
+    | ParamSeen.malformed => (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.malformedParamHeader (project expected header)))
+    | ParamSeen.absent => (ctor Option.none [Refusal::HeaderProblem])
+    | ParamSeen.value content => (ctor Option.none [Refusal::HeaderProblem])),
+  executable: true
+}
+
+definition{
+  name: paramPresentProblem,
+  parameters: [expected : ParamHeader, value : Json::Json],
+  result: (Option Refusal::HeaderProblem),
+  body: (match (project expected seen)
+    | ParamSeen.absent => (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.missingParamHeader (project expected header)))
+    | ParamSeen.malformed => (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.malformedParamHeader (project expected header)))
+    | ParamSeen.value content => (if (sameParam (project expected kind) content value) then (ctor Option.none [Refusal::HeaderProblem]) else (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.paramDiffers (project expected header))))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: paramProblem,
+  parameters: [expected : ParamHeader, arguments : Json::JsonObject],
+  result: (Option Refusal::HeaderProblem),
+  body: (match (lookupPath (project expected path) arguments)
+    | Json::Lookup.absent => (paramAbsentProblem expected)
+    | Json::Lookup.present value => (if (isNull value) then (paramAbsentProblem expected) else (paramPresentProblem expected value))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: paramCheck,
+  parameters: [seen : (List ParamHeader), arguments : Json::JsonObject],
+  result: (Option Refusal::HeaderProblem),
+  body: (match seen
+    | List.nil => (ctor Option.none [Refusal::HeaderProblem])
+    | List.cons expected rest => (match (paramProblem expected arguments)
+      | Option.some problem => (ctor Option.some [Refusal::HeaderProblem] problem)
+      | Option.none => (paramCheck rest arguments))),
+  axioms: [Quot.sound, propext],
+  executable: true,
+  recursive_argument: seen
+}
+\end{semanticmodule}
+\end{lexlean}

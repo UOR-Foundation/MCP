@@ -1,0 +1,221 @@
+\begin{lexlean}{Serve}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Dispatch}
+\importmodule{Envelope}
+\importmodule{Extension}
+\importmodule{Frame}
+\importmodule{Http}
+\importmodule{Json}
+\importmodule{JsonRead}
+\importmodule{JsonRpc}
+\importmodule{JsonText}
+\importmodule{JsonWrite}
+\importmodule{Methods}
+\importmodule{Refusal}
+\importmodule{ResultJson}
+\importmodule{RpcWire}
+\importmodule{Status}
+\importmodule{Validation}
+\title{MCP stateless serving}
+\begin{semanticmodule}
+definition{
+  name: contentTypeName,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 67 (cons 111 (cons 110 (cons 116 (cons 101 (cons 110 (cons 116 (cons 45 (cons 84 (cons 121 (cons 112 (cons 101 (nil Nat))))))))))))),
+  executable: true
+}
+
+definition{
+  name: jsonMediaType,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 97 (cons 112 (cons 112 (cons 108 (cons 105 (cons 99 (cons 97 (cons 116 (cons 105 (cons 111 (cons 110 (cons 47 (cons 106 (cons 115 (cons 111 (cons 110 (nil Nat))))))))))))))))),
+  executable: true
+}
+
+definition{
+  name: allowName,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 65 (cons 108 (cons 108 (cons 111 (cons 119 (nil Nat)))))),
+  executable: true
+}
+
+definition{
+  name: postValue,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 80 (cons 79 (cons 83 (cons 84 (nil Nat))))),
+  executable: true
+}
+
+definition{
+  name: internalBodyHead,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 123 (cons 34 (cons 106 (cons 115 (cons 111 (cons 110 (cons 114 (cons 112 (cons 99 (cons 34 (cons 58 (cons 34 (cons 50 (cons 46 (cons 48 (cons 34 (cons 44 (cons 34 (cons 105 (cons 100 (cons 34 (cons 58 (cons 110 (cons 117 (cons 108 (cons 108 (nil Nat))))))))))))))))))))))))))),
+  executable: true
+}
+
+definition{
+  name: internalBodyMiddle,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 44 (cons 34 (cons 101 (cons 114 (cons 114 (cons 111 (cons 114 (cons 34 (cons 58 (cons 123 (cons 34 (cons 99 (cons 111 (cons 100 (cons 101 (cons 34 (cons 58 (cons 45 (cons 51 (cons 50 (cons 54 (cons 48 (cons 51 (cons 44 (cons 34 (cons 109 (nil Nat))))))))))))))))))))))))))),
+  executable: true
+}
+
+definition{
+  name: internalBodyTail,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 101 (cons 115 (cons 115 (cons 97 (cons 103 (cons 101 (cons 34 (cons 58 (cons 34 (cons 73 (cons 110 (cons 116 (cons 101 (cons 114 (cons 110 (cons 97 (cons 108 (cons 32 (cons 101 (cons 114 (cons 114 (cons 111 (cons 114 (cons 34 (cons 125 (cons 125 (nil Nat))))))))))))))))))))))))))),
+  executable: true
+}
+
+definition{
+  name: internalBody,
+  parameters: [],
+  result: (List Nat),
+  body: (prim append (internalBodyHead) (prim append (internalBodyMiddle) (internalBodyTail) : (List Nat)) : (List Nat)),
+  executable: true
+}
+
+definition{
+  name: jsonFields,
+  parameters: [],
+  result: (List Http::Field),
+  body: (cons (record Http::Field {name := (contentTypeName), value := (jsonMediaType)}) (nil Http::Field)),
+  executable: true
+}
+
+definition{
+  name: internalResponse,
+  parameters: [],
+  result: Http::HttpResponse,
+  body: (record Http::HttpResponse {status := (Status::serverErrorStatus), fields := (jsonFields), body := (internalBody)}),
+  executable: true
+}
+
+definition{
+  name: notAllowedResponse,
+  parameters: [],
+  result: Http::HttpResponse,
+  body: (record Http::HttpResponse {status := (Status::methodNotAllowedStatus), fields := (cons (record Http::Field {name := (allowName), value := (postValue)}) (nil Http::Field)), body := (nil Nat)}),
+  executable: true
+}
+
+definition{
+  name: jsonResponse,
+  parameters: [status : Nat, message : Json::Json],
+  result: Http::HttpResponse,
+  body: (match (JsonWrite::writeList message)
+    | Result.error refusal => (internalResponse)
+    | Result.ok produced => (record Http::HttpResponse {status := status, fields := (jsonFields), body := produced})),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: toolNameOf,
+  parameters: [request : JsonRpc::Request],
+  result: (Option String),
+  body: (if (prim equal (project request method) "tools/call" : Bool) then (match (project request params)
+    | Option.none => (ctor Option.none [String])
+    | Option.some params => (match (Json::lookup "name" params)
+      | Json::Lookup.absent => (ctor Option.none [String])
+      | Json::Lookup.present found => (Json::asText found))) else (ctor Option.none [String])),
+  executable: true
+}
+
+definition{
+  name: respond,
+  parameters: [handled : Dispatch::Handled],
+  result: Http::HttpResponse,
+  body: (match (project handled outcome)
+    | Result.ok reply => (match (ResultJson::resultObject reply)
+      | Option.none => (internalResponse)
+      | Option.some found => (jsonResponse (Status::okStatus) (RpcWire::resultResponse (project handled id) found)))
+    | Result.error refusal => (jsonResponse (Status::statusOf refusal) (RpcWire::errorResponse (ctor Option.some [JsonRpc::RequestId] (project handled id)) (Refusal::errorObjectOf refusal)))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: answerRequest,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    fields : (List Http::Field),
+    rpc : JsonRpc::Request
+  ],
+  result: Http::HttpResponse,
+  body: (respond (Dispatch::handleWith info answer (ctor Option.some [Validation::Headers] (Http::headersOf fields (project info paramRules) (toolNameOf rpc) (project rpc method))) (Validation::supportedVersions) rpc)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: afterDecode,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    fields : (List Http::Field),
+    decoded : (Result JsonRpc::Request RpcWire::Fault)
+  ],
+  result: Http::HttpResponse,
+  body: (match decoded
+    | Result.error fault => (jsonResponse (Status::faultStatus fault) (RpcWire::errorResponse (RpcWire::faultId fault) (RpcWire::faultObject fault)))
+    | Result.ok rpc => (answerRequest info answer fields rpc)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: afterParse,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    fields : (List Http::Field),
+    parsed : (Result Json::Json JsonText::JsonRefusal)
+  ],
+  result: Http::HttpResponse,
+  body: (match parsed
+    | Result.error refusal => (jsonResponse (Status::badRequestStatus) (RpcWire::errorResponse (ctor Option.none [JsonRpc::RequestId]) (RpcWire::faultObject (ctor RpcWire::Fault.parseError))))
+    | Result.ok message => (afterDecode info answer fields (RpcWire::decodeRequest message))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: serveRequest,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    request : Http::HttpRequest
+  ],
+  result: Http::HttpResponse,
+  body: (if (Http::isPost (project request method)) then (afterParse info answer (project request fields) (JsonRead::readJson (project request body))) else (notAllowedResponse)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: serve,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    input : Bytes
+  ],
+  result: (List Nat),
+  body: (match (Frame::readRequest input)
+    | Result.error fault => (Frame::writeResponse (internalResponse))
+    | Result.ok request => (Frame::writeResponse (serveRequest info answer request))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

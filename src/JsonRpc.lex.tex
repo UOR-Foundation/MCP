@@ -67,35 +67,79 @@ inductive{
   ]
 }
 
-definition{name: jsonrpcVersion, parameters: [], result: String, body: "2.0"}
+definition{name: jsonrpcVersion, parameters: [], result: String, body: "2.0", executable: true}
 
-definition{name: parseErrorCode, parameters: [], result: Int, body: (-32700 : Int)}
+definition{
+  name: parseErrorCode,
+  parameters: [],
+  result: Int,
+  body: (-32700 : Int),
+  executable: true
+}
 
-definition{name: invalidRequestCode, parameters: [], result: Int, body: (-32600 : Int)}
+definition{
+  name: invalidRequestCode,
+  parameters: [],
+  result: Int,
+  body: (-32600 : Int),
+  executable: true
+}
 
-definition{name: methodNotFoundCode, parameters: [], result: Int, body: (-32601 : Int)}
+definition{
+  name: methodNotFoundCode,
+  parameters: [],
+  result: Int,
+  body: (-32601 : Int),
+  executable: true
+}
 
-definition{name: invalidParamsCode, parameters: [], result: Int, body: (-32602 : Int)}
+definition{
+  name: invalidParamsCode,
+  parameters: [],
+  result: Int,
+  body: (-32602 : Int),
+  executable: true
+}
 
-definition{name: internalErrorCode, parameters: [], result: Int, body: (-32603 : Int)}
+definition{
+  name: internalErrorCode,
+  parameters: [],
+  result: Int,
+  body: (-32603 : Int),
+  executable: true
+}
 
-definition{name: headerMismatchCode, parameters: [], result: Int, body: (-32020 : Int)}
+definition{
+  name: headerMismatchCode,
+  parameters: [],
+  result: Int,
+  body: (-32020 : Int),
+  executable: true
+}
 
 definition{
   name: missingRequiredClientCapabilityCode,
   parameters: [],
   result: Int,
-  body: (-32021 : Int)
+  body: (-32021 : Int),
+  executable: true
 }
 
-definition{name: unsupportedProtocolVersionCode, parameters: [], result: Int, body: (-32022 : Int)}
+definition{
+  name: unsupportedProtocolVersionCode,
+  parameters: [],
+  result: Int,
+  body: (-32022 : Int),
+  executable: true
+}
 
 definition{
   name: inMcpReservedRange,
   parameters: [code : Int],
   result: Bool,
   body: (not ((prim less_than code (-32099 : Int) : Bool) || (prim less_than (-32020 : Int) code : Bool))),
-  axioms: [propext]
+  axioms: [propext],
+  executable: true
 }
 
 definition{
@@ -103,7 +147,8 @@ definition{
   parameters: [code : Int],
   result: Bool,
   body: (not ((prim less_than code (-32019 : Int) : Bool) || (prim less_than (-32000 : Int) code : Bool))),
-  axioms: [propext]
+  axioms: [propext],
+  executable: true
 }
 
 theorem{

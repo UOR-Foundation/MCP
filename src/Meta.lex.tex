@@ -8,50 +8,68 @@
 \importmodule{JsonRpc}
 \title{MCP request and result metadata}
 \begin{semanticmodule}
-definition{name: latestProtocolVersion, parameters: [], result: String, body: "2026-07-28"}
+definition{
+  name: latestProtocolVersion,
+  parameters: [],
+  result: String,
+  body: "2026-07-28",
+  executable: true
+}
 
 definition{
   name: protocolVersionKey,
   parameters: [],
   result: String,
-  body: "io.modelcontextprotocol/protocolVersion"
+  body: "io.modelcontextprotocol/protocolVersion",
+  executable: true
 }
 
 definition{
   name: clientCapabilitiesKey,
   parameters: [],
   result: String,
-  body: "io.modelcontextprotocol/clientCapabilities"
+  body: "io.modelcontextprotocol/clientCapabilities",
+  executable: true
 }
 
 definition{
   name: clientInfoKey,
   parameters: [],
   result: String,
-  body: "io.modelcontextprotocol/clientInfo"
+  body: "io.modelcontextprotocol/clientInfo",
+  executable: true
 }
 
 definition{
   name: logLevelKey,
   parameters: [],
   result: String,
-  body: "io.modelcontextprotocol/logLevel"
+  body: "io.modelcontextprotocol/logLevel",
+  executable: true
 }
 
-definition{name: progressTokenKey, parameters: [], result: String, body: "progressToken"}
+definition{
+  name: progressTokenKey,
+  parameters: [],
+  result: String,
+  body: "progressToken",
+  executable: true
+}
 
 definition{
   name: serverInfoKey,
   parameters: [],
   result: String,
-  body: "io.modelcontextprotocol/serverInfo"
+  body: "io.modelcontextprotocol/serverInfo",
+  executable: true
 }
 
 definition{
   name: subscriptionIdKey,
   parameters: [],
   result: String,
-  body: "io.modelcontextprotocol/subscriptionId"
+  body: "io.modelcontextprotocol/subscriptionId",
+  executable: true
 }
 
 structure{
@@ -86,7 +104,8 @@ definition{
   body: (match kind
     | ResultType.complete => "complete"
     | ResultType.input_required => "input_required"
-    | ResultType.task => "task")
+    | ResultType.task => "task"),
+  executable: true
 }
 
 structure{

@@ -19,7 +19,8 @@ definition{
   result: (List (String * Json::Json)),
   body: (match value
     | Option.none => (nil (String * Json::Json))
-    | Option.some content => (cons (key, (ctor Json::Json.text content)) (nil (String * Json::Json))))
+    | Option.some content => (cons (key, (ctor Json::Json.text content)) (nil (String * Json::Json)))),
+  executable: true
 }
 
 definition{
@@ -28,7 +29,8 @@ definition{
   result: (List (String * Json::Json)),
   body: (match theme
     | Option.none => (nil (String * Json::Json))
-    | Option.some chosen => (cons ("theme", (ctor Json::Json.text (Common::iconThemeWire chosen))) (nil (String * Json::Json))))
+    | Option.some chosen => (cons ("theme", (ctor Json::Json.text (Common::iconThemeWire chosen))) (nil (String * Json::Json)))),
+  executable: true
 }
 
 definition{
@@ -37,14 +39,16 @@ definition{
   result: (List (String * Json::Json)),
   body: (match sizes
     | Option.none => (nil (String * Json::Json))
-    | Option.some items => (cons ("sizes", (ctor Json::Json.array (Refusal::textList items))) (nil (String * Json::Json))))
+    | Option.some items => (cons ("sizes", (ctor Json::Json.array (Refusal::textList items))) (nil (String * Json::Json)))),
+  executable: true
 }
 
 definition{
   name: iconJson,
   parameters: [icon : Common::Icon],
   result: Json::Json,
-  body: (ctor Json::Json.object (cons ("src", (ctor Json::Json.text (project icon src))) (prim append (textMember "mimeType" (project icon mimeType)) (prim append (sizesMember (project icon sizes)) (iconThemeMember (project icon theme)) : (List (String * Json::Json))) : (List (String * Json::Json)))))
+  body: (ctor Json::Json.object (cons ("src", (ctor Json::Json.text (project icon src))) (prim append (textMember "mimeType" (project icon mimeType)) (prim append (sizesMember (project icon sizes)) (iconThemeMember (project icon theme)) : (List (String * Json::Json))) : (List (String * Json::Json))))),
+  executable: true
 }
 
 definition{
@@ -54,6 +58,7 @@ definition{
   body: (match icons
     | List.nil => (nil Json::Json)
     | List.cons head tail => (cons (iconJson head) (iconsJson tail))),
+  executable: true,
   recursive_argument: icons
 }
 
@@ -63,14 +68,16 @@ definition{
   result: (List (String * Json::Json)),
   body: (match icons
     | Option.none => (nil (String * Json::Json))
-    | Option.some items => (cons ("icons", (ctor Json::Json.array (iconsJson items))) (nil (String * Json::Json))))
+    | Option.some items => (cons ("icons", (ctor Json::Json.array (iconsJson items))) (nil (String * Json::Json)))),
+  executable: true
 }
 
 definition{
   name: implementationJson,
   parameters: [info : Common::Implementation],
   result: Json::Json,
-  body: (ctor Json::Json.object (cons ("name", (ctor Json::Json.text (project info name))) (cons ("version", (ctor Json::Json.text (project info version))) (prim append (textMember "title" (project info title)) (prim append (textMember "description" (project info description)) (prim append (textMember "websiteUrl" (project info websiteUrl)) (iconsMember (project info icons)) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))))))
+  body: (ctor Json::Json.object (cons ("name", (ctor Json::Json.text (project info name))) (cons ("version", (ctor Json::Json.text (project info version))) (prim append (textMember "title" (project info title)) (prim append (textMember "description" (project info description)) (prim append (textMember "websiteUrl" (project info websiteUrl)) (iconsMember (project info icons)) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json)))))),
+  executable: true
 }
 
 definition{
@@ -79,14 +86,16 @@ definition{
   result: (List (String * Json::Json)),
   body: (match info
     | Option.none => (nil (String * Json::Json))
-    | Option.some described => (cons ((Meta::serverInfoKey), (implementationJson described)) (nil (String * Json::Json))))
+    | Option.some described => (cons ((Meta::serverInfoKey), (implementationJson described)) (nil (String * Json::Json)))),
+  executable: true
 }
 
 definition{
   name: envelope,
   parameters: [reply : Dispatch::Reply],
   result: Json::JsonObject,
-  body: (record Json::JsonObject {members := (cons ("resultType", (ctor Json::Json.text (Meta::resultTypeWire (Methods::resultTypeOf (project reply body))))) (cons ("_meta", (ctor Json::Json.object (serverInfoMember (project (project reply meta) serverInfo)))) (nil (String * Json::Json))))})
+  body: (record Json::JsonObject {members := (cons ("resultType", (ctor Json::Json.text (Meta::resultTypeWire (Methods::resultTypeOf (project reply body))))) (cons ("_meta", (ctor Json::Json.object (serverInfoMember (project (project reply meta) serverInfo)))) (nil (String * Json::Json))))}),
+  executable: true
 }
 
 definition{
@@ -99,7 +108,8 @@ definition{
       | Option.none => (ctor Option.none [Json::Json])
       | Option.some meta => (match (Json::lookup (Meta::serverInfoKey) meta)
         | Json::Lookup.absent => (ctor Option.none [Json::Json])
-        | Json::Lookup.present info => (ctor Option.some [Json::Json] info))))
+        | Json::Lookup.present info => (ctor Option.some [Json::Json] info)))),
+  executable: true
 }
 
 theorem{
@@ -112,28 +122,28 @@ theorem{
 theorem{
   name: envelope_of_a_complete_result_declares_complete,
   parameters: [provider : Extension::Provider, found : Methods::CallToolResult],
-  statement: ((Json::lookup "resultType" (envelope (Dispatch::replyOf provider (ctor Methods::ResultBody.callTool found)))) = (ctor Json::Lookup.present (ctor Json::Json.text "complete"))),
+  statement: ((Json::lookup "resultType" (envelope (Dispatch::replyOf (Extension::infoOf provider) (ctor Methods::ResultBody.callTool found)))) = (ctor Json::Lookup.present (ctor Json::Json.text "complete"))),
   proof: reflexivity{}
 }
 
 theorem{
   name: envelope_of_an_interim_result_declares_input_required,
   parameters: [provider : Extension::Provider, needed : Input::InputRequiredResult],
-  statement: ((Json::lookup "resultType" (envelope (Dispatch::replyOf provider (ctor Methods::ResultBody.inputRequired needed)))) = (ctor Json::Lookup.present (ctor Json::Json.text "input_required"))),
+  statement: ((Json::lookup "resultType" (envelope (Dispatch::replyOf (Extension::infoOf provider) (ctor Methods::ResultBody.inputRequired needed)))) = (ctor Json::Lookup.present (ctor Json::Json.text "input_required"))),
   proof: reflexivity{}
 }
 
 theorem{
   name: envelope_of_a_created_task_declares_task,
   parameters: [provider : Extension::Provider, created : Tasks::CreateTaskResult],
-  statement: ((Json::lookup "resultType" (envelope (Dispatch::replyOf provider (ctor Methods::ResultBody.taskCreated created)))) = (ctor Json::Lookup.present (ctor Json::Json.text "task"))),
+  statement: ((Json::lookup "resultType" (envelope (Dispatch::replyOf (Extension::infoOf provider) (ctor Methods::ResultBody.taskCreated created)))) = (ctor Json::Lookup.present (ctor Json::Json.text "task"))),
   proof: reflexivity{}
 }
 
 theorem{
   name: envelope_of_a_dispatched_reply_carries_the_server_info,
   parameters: [provider : Extension::Provider, body : Methods::ResultBody],
-  statement: ((serverInfoOfEnvelope (envelope (Dispatch::replyOf provider body))) = (ctor Option.some [Json::Json] (implementationJson (project provider serverInfo)))),
+  statement: ((serverInfoOfEnvelope (envelope (Dispatch::replyOf (Extension::infoOf provider) body))) = (ctor Option.some [Json::Json] (implementationJson (project provider serverInfo)))),
   proof: reflexivity{}
 }
 \end{semanticmodule}

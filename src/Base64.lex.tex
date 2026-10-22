@@ -1,0 +1,126 @@
+\begin{lexlean}{Base64}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\title{MCP header encoding}
+\begin{semanticmodule}
+definition{
+  name: sextet,
+  parameters: [byte : Nat],
+  result: (Option Nat),
+  body: (if ((64 <? byte) && (byte <? 91)) then (ctor Option.some [Nat] (prim subtract byte 65 : Nat)) else (if ((96 <? byte) && (byte <? 123)) then (ctor Option.some [Nat] (prim subtract byte 71 : Nat)) else (if ((47 <? byte) && (byte <? 58)) then (ctor Option.some [Nat] (byte + 4)) else (if (byte =? 43) then (ctor Option.some [Nat] 62) else (if (byte =? 47) then (ctor Option.some [Nat] 63) else (ctor Option.none [Nat])))))),
+  executable: true
+}
+
+definition{
+  name: low,
+  parameters: [value : Nat, modulus : Nat],
+  result: Nat,
+  body: (prim remainder value modulus 0 : Nat),
+  executable: true
+}
+
+definition{
+  name: high,
+  parameters: [value : Nat, divisor : Nat],
+  result: Nat,
+  body: (prim quotient value divisor 0 : Nat),
+  executable: true
+}
+
+definition{
+  name: oneByte,
+  parameters: [s1 : Nat, s2 : Nat],
+  result: (List Nat),
+  body: (cons ((prim multiply s1 4 : Nat) + (high s2 16)) (nil Nat)),
+  executable: true
+}
+
+definition{
+  name: twoBytes,
+  parameters: [s1 : Nat, s2 : Nat, s3 : Nat],
+  result: (List Nat),
+  body: (cons ((prim multiply s1 4 : Nat) + (high s2 16)) (cons ((prim multiply (low s2 16) 16 : Nat) + (high s3 4)) (nil Nat))),
+  executable: true
+}
+
+definition{
+  name: threeBytes,
+  parameters: [s1 : Nat, s2 : Nat, s3 : Nat, s4 : Nat],
+  result: (List Nat),
+  body: (cons ((prim multiply s1 4 : Nat) + (high s2 16)) (cons ((prim multiply (low s2 16) 16 : Nat) + (high s3 4)) (cons ((prim multiply (low s3 4) 64 : Nat) + s4) (nil Nat)))),
+  executable: true
+}
+
+definition{
+  name: paddedThrice,
+  parameters: [s1 : Nat, s2 : Nat, s3 : Nat, last : Bool],
+  result: (Option (List Nat)),
+  body: (if (last && ((low s3 4) =? 0)) then (ctor Option.some [(List Nat)] (twoBytes s1 s2 s3)) else (ctor Option.none [(List Nat)])),
+  executable: true
+}
+
+definition{
+  name: paddedTwice,
+  parameters: [s1 : Nat, s2 : Nat, last : Bool, s4 : Nat],
+  result: (Option (List Nat)),
+  body: (if (last && ((s4 =? 61) && ((low s2 16) =? 0))) then (ctor Option.some [(List Nat)] (oneByte s1 s2)) else (ctor Option.none [(List Nat)])),
+  executable: true
+}
+
+definition{
+  name: group,
+  parameters: [a : Nat, b : Nat, c : Nat, d : Nat, last : Bool],
+  result: (Option (List Nat)),
+  body: (match (sextet a)
+    | Option.none => (ctor Option.none [(List Nat)])
+    | Option.some s1 => (match (sextet b)
+      | Option.none => (ctor Option.none [(List Nat)])
+      | Option.some s2 => (if (c =? 61) then (paddedTwice s1 s2 last d) else (match (sextet c)
+        | Option.none => (ctor Option.none [(List Nat)])
+        | Option.some s3 => (if (d =? 61) then (paddedThrice s1 s2 s3 last) else (match (sextet d)
+          | Option.none => (ctor Option.none [(List Nat)])
+          | Option.some s4 => (ctor Option.some [(List Nat)] (threeBytes s1 s2 s3 s4)))))))),
+  executable: true
+}
+
+definition{
+  name: isEmpty,
+  parameters: [items : (List Nat)],
+  result: Bool,
+  body: (match items | List.nil => true | List.cons head tail => false),
+  executable: true
+}
+
+definition{
+  name: groups,
+  parameters: [fuel : Nat, chars : (List Nat), built : (List Nat)],
+  result: (Option (List Nat)),
+  body: (match fuel
+    | Nat.zero => (match chars
+      | List.nil => (ctor Option.some [(List Nat)] built)
+      | List.cons a r1 => (ctor Option.none [(List Nat)]))
+    | Nat.succ below => (match chars
+      | List.nil => (ctor Option.some [(List Nat)] built)
+      | List.cons a r1 => (match r1
+        | List.nil => (ctor Option.none [(List Nat)])
+        | List.cons b r2 => (match r2
+          | List.nil => (ctor Option.none [(List Nat)])
+          | List.cons c r3 => (match r3
+            | List.nil => (ctor Option.none [(List Nat)])
+            | List.cons d rest => (match (group a b c d (isEmpty rest))
+              | Option.none => (ctor Option.none [(List Nat)])
+              | Option.some produced => (groups below rest (prim append built produced : (List Nat))))))))),
+  executable: true,
+  recursive_argument: fuel
+}
+
+definition{
+  name: decode,
+  parameters: [chars : (List Nat)],
+  result: (Option (List Nat)),
+  body: (groups (prim length chars : Nat) chars (nil Nat)),
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

@@ -1,0 +1,268 @@
+\begin{lexlean}{HeaderLaws}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Base64}
+\importmodule{Http}
+\title{MCP header laws}
+\begin{semanticmodule}
+theorem{
+  name: a_header_name_matches_in_lower_case,
+  parameters: [],
+  statement: ((Http::sameName (cons 77 (cons 99 (cons 112 (cons 45 (cons 77 (cons 101 (cons 116 (cons 104 (cons 111 (cons 100 (nil Nat))))))))))) (cons 109 (cons 99 (cons 112 (cons 45 (cons 109 (cons 101 (cons 116 (cons 104 (cons 111 (cons 100 (nil Nat)))))))))))) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_header_name_matches_in_upper_case,
+  parameters: [],
+  statement: ((Http::sameName (cons 77 (cons 99 (cons 112 (cons 45 (cons 77 (cons 101 (cons 116 (cons 104 (cons 111 (cons 100 (nil Nat))))))))))) (cons 77 (cons 67 (cons 80 (cons 45 (cons 77 (cons 69 (cons 84 (cons 72 (cons 79 (cons 68 (nil Nat)))))))))))) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_method_name_constant_matches_the_registered_spelling,
+  parameters: [],
+  statement: ((Http::sameName (Http::methodName) (cons 77 (cons 99 (cons 112 (cons 45 (cons 77 (cons 101 (cons 116 (cons 104 (cons 111 (cons 100 (nil Nat)))))))))))) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_name_constant_matches_the_registered_spelling,
+  parameters: [],
+  statement: ((Http::sameName (Http::nameName) (cons 77 (cons 67 (cons 80 (cons 45 (cons 78 (cons 65 (cons 77 (cons 69 (nil Nat)))))))))) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_protocol_version_constant_matches_the_registered_spelling,
+  parameters: [],
+  statement: ((Http::sameName (Http::protocolVersionName) (cons 77 (cons 67 (cons 80 (cons 45 (cons 80 (cons 114 (cons 111 (cons 116 (cons 111 (cons 99 (cons 111 (cons 108 (cons 45 (cons 86 (cons 101 (cons 114 (cons 115 (cons 105 (cons 111 (cons 110 (nil Nat)))))))))))))))))))))) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: different_header_names_do_not_match,
+  parameters: [],
+  statement: ((Http::sameName (cons 77 (cons 99 (cons 112 (cons 45 (cons 77 (cons 101 (cons 116 (cons 104 (cons 111 (cons 100 (nil Nat))))))))))) (cons 77 (cons 99 (cons 112 (cons 45 (cons 78 (cons 97 (cons 109 (cons 101 (nil Nat)))))))))) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_shorter_header_name_does_not_match,
+  parameters: [],
+  statement: ((Http::sameName (cons 77 (cons 99 (cons 112 (cons 45 (cons 77 (cons 101 (cons 116 (cons 104 (cons 111 (cons 100 (nil Nat))))))))))) (cons 77 (cons 99 (cons 112 (cons 45 (cons 77 (cons 101 (cons 116 (cons 104 (cons 111 (nil Nat))))))))))) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: only_letters_are_folded,
+  parameters: [],
+  statement: ((Http::sameName (cons 91 (nil Nat)) (cons 123 (nil Nat))) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: optional_whitespace_is_trimmed_from_both_ends,
+  parameters: [],
+  statement: ((Http::trimOws (cons 32 (cons 32 (cons 101 (cons 99 (cons 104 (cons 111 (cons 9 (cons 32 (nil Nat)))))))))) = (cons 101 (cons 99 (cons 104 (cons 111 (nil Nat)))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_value_without_whitespace_is_unchanged,
+  parameters: [],
+  statement: ((Http::trimOws (cons 101 (cons 99 (cons 104 (cons 111 (nil Nat)))))) = (cons 101 (cons 99 (cons 104 (cons 111 (nil Nat)))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_blank_value_trims_to_nothing,
+  parameters: [],
+  statement: ((Http::trimOws (cons 32 (cons 9 (cons 32 (nil Nat))))) = (nil Nat)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_control_byte_makes_a_value_malformed,
+  parameters: [],
+  statement: ((Http::cleanValue (cons 101 (cons 1 (cons 99 (nil Nat))))) = (ctor Option.none [(List Nat)])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_delete_byte_makes_a_value_malformed,
+  parameters: [],
+  statement: ((Http::cleanValue (cons 101 (cons 127 (nil Nat)))) = (ctor Option.none [(List Nat)])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_byte_above_the_ascii_range_makes_a_value_malformed,
+  parameters: [],
+  statement: ((Http::cleanValue (cons 101 (cons 128 (nil Nat)))) = (ctor Option.none [(List Nat)])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_plain_value_is_clean,
+  parameters: [],
+  statement: ((Http::cleanValue (cons 32 (cons 116 (cons 111 (cons 111 (cons 108 (cons 115 (cons 47 (cons 108 (cons 105 (cons 115 (cons 116 (cons 32 (nil Nat)))))))))))))) = (ctor Option.some [(List Nat)] (cons 116 (cons 111 (cons 111 (cons 108 (cons 115 (cons 47 (cons 108 (cons 105 (cons 115 (cons 116 (nil Nat))))))))))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_field_is_read_whatever_the_case_of_its_name,
+  parameters: [],
+  statement: ((Http::readField (cons (record Http::Field {name := (cons 77 (cons 67 (cons 80 (cons 45 (cons 77 (cons 69 (cons 84 (cons 72 (cons 79 (cons 68 (nil Nat))))))))))), value := (cons 116 (cons 111 (cons 111 (cons 108 (cons 115 (cons 47 (cons 108 (cons 105 (cons 115 (cons 116 (nil Nat)))))))))))}) (nil Http::Field)) (Http::methodName)) = (ctor Http::Reading.value (cons 116 (cons 111 (cons 111 (cons 108 (cons 115 (cons 47 (cons 108 (cons 105 (cons 115 (cons 116 (nil Nat))))))))))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_field_value_is_read_without_its_whitespace,
+  parameters: [],
+  statement: ((Http::readField (cons (record Http::Field {name := (cons 109 (cons 99 (cons 112 (cons 45 (cons 109 (cons 101 (cons 116 (cons 104 (cons 111 (cons 100 (nil Nat))))))))))), value := (cons 32 (cons 32 (cons 116 (cons 111 (cons 111 (cons 108 (cons 115 (cons 47 (cons 108 (cons 105 (cons 115 (cons 116 (cons 32 (nil Nat))))))))))))))}) (nil Http::Field)) (Http::methodName)) = (ctor Http::Reading.value (cons 116 (cons 111 (cons 111 (cons 108 (cons 115 (cons 47 (cons 108 (cons 105 (cons 115 (cons 116 (nil Nat))))))))))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_absent_field_is_absent,
+  parameters: [],
+  statement: ((Http::readField (cons (record Http::Field {name := (cons 77 (cons 99 (cons 112 (cons 45 (cons 78 (cons 97 (cons 109 (cons 101 (nil Nat))))))))), value := (cons 101 (cons 99 (cons 104 (cons 111 (nil Nat)))))}) (nil Http::Field)) (Http::methodName)) = (ctor Http::Reading.absent)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: no_fields_read_as_absent,
+  parameters: [],
+  statement: ((Http::readField (nil Http::Field) (Http::methodName)) = (ctor Http::Reading.absent)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_repeated_field_is_repeated_whatever_the_case,
+  parameters: [],
+  statement: ((Http::readField (cons (record Http::Field {name := (cons 77 (cons 99 (cons 112 (cons 45 (cons 77 (cons 101 (cons 116 (cons 104 (cons 111 (cons 100 (nil Nat))))))))))), value := (cons 116 (cons 111 (cons 111 (cons 108 (cons 115 (cons 47 (cons 108 (cons 105 (cons 115 (cons 116 (nil Nat)))))))))))}) (cons (record Http::Field {name := (cons 109 (cons 99 (cons 112 (cons 45 (cons 109 (cons 101 (cons 116 (cons 104 (cons 111 (cons 100 (nil Nat))))))))))), value := (cons 116 (cons 111 (cons 111 (cons 108 (cons 115 (cons 47 (cons 108 (cons 105 (cons 115 (cons 116 (nil Nat)))))))))))}) (nil Http::Field))) (Http::methodName)) = (ctor Http::Reading.repeated)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_field_with_a_control_byte_is_malformed,
+  parameters: [],
+  statement: ((Http::readField (cons (record Http::Field {name := (cons 77 (cons 99 (cons 112 (cons 45 (cons 77 (cons 101 (cons 116 (cons 104 (cons 111 (cons 100 (nil Nat))))))))))), value := (cons 116 (cons 1 (nil Nat)))}) (nil Http::Field)) (Http::methodName)) = (ctor Http::Reading.malformed)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_sentinel_payload_is_taken_between_its_marks,
+  parameters: [],
+  statement: ((Http::sentinelPayload (cons 61 (cons 63 (cons 98 (cons 97 (cons 115 (cons 101 (cons 54 (cons 52 (cons 63 (cons 83 (cons 71 (cons 86 (cons 115 (cons 98 (cons 71 (cons 56 (cons 61 (cons 63 (cons 61 (nil Nat))))))))))))))))))))) = (ctor Option.some [(List Nat)] (cons 83 (cons 71 (cons 86 (cons 115 (cons 98 (cons 71 (cons 56 (cons 61 (nil Nat))))))))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_value_without_the_closing_mark_is_literal,
+  parameters: [],
+  statement: ((Http::sentinelPayload (cons 61 (cons 63 (cons 98 (cons 97 (cons 115 (cons 101 (cons 54 (cons 52 (cons 63 (cons 83 (cons 71 (cons 86 (cons 115 (cons 98 (cons 71 (cons 56 (cons 61 (nil Nat))))))))))))))))))) = (ctor Option.none [(List Nat)])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_value_without_the_opening_mark_is_literal,
+  parameters: [],
+  statement: ((Http::sentinelPayload (cons 83 (cons 71 (cons 86 (cons 115 (cons 98 (cons 71 (cons 56 (cons 61 (nil Nat)))))))))) = (ctor Option.none [(List Nat)])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_sentinel_marks_are_case_sensitive,
+  parameters: [],
+  statement: ((Http::sentinelPayload (cons 61 (cons 63 (cons 66 (cons 65 (cons 83 (cons 69 (cons 54 (cons 52 (cons 63 (cons 83 (cons 71 (cons 86 (cons 115 (cons 98 (cons 71 (cons 56 (cons 61 (cons 63 (cons 61 (nil Nat))))))))))))))))))))) = (ctor Option.none [(List Nat)])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_valid_sentinel_value_is_decoded,
+  parameters: [],
+  statement: ((Http::decodedReading (ctor Http::Reading.value (cons 61 (cons 63 (cons 98 (cons 97 (cons 115 (cons 101 (cons 54 (cons 52 (cons 63 (cons 83 (cons 71 (cons 86 (cons 115 (cons 98 (cons 71 (cons 56 (cons 61 (cons 63 (cons 61 (nil Nat)))))))))))))))))))))) = (ctor Http::Reading.value (cons 72 (cons 101 (cons 108 (cons 108 (cons 111 (nil Nat)))))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_sentinel_value_without_padding_is_malformed,
+  parameters: [],
+  statement: ((Http::decodedReading (ctor Http::Reading.value (cons 61 (cons 63 (cons 98 (cons 97 (cons 115 (cons 101 (cons 54 (cons 52 (cons 63 (cons 83 (cons 71 (cons 86 (cons 115 (cons 98 (cons 71 (cons 56 (cons 63 (cons 61 (nil Nat))))))))))))))))))))) = (ctor Http::Reading.malformed)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_sentinel_value_with_foreign_characters_is_malformed,
+  parameters: [],
+  statement: ((Http::decodedReading (ctor Http::Reading.value (cons 61 (cons 63 (cons 98 (cons 97 (cons 115 (cons 101 (cons 54 (cons 52 (cons 63 (cons 83 (cons 71 (cons 86 (cons 115 (cons 33 (cons 33 (cons 33 (cons 98 (cons 71 (cons 56 (cons 61 (cons 63 (cons 61 (nil Nat))))))))))))))))))))))))) = (ctor Http::Reading.malformed)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_value_that_is_not_a_sentinel_is_kept_literally,
+  parameters: [],
+  statement: ((Http::decodedReading (ctor Http::Reading.value (cons 83 (cons 71 (cons 86 (cons 115 (cons 98 (cons 71 (cons 56 (cons 61 (nil Nat))))))))))) = (ctor Http::Reading.value (cons 83 (cons 71 (cons 86 (cons 115 (cons 98 (cons 71 (cons 56 (cons 61 (nil Nat))))))))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_open_sentinel_is_kept_literally,
+  parameters: [],
+  statement: ((Http::decodedReading (ctor Http::Reading.value (cons 61 (cons 63 (cons 98 (cons 97 (cons 115 (cons 101 (cons 54 (cons 52 (cons 63 (cons 83 (cons 71 (cons 86 (cons 115 (cons 98 (cons 71 (cons 56 (cons 61 (nil Nat)))))))))))))))))))) = (ctor Http::Reading.value (cons 61 (cons 63 (cons 98 (cons 97 (cons 115 (cons 101 (cons 54 (cons 52 (cons 63 (cons 83 (cons 71 (cons 86 (cons 115 (cons 98 (cons 71 (cons 56 (cons 61 (nil Nat)))))))))))))))))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: base64_decodes_a_padded_group,
+  parameters: [],
+  statement: ((Base64::decode (cons 83 (cons 71 (cons 86 (cons 115 (cons 98 (cons 71 (cons 56 (cons 61 (nil Nat)))))))))) = (ctor Option.some [(List Nat)] (cons 72 (cons 101 (cons 108 (cons 108 (cons 111 (nil Nat)))))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: base64_decodes_two_padding_characters,
+  parameters: [],
+  statement: ((Base64::decode (cons 83 (cons 71 (cons 86 (cons 115 (cons 98 (cons 65 (cons 61 (cons 61 (nil Nat)))))))))) = (ctor Option.some [(List Nat)] (cons 72 (cons 101 (cons 108 (cons 108 (nil Nat))))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: base64_decodes_the_empty_text,
+  parameters: [],
+  statement: ((Base64::decode (nil Nat)) = (ctor Option.some [(List Nat)] (nil Nat))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: base64_refuses_missing_padding,
+  parameters: [],
+  statement: ((Base64::decode (cons 83 (cons 71 (cons 86 (cons 115 (cons 98 (cons 71 (cons 56 (nil Nat))))))))) = (ctor Option.none [(List Nat)])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: base64_refuses_characters_outside_the_alphabet,
+  parameters: [],
+  statement: ((Base64::decode (cons 83 (cons 71 (cons 86 (cons 115 (cons 33 (cons 33 (cons 33 (cons 98 (cons 71 (cons 56 (cons 61 (nil Nat))))))))))))) = (ctor Option.none [(List Nat)])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: base64_refuses_padding_in_the_middle,
+  parameters: [],
+  statement: ((Base64::decode (cons 83 (cons 71 (cons 61 (cons 115 (cons 98 (cons 71 (cons 56 (cons 61 (nil Nat)))))))))) = (ctor Option.none [(List Nat)])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: base64_refuses_non_canonical_trailing_bits,
+  parameters: [],
+  statement: ((Base64::decode (cons 83 (cons 71 (cons 86 (cons 115 (cons 98 (cons 71 (cons 57 (cons 61 (nil Nat)))))))))) = (ctor Option.none [(List Nat)])),
+  proof: reflexivity{}
+}
+\end{semanticmodule}
+\end{lexlean}

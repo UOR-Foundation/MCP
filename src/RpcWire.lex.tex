@@ -1,0 +1,266 @@
+\begin{lexlean}{RpcWire}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Json}
+\importmodule{JsonRpc}
+\importmodule{Param}
+\importmodule{Refusal}
+\title{MCP JSON-RPC wire messages}
+\begin{semanticmodule}
+inductive{
+  name: InvalidReason,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: notAnObject, fields: []},
+    {name: batch, fields: []},
+    {name: wrongVersion, fields: []},
+    {name: missingMethod, fields: []},
+    {name: methodNotText, fields: []},
+    {name: badId, fields: []},
+    {name: paramsNotObject, fields: []},
+    {name: notification, fields: []},
+    {name: responseMessage, fields: []}
+  ]
+}
+
+inductive{
+  name: Fault,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: parseError, fields: []},
+    {name: invalidRequest, fields: [(Option JsonRpc::RequestId), InvalidReason]}
+  ]
+}
+
+inductive{
+  name: IdRead,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: noId, fields: []},
+    {name: gotId, fields: [JsonRpc::RequestId]},
+    {name: badId, fields: []}
+  ]
+}
+
+definition{
+  name: readId,
+  parameters: [object : Json::JsonObject],
+  result: IdRead,
+  body: (match (Json::lookup "id" object)
+    | Json::Lookup.absent => (ctor IdRead.noId)
+    | Json::Lookup.present found => (match found
+      | Json::Json.text content => (ctor IdRead.gotId (ctor JsonRpc::RequestId.text content))
+      | Json::Json.number amount => (match (Param::wholeNumber amount)
+        | Option.none => (ctor IdRead.badId)
+        | Option.some whole => (ctor IdRead.gotId (ctor JsonRpc::RequestId.number whole)))
+      | Json::Json.null => (ctor IdRead.badId)
+      | Json::Json.bool flag => (ctor IdRead.badId)
+      | Json::Json.array items => (ctor IdRead.badId)
+      | Json::Json.object members => (ctor IdRead.badId))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: isResponseShaped,
+  parameters: [object : Json::JsonObject],
+  result: Bool,
+  body: ((Json::hasKey "result" object) || (Json::hasKey "error" object)),
+  executable: true
+}
+
+definition{
+  name: withoutMethod,
+  parameters: [object : Json::JsonObject],
+  result: InvalidReason,
+  body: (if (isResponseShaped object) then (ctor InvalidReason.responseMessage) else (ctor InvalidReason.missingMethod)),
+  executable: true
+}
+
+definition{
+  name: invalid,
+  parameters: [ident : (Option JsonRpc::RequestId), reason : InvalidReason],
+  result: (Result JsonRpc::Request Fault),
+  body: (ctor Result.error [JsonRpc::Request, Fault] (ctor Fault.invalidRequest ident reason)),
+  executable: true
+}
+
+definition{
+  name: withParams,
+  parameters: [ident : JsonRpc::RequestId, method : String, object : Json::JsonObject],
+  result: (Result JsonRpc::Request Fault),
+  body: (match (Json::lookup "params" object)
+    | Json::Lookup.absent => (ctor Result.ok [JsonRpc::Request, Fault] (record JsonRpc::Request {id := ident, method := method, params := (ctor Option.none [Json::JsonObject])}))
+    | Json::Lookup.present found => (match (Json::asObject found)
+      | Option.none => (invalid (ctor Option.some [JsonRpc::RequestId] ident) (ctor InvalidReason.paramsNotObject))
+      | Option.some params => (ctor Result.ok [JsonRpc::Request, Fault] (record JsonRpc::Request {id := ident, method := method, params := (ctor Option.some [Json::JsonObject] params)})))),
+  executable: true
+}
+
+definition{
+  name: withMethod,
+  parameters: [ident : JsonRpc::RequestId, object : Json::JsonObject],
+  result: (Result JsonRpc::Request Fault),
+  body: (match (Json::lookup "method" object)
+    | Json::Lookup.absent => (invalid (ctor Option.some [JsonRpc::RequestId] ident) (withoutMethod object))
+    | Json::Lookup.present found => (match (Json::asText found)
+      | Option.none => (invalid (ctor Option.some [JsonRpc::RequestId] ident) (ctor InvalidReason.methodNotText))
+      | Option.some method => (withParams ident method object))),
+  executable: true
+}
+
+definition{
+  name: withVersion,
+  parameters: [ident : JsonRpc::RequestId, object : Json::JsonObject],
+  result: (Result JsonRpc::Request Fault),
+  body: (match (Json::lookup "jsonrpc" object)
+    | Json::Lookup.absent => (invalid (ctor Option.some [JsonRpc::RequestId] ident) (ctor InvalidReason.wrongVersion))
+    | Json::Lookup.present found => (match (Json::asText found)
+      | Option.none => (invalid (ctor Option.some [JsonRpc::RequestId] ident) (ctor InvalidReason.wrongVersion))
+      | Option.some version => (if (prim equal version (JsonRpc::jsonrpcVersion) : Bool) then (withMethod ident object) else (invalid (ctor Option.some [JsonRpc::RequestId] ident) (ctor InvalidReason.wrongVersion))))),
+  executable: true
+}
+
+definition{
+  name: withId,
+  parameters: [object : Json::JsonObject],
+  result: (Result JsonRpc::Request Fault),
+  body: (match (readId object)
+    | IdRead.badId => (invalid (ctor Option.none [JsonRpc::RequestId]) (ctor InvalidReason.badId))
+    | IdRead.noId => (match (Json::lookup "method" object)
+      | Json::Lookup.absent => (invalid (ctor Option.none [JsonRpc::RequestId]) (withoutMethod object))
+      | Json::Lookup.present found => (invalid (ctor Option.none [JsonRpc::RequestId]) (if (isResponseShaped object) then (ctor InvalidReason.responseMessage) else (ctor InvalidReason.notification))))
+    | IdRead.gotId identifier => (withVersion identifier object)),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: decodeRequest,
+  parameters: [message : Json::Json],
+  result: (Result JsonRpc::Request Fault),
+  body: (match message
+    | Json::Json.object members => (withId (record Json::JsonObject {members := members}))
+    | Json::Json.array items => (invalid (ctor Option.none [JsonRpc::RequestId]) (ctor InvalidReason.batch))
+    | Json::Json.null => (invalid (ctor Option.none [JsonRpc::RequestId]) (ctor InvalidReason.notAnObject))
+    | Json::Json.bool flag => (invalid (ctor Option.none [JsonRpc::RequestId]) (ctor InvalidReason.notAnObject))
+    | Json::Json.number amount => (invalid (ctor Option.none [JsonRpc::RequestId]) (ctor InvalidReason.notAnObject))
+    | Json::Json.text content => (invalid (ctor Option.none [JsonRpc::RequestId]) (ctor InvalidReason.notAnObject))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: reasonMessage,
+  parameters: [reason : InvalidReason],
+  result: String,
+  body: (match reason
+    | InvalidReason.notAnObject => "Invalid Request: the body is not a JSON object"
+    | InvalidReason.batch => "Invalid Request: batches are not supported"
+    | InvalidReason.wrongVersion => "Invalid Request: jsonrpc must be 2.0"
+    | InvalidReason.missingMethod => "Invalid Request: method is required"
+    | InvalidReason.methodNotText => "Invalid Request: method must be a string"
+    | InvalidReason.badId => "Invalid Request: ident must be a string or an integer"
+    | InvalidReason.paramsNotObject => "Invalid Request: params must be an object"
+    | InvalidReason.notification => "Invalid Request: notifications are not accepted"
+    | InvalidReason.responseMessage => "Invalid Request: the client must not send responses"),
+  executable: true
+}
+
+definition{
+  name: faultCode,
+  parameters: [fault : Fault],
+  result: Int,
+  body: (match fault
+    | Fault.parseError => (JsonRpc::parseErrorCode)
+    | Fault.invalidRequest ident reason => (JsonRpc::invalidRequestCode)),
+  executable: true
+}
+
+definition{
+  name: faultMessage,
+  parameters: [fault : Fault],
+  result: String,
+  body: (match fault
+    | Fault.parseError => "Parse error"
+    | Fault.invalidRequest ident reason => (reasonMessage reason)),
+  executable: true
+}
+
+definition{
+  name: faultId,
+  parameters: [fault : Fault],
+  result: (Option JsonRpc::RequestId),
+  body: (match fault
+    | Fault.parseError => (ctor Option.none [JsonRpc::RequestId])
+    | Fault.invalidRequest ident reason => ident),
+  executable: true
+}
+
+definition{
+  name: faultObject,
+  parameters: [fault : Fault],
+  result: JsonRpc::ErrorObject,
+  body: (record JsonRpc::ErrorObject {code := (faultCode fault), message := (faultMessage fault), data := (ctor Option.none [Json::Json])}),
+  executable: true
+}
+
+definition{
+  name: idJson,
+  parameters: [ident : JsonRpc::RequestId],
+  result: Json::Json,
+  body: (match ident
+    | JsonRpc::RequestId.text content => (ctor Json::Json.text content)
+    | JsonRpc::RequestId.number whole => (ctor Json::Json.number (record Json::Decimal {mantissa := whole, exponent := (0 : Int)}))),
+  executable: true
+}
+
+definition{
+  name: optionalIdJson,
+  parameters: [ident : (Option JsonRpc::RequestId)],
+  result: Json::Json,
+  body: (match ident
+    | Option.none => (ctor Json::Json.null)
+    | Option.some present => (idJson present)),
+  executable: true
+}
+
+definition{
+  name: dataMember,
+  parameters: [data : (Option Json::Json)],
+  result: (List (String * Json::Json)),
+  body: (match data
+    | Option.none => (nil (String * Json::Json))
+    | Option.some payload => (cons ("data", payload) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: errorObjectJson,
+  parameters: [error : JsonRpc::ErrorObject],
+  result: Json::Json,
+  body: (ctor Json::Json.object (cons ("code", (ctor Json::Json.number (record Json::Decimal {mantissa := (project error code), exponent := (0 : Int)}))) (cons ("message", (ctor Json::Json.text (project error message))) (dataMember (project error data))))),
+  executable: true
+}
+
+definition{
+  name: errorResponse,
+  parameters: [ident : (Option JsonRpc::RequestId), error : JsonRpc::ErrorObject],
+  result: Json::Json,
+  body: (ctor Json::Json.object (cons ("jsonrpc", (ctor Json::Json.text (JsonRpc::jsonrpcVersion))) (cons ("id", (optionalIdJson ident)) (cons ("error", (errorObjectJson error)) (nil (String * Json::Json)))))),
+  executable: true
+}
+
+definition{
+  name: resultResponse,
+  parameters: [ident : JsonRpc::RequestId, result : Json::JsonObject],
+  result: Json::Json,
+  body: (ctor Json::Json.object (cons ("jsonrpc", (ctor Json::Json.text (JsonRpc::jsonrpcVersion))) (cons ("id", (idJson ident)) (cons ("result", (ctor Json::Json.object (project result members))) (nil (String * Json::Json)))))),
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

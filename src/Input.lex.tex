@@ -248,7 +248,8 @@ definition{
   body: (match required
     | InputRequiredResult.requests pending => pending
     | InputRequiredResult.state token => (nil (String * InputRequest))
-    | InputRequiredResult.requestsAndState pending token => pending)
+    | InputRequiredResult.requestsAndState pending token => pending),
+  executable: true
 }
 
 definition{
@@ -258,7 +259,8 @@ definition{
   body: (match required
     | InputRequiredResult.requests pending => (ctor Option.none [String])
     | InputRequiredResult.state token => (ctor Option.some [String] token)
-    | InputRequiredResult.requestsAndState pending token => (ctor Option.some [String] token))
+    | InputRequiredResult.requestsAndState pending token => (ctor Option.some [String] token)),
+  executable: true
 }
 
 definition{
@@ -271,6 +273,7 @@ definition{
       | InputRequest.elicitation params => true
       | InputRequest.sampling params => (needsElicitation rest)
       | InputRequest.roots params => (needsElicitation rest))),
+  executable: true,
   recursive_argument: pending
 }
 
@@ -284,6 +287,7 @@ definition{
       | InputRequest.elicitation params => (needsSampling rest)
       | InputRequest.sampling params => true
       | InputRequest.roots params => (needsSampling rest))),
+  executable: true,
   recursive_argument: pending
 }
 
@@ -297,6 +301,7 @@ definition{
       | InputRequest.elicitation params => (needsRoots rest)
       | InputRequest.sampling params => (needsRoots rest)
       | InputRequest.roots params => true)),
+  executable: true,
   recursive_argument: pending
 }
 
@@ -304,7 +309,8 @@ definition{
   name: requiredCapabilities,
   parameters: [pending : (List (String * InputRequest))],
   result: Capabilities::ClientCapabilities,
-  body: (record Capabilities::ClientCapabilities {experimental := (ctor Option.none [Json::JsonObject]), roots := (if (needsRoots pending) then (ctor Option.some [Json::JsonObject] (Capabilities::noObject)) else (ctor Option.none [Json::JsonObject])), sampling := (if (needsSampling pending) then (ctor Option.some [Json::JsonObject] (Capabilities::noObject)) else (ctor Option.none [Json::JsonObject])), elicitation := (if (needsElicitation pending) then (ctor Option.some [Json::JsonObject] (Capabilities::noObject)) else (ctor Option.none [Json::JsonObject])), extensions := (ctor Option.none [Json::JsonObject])})
+  body: (record Capabilities::ClientCapabilities {experimental := (ctor Option.none [Json::JsonObject]), roots := (if (needsRoots pending) then (ctor Option.some [Json::JsonObject] (Capabilities::noObject)) else (ctor Option.none [Json::JsonObject])), sampling := (if (needsSampling pending) then (ctor Option.some [Json::JsonObject] (Capabilities::noObject)) else (ctor Option.none [Json::JsonObject])), elicitation := (if (needsElicitation pending) then (ctor Option.some [Json::JsonObject] (Capabilities::noObject)) else (ctor Option.none [Json::JsonObject])), extensions := (ctor Option.none [Json::JsonObject])}),
+  executable: true
 }
 
 definition{
@@ -314,7 +320,8 @@ definition{
     pending : (List (String * InputRequest))
   ],
   result: Bool,
-  body: ((((not (needsElicitation pending)) || (Capabilities::isDeclared (project declared elicitation))) && ((not (needsSampling pending)) || (Capabilities::isDeclared (project declared sampling)))) && ((not (needsRoots pending)) || (Capabilities::isDeclared (project declared roots))))
+  body: ((((not (needsElicitation pending)) || (Capabilities::isDeclared (project declared elicitation))) && ((not (needsSampling pending)) || (Capabilities::isDeclared (project declared sampling)))) && ((not (needsRoots pending)) || (Capabilities::isDeclared (project declared roots)))),
+  executable: true
 }
 
 theorem{

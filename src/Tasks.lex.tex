@@ -63,7 +63,8 @@ definition{
     | DetailedTask.input_required fields requests => (ctor TaskStatus.input_required)
     | DetailedTask.completed fields result => (ctor TaskStatus.completed)
     | DetailedTask.failed fields error => (ctor TaskStatus.failed)
-    | DetailedTask.cancelled fields => (ctor TaskStatus.cancelled))
+    | DetailedTask.cancelled fields => (ctor TaskStatus.cancelled)),
+  executable: true
 }
 
 definition{
@@ -75,7 +76,8 @@ definition{
     | DetailedTask.input_required fields requests => fields
     | DetailedTask.completed fields result => fields
     | DetailedTask.failed fields error => fields
-    | DetailedTask.cancelled fields => fields)
+    | DetailedTask.cancelled fields => fields),
+  executable: true
 }
 
 definition{
@@ -87,7 +89,8 @@ definition{
     | TaskStatus.input_required => false
     | TaskStatus.completed => true
     | TaskStatus.failed => true
-    | TaskStatus.cancelled => true)
+    | TaskStatus.cancelled => true),
+  executable: true
 }
 
 definition{
@@ -99,7 +102,8 @@ definition{
     | TaskStatus.input_required => "input_required"
     | TaskStatus.completed => "completed"
     | TaskStatus.failed => "failed"
-    | TaskStatus.cancelled => "cancelled")
+    | TaskStatus.cancelled => "cancelled"),
+  executable: true
 }
 
 definition{
@@ -111,7 +115,8 @@ definition{
     | DetailedTask.input_required fields requests => false
     | DetailedTask.completed fields result => true
     | DetailedTask.failed fields error => false
-    | DetailedTask.cancelled fields => false)
+    | DetailedTask.cancelled fields => false),
+  executable: true
 }
 
 theorem{

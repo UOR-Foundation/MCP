@@ -16,7 +16,8 @@ definition{
     | Json::Lookup.absent => (ctor Result.error [String, Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.missingField key))
     | Json::Lookup.present value => (match (Json::asText value)
       | Option.none => (ctor Result.error [String, Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedField key))
-      | Option.some text => (ctor Result.ok [String, Refusal::ParamsProblem] text)))
+      | Option.some text => (ctor Result.ok [String, Refusal::ParamsProblem] text))),
+  executable: true
 }
 
 definition{
@@ -27,7 +28,8 @@ definition{
     | Json::Lookup.absent => (ctor Result.ok [(Option String), Refusal::ParamsProblem] (ctor Option.none [String]))
     | Json::Lookup.present value => (match (Json::asText value)
       | Option.none => (ctor Result.error [(Option String), Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedField key))
-      | Option.some text => (ctor Result.ok [(Option String), Refusal::ParamsProblem] (ctor Option.some [String] text))))
+      | Option.some text => (ctor Result.ok [(Option String), Refusal::ParamsProblem] (ctor Option.some [String] text)))),
+  executable: true
 }
 
 definition{
@@ -38,7 +40,8 @@ definition{
     | Json::Lookup.absent => (ctor Result.error [Json::JsonObject, Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.missingField key))
     | Json::Lookup.present value => (match (Json::asObject value)
       | Option.none => (ctor Result.error [Json::JsonObject, Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedField key))
-      | Option.some found => (ctor Result.ok [Json::JsonObject, Refusal::ParamsProblem] found)))
+      | Option.some found => (ctor Result.ok [Json::JsonObject, Refusal::ParamsProblem] found))),
+  executable: true
 }
 
 definition{
@@ -49,7 +52,8 @@ definition{
     | Json::Lookup.absent => (ctor Result.ok [(Option Json::JsonObject), Refusal::ParamsProblem] (ctor Option.none [Json::JsonObject]))
     | Json::Lookup.present value => (match (Json::asObject value)
       | Option.none => (ctor Result.error [(Option Json::JsonObject), Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedField key))
-      | Option.some found => (ctor Result.ok [(Option Json::JsonObject), Refusal::ParamsProblem] (ctor Option.some [Json::JsonObject] found))))
+      | Option.some found => (ctor Result.ok [(Option Json::JsonObject), Refusal::ParamsProblem] (ctor Option.some [Json::JsonObject] found)))),
+  executable: true
 }
 
 definition{
@@ -63,6 +67,7 @@ definition{
       | Option.some text => (match (textMembers key rest)
         | Result.ok tail => (ctor Result.ok [(List (String * String)), Refusal::ParamsProblem] (cons ((first entry), text) tail))
         | Result.error problem => (ctor Result.error [(List (String * String)), Refusal::ParamsProblem] problem)))),
+  executable: true,
   recursive_argument: members
 }
 
@@ -76,7 +81,8 @@ definition{
       | Option.none => (ctor Result.error [(Option (List (String * String))), Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedField key))
       | Option.some found => (match (textMembers key (project found members))
         | Result.ok pairs => (ctor Result.ok [(Option (List (String * String))), Refusal::ParamsProblem] (ctor Option.some [(List (String * String))] pairs))
-        | Result.error problem => (ctor Result.error [(Option (List (String * String))), Refusal::ParamsProblem] problem))))
+        | Result.error problem => (ctor Result.error [(Option (List (String * String))), Refusal::ParamsProblem] problem)))),
+  executable: true
 }
 
 definition{
@@ -91,7 +97,8 @@ definition{
       | Result.error problem => (ctor Result.error [Methods::CompletionReference, Refusal::ParamsProblem] problem)) else (if (prim equal kind "ref/resource" : Bool) then (match (reqText "uri" object)
       | Result.ok uri => (ctor Result.ok [Methods::CompletionReference, Refusal::ParamsProblem] (ctor Methods::CompletionReference.resourceTemplate uri))
       | Result.error problem => (ctor Result.error [Methods::CompletionReference, Refusal::ParamsProblem] problem)) else (ctor Result.error [Methods::CompletionReference, Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedField "type"))))
-    | Result.error problem => (ctor Result.error [Methods::CompletionReference, Refusal::ParamsProblem] problem))
+    | Result.error problem => (ctor Result.error [Methods::CompletionReference, Refusal::ParamsProblem] problem)),
+  executable: true
 }
 
 definition{
@@ -102,7 +109,8 @@ definition{
     | Result.ok name => (match (reqText "value" object)
       | Result.ok value => (ctor Result.ok [Methods::CompletionArgument, Refusal::ParamsProblem] (record Methods::CompletionArgument {name := name, value := value}))
       | Result.error problem => (ctor Result.error [Methods::CompletionArgument, Refusal::ParamsProblem] problem))
-    | Result.error problem => (ctor Result.error [Methods::CompletionArgument, Refusal::ParamsProblem] problem))
+    | Result.error problem => (ctor Result.error [Methods::CompletionArgument, Refusal::ParamsProblem] problem)),
+  executable: true
 }
 
 definition{
@@ -115,14 +123,16 @@ definition{
       | Option.none => (ctor Result.error [(Option Methods::CompletionContext), Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedField "context"))
       | Option.some found => (match (optStringMap "arguments" found)
         | Result.ok arguments => (ctor Result.ok [(Option Methods::CompletionContext), Refusal::ParamsProblem] (ctor Option.some [Methods::CompletionContext] (record Methods::CompletionContext {arguments := arguments})))
-        | Result.error problem => (ctor Result.error [(Option Methods::CompletionContext), Refusal::ParamsProblem] problem))))
+        | Result.error problem => (ctor Result.error [(Option Methods::CompletionContext), Refusal::ParamsProblem] problem)))),
+  executable: true
 }
 
 definition{
   name: decodeDiscover,
   parameters: [meta : Meta::RequestMeta, object : Json::JsonObject],
   result: (Result Methods::ClientRequest Refusal::ParamsProblem),
-  body: (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.serverDiscover (record Methods::DiscoverParams {meta := meta})))
+  body: (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.serverDiscover (record Methods::DiscoverParams {meta := meta}))),
+  executable: true
 }
 
 definition{
@@ -131,7 +141,8 @@ definition{
   result: (Result Methods::ClientRequest Refusal::ParamsProblem),
   body: (match (optText "cursor" object)
     | Result.ok cursor => (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.toolsList (record Methods::PaginatedParams {meta := meta, cursor := cursor})))
-    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
 }
 
 definition{
@@ -140,7 +151,8 @@ definition{
   result: (Result Methods::ClientRequest Refusal::ParamsProblem),
   body: (match (optText "cursor" object)
     | Result.ok cursor => (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.resourcesList (record Methods::PaginatedParams {meta := meta, cursor := cursor})))
-    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
 }
 
 definition{
@@ -149,7 +161,8 @@ definition{
   result: (Result Methods::ClientRequest Refusal::ParamsProblem),
   body: (match (optText "cursor" object)
     | Result.ok cursor => (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.resourcesTemplatesList (record Methods::PaginatedParams {meta := meta, cursor := cursor})))
-    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
 }
 
 definition{
@@ -158,7 +171,8 @@ definition{
   result: (Result Methods::ClientRequest Refusal::ParamsProblem),
   body: (match (optText "cursor" object)
     | Result.ok cursor => (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.promptsList (record Methods::PaginatedParams {meta := meta, cursor := cursor})))
-    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
 }
 
 definition{
@@ -173,7 +187,8 @@ definition{
           | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
         | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
       | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
-    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
 }
 
 definition{
@@ -186,7 +201,8 @@ definition{
         | Result.ok requestState => (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.resourcesRead (record Methods::ReadResourceParams {meta := meta, uri := uri, inputResponses := inputResponses, requestState := requestState})))
         | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
       | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
-    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
 }
 
 definition{
@@ -201,7 +217,8 @@ definition{
           | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
         | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
       | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
-    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
 }
 
 definition{
@@ -218,7 +235,8 @@ definition{
           | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
         | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
       | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
-    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
 }
 
 definition{
@@ -227,7 +245,8 @@ definition{
   result: (Result Methods::ClientRequest Refusal::ParamsProblem),
   body: (match (reqText "taskId" object)
     | Result.ok taskId => (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.tasksGet (record Methods::GetTaskParams {meta := meta, taskId := taskId})))
-    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
 }
 
 definition{
@@ -238,7 +257,8 @@ definition{
     | Result.ok taskId => (match (reqObject "inputResponses" object)
       | Result.ok inputResponses => (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.tasksUpdate (record Methods::UpdateTaskParams {meta := meta, taskId := taskId, inputResponses := inputResponses})))
       | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
-    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
 }
 
 definition{
@@ -247,7 +267,8 @@ definition{
   result: (Result Methods::ClientRequest Refusal::ParamsProblem),
   body: (match (reqText "taskId" object)
     | Result.ok taskId => (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.tasksCancel (record Methods::CancelTaskParams {meta := meta, taskId := taskId})))
-    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
 }
 
 definition{
@@ -266,7 +287,8 @@ definition{
     | Methods::Method.completionComplete => (decodeComplete meta object)
     | Methods::Method.tasksGet => (decodeGetTask meta object)
     | Methods::Method.tasksUpdate => (decodeUpdateTask meta object)
-    | Methods::Method.tasksCancel => (decodeCancelTask meta object))
+    | Methods::Method.tasksCancel => (decodeCancelTask meta object)),
+  executable: true
 }
 \end{semanticmodule}
 \end{lexlean}
