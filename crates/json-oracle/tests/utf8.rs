@@ -250,7 +250,11 @@ fn every_complete_three_byte_sequence_is_judged_as_table_3_7_judges_it_jc_14() {
         }
     }
     // U+0800..U+FFFF without the 2048 surrogates.
-    assert_eq!(accepted, 0x1_0000 - 0x800 - 0x800, "well-formed three-byte sequences");
+    assert_eq!(
+        accepted,
+        0x1_0000 - 0x800 - 0x800,
+        "well-formed three-byte sequences"
+    );
 }
 
 /// The bytes that stand for every class of byte the fourth and third places tell apart.
@@ -340,5 +344,8 @@ fn the_table_3_7_theorems_are_declared_in_the_validator_module_jc_14() {
     }
     // A theorem is checked only if it carries a proof the kernel replays: no
     // placeholder stands in for one.
-    assert!(!source.contains("sorry"), "a placeholder proof in the validator module");
+    assert!(
+        !source.contains("sorry"),
+        "a placeholder proof in the validator module"
+    );
 }

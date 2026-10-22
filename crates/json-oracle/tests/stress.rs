@@ -104,7 +104,10 @@ fn check(shape: &Shape) {
                 "{}: the canonical text of {length} bytes differs from the expected one",
                 shape.name
             ),
-            other => panic!("{}: {length} bytes were not accepted: {other:?}", shape.name),
+            other => panic!(
+                "{}: {length} bytes were not accepted: {other:?}",
+                shape.name
+            ),
         }
         eprintln!(
             "{}: {length} bytes read in {elapsed:?} (bound {limit:?})",
