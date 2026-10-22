@@ -318,6 +318,33 @@ structure{
   fields: [{name: meta, type: Meta::RequestMeta}, {name: taskId, type: String}]
 }
 
+structure{
+  name: SubscriptionFilter,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: toolsListChanged, type: (Option Bool)},
+    {name: promptsListChanged, type: (Option Bool)},
+    {name: resourcesListChanged, type: (Option Bool)},
+    {name: resourceSubscriptions, type: (Option (List String))},
+    {name: taskIds, type: (Option (List String))}
+  ]
+}
+
+structure{
+  name: SubscriptionsListenParams,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: meta, type: Meta::RequestMeta}, {name: notifications, type: SubscriptionFilter}]
+}
+
+structure{
+  name: SubscriptionsListenResult,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: subscriptionId, type: JsonRpc::RequestId}]
+}
+
 inductive{
   name: ClientRequest,
   type_parameters: [],

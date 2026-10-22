@@ -39,7 +39,8 @@ MCP's own oracles, so this repository makes no conformance claim.
 
 What is not modeled: the JSON text codec (the LexLean stdlib has no JSON
 parser or printer), the JSON encoding of result bodies beyond the envelope,
-`subscriptions/listen`, and host effects.
+the `subscriptions/listen` stream (its params and result types are declared,
+but the method is not dispatched), server notifications, and host effects.
 
 - The claim registers in `model/` are empty, so `CONFORMANCE.md` lists no
   capability and this repository claims none.
