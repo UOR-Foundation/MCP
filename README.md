@@ -38,13 +38,19 @@ MCP's own oracles, so this repository makes no conformance claim.
 | `Utf8`, `JsonText`, `JsonRead`, `JsonWrite`, `JsonCodec` | the JSON text codec: RFC 3629 validation, a parser from bytes to `Json` and an encoder back, with typed refusals, against the pinned JSONTestSuite ([JSON-CODEC.md](JSON-CODEC.md)) |
 | `JsonGate`, `JsonExamples`, `JsonRoundTrip` | theorems about the codec |
 | `Envelope` | the result envelope: `resultType` and `_meta` `io.modelcontextprotocol/serverInfo` |
+| `Param`, `Base64`, `Http`, `HeaderLaws` | the HTTP exchange as data: header fields read without regard to case, repeated and malformed fields refused, the Base64 sentinel decoded, `Mcp-Param` headers compared by kind, and theorems about them ([LIFECYCLE.md](LIFECYCLE.md)) |
+| `RpcWire`, `ResultJson`, `Status`, `Frame` | JSON-RPC faults before a request exists, the result bodies of `server/discover`, `tools/list` and `tools/call` as JSON, the HTTP status of every outcome with kernel-checked theorems, and the first-order frame that is the boundary encoding |
+| `Serve`, `Fixture` | the pipeline from an encoded request to an encoded response, and its production root `fixtureRun` over a tools-only provider ([LIFECYCLE.md](LIFECYCLE.md)) |
 
-What is not modeled: the JSON encoding of result bodies beyond the envelope,
+What is not modeled: the JSON encoding of result bodies other than those of
+`server/discover`, `tools/list` and `tools/call` (text content blocks only),
 the `subscriptions/listen` stream (its params and result types are declared,
 but the method is not dispatched), server notifications, and host effects.
 
-- The claim registers in `model/` hold the JSON text codec only (JC-01 to JC-12);
-  no protocol capability is registered and none is claimed.
+- The claim registers in `model/` hold the JSON text codec (JC-01 to JC-12) and the
+  stateless lifecycle and HTTP header capabilities of #7 (LC-01 to LC-14, HH-01 to HH-13).
+  No other protocol capability is registered and none is claimed, and the conformance
+  scenarios have not been run against a conformance build (#13).
 - The repository is not bound to a PrismPM SDK release (#4): `prismpm.lock` and
   `template.lock` are absent, so `just vv` and the devcontainer cannot run.
 - v0.1.0 is tracked in #16.
