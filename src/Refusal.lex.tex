@@ -5,6 +5,7 @@
 \importmodule{Capabilities}
 \importmodule{Json}
 \importmodule{JsonRpc}
+\importmodule{JsonRead}
 \title{MCP typed refusals}
 \begin{semanticmodule}
 inductive{
@@ -25,6 +26,17 @@ inductive{
 }
 
 inductive{
+  name: HeaderKind,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: protocolVersion, fields: []},
+    {name: method, fields: []},
+    {name: name, fields: []}
+  ]
+}
+
+inductive{
   name: HeaderProblem,
   type_parameters: [],
   parameters: [],
@@ -34,7 +46,12 @@ inductive{
     {name: missingNameHeader, fields: []},
     {name: protocolVersionDiffers, fields: []},
     {name: methodDiffers, fields: []},
-    {name: nameDiffers, fields: []}
+    {name: nameDiffers, fields: []},
+    {name: malformedValue, fields: [HeaderKind]},
+    {name: repeatedField, fields: [HeaderKind]},
+    {name: missingParamHeader, fields: [String]},
+    {name: paramDiffers, fields: [String]},
+    {name: malformedParamHeader, fields: [String]}
   ]
 }
 
@@ -77,7 +94,8 @@ definition{
     | ProviderRefusal.unknownTask taskId => (JsonRpc::invalidParamsCode)
     | ProviderRefusal.invalidArguments reason => (JsonRpc::invalidParamsCode)
     | ProviderRefusal.missingCapability required => (JsonRpc::missingRequiredClientCapabilityCode)
-    | ProviderRefusal.internal reason => (JsonRpc::internalErrorCode))
+    | ProviderRefusal.internal reason => (JsonRpc::internalErrorCode)),
+  executable: true
 }
 
 definition{
@@ -89,7 +107,8 @@ definition{
     | Refusal.unsupportedProtocolVersion requested supported => (JsonRpc::unsupportedProtocolVersionCode)
     | Refusal.headerMismatch problem => (JsonRpc::headerMismatchCode)
     | Refusal.methodNotFound method => (JsonRpc::methodNotFoundCode)
-    | Refusal.provider inner => (providerCode inner))
+    | Refusal.provider inner => (providerCode inner)),
+  executable: true
 }
 
 definition{
@@ -105,7 +124,8 @@ definition{
     | ParamsProblem.malformedProtocolVersion => "Invalid params: io.modelcontextprotocol/protocolVersion is not a string"
     | ParamsProblem.malformedClientCapabilities => "Invalid params: io.modelcontextprotocol/clientCapabilities is not a valid capabilities object"
     | ParamsProblem.missingField key => "Invalid params: a required field is missing"
-    | ParamsProblem.malformedField key => "Invalid params: a field has the wrong type")
+    | ParamsProblem.malformedField key => "Invalid params: a field has the wrong type"),
+  executable: true
 }
 
 definition{
@@ -118,17 +138,38 @@ definition{
     | HeaderProblem.missingNameHeader => "Header mismatch: Mcp-Name header is missing"
     | HeaderProblem.protocolVersionDiffers => "Header mismatch: MCP-Protocol-Version differs from the request body"
     | HeaderProblem.methodDiffers => "Header mismatch: Mcp-Method differs from the request body"
-    | HeaderProblem.nameDiffers => "Header mismatch: Mcp-Name differs from the request body")
+    | HeaderProblem.nameDiffers => "Header mismatch: Mcp-Name differs from the request body"
+    | HeaderProblem.malformedValue kind => (match kind
+      | HeaderKind.protocolVersion => "Header mismatch: MCP-Protocol-Version has a malformed value"
+      | HeaderKind.method => "Header mismatch: Mcp-Method has a malformed value"
+      | HeaderKind.name => "Header mismatch: Mcp-Name has a malformed value")
+    | HeaderProblem.repeatedField kind => (match kind
+      | HeaderKind.protocolVersion => "Header mismatch: MCP-Protocol-Version is repeated"
+      | HeaderKind.method => "Header mismatch: Mcp-Method is repeated"
+      | HeaderKind.name => "Header mismatch: Mcp-Name is repeated")
+    | HeaderProblem.missingParamHeader header => "Header mismatch: a required Mcp-Param header is missing"
+    | HeaderProblem.paramDiffers header => "Header mismatch: an Mcp-Param header differs from the request body"
+    | HeaderProblem.malformedParamHeader header => "Header mismatch: an Mcp-Param header has a malformed value"),
+  executable: true
+}
+
+definition{
+  name: textListOnto,
+  parameters: [items : (List String), built : (List Json::Json)],
+  result: (List Json::Json),
+  body: (match items
+    | List.nil => built
+    | List.cons head tail => (textListOnto tail (cons (ctor Json::Json.text head) built))),
+  executable: true,
+  recursive_argument: items
 }
 
 definition{
   name: textList,
   parameters: [items : (List String)],
   result: (List Json::Json),
-  body: (match items
-    | List.nil => (nil Json::Json)
-    | List.cons head tail => (cons (ctor Json::Json.text head) (textList tail))),
-  recursive_argument: items
+  body: (JsonRead::reverseOnto [Json::Json] (textListOnto items (nil Json::Json)) (nil Json::Json)),
+  executable: true
 }
 
 definition{
@@ -137,14 +178,16 @@ definition{
   result: (List (String * Json::Json)),
   body: (match value
     | Option.none => (nil (String * Json::Json))
-    | Option.some declared => (cons (key, (ctor Json::Json.object (project declared members))) (nil (String * Json::Json))))
+    | Option.some declared => (cons (key, (ctor Json::Json.object (project declared members))) (nil (String * Json::Json)))),
+  executable: true
 }
 
 definition{
   name: capabilitiesJson,
   parameters: [capabilities : Capabilities::ClientCapabilities],
   result: Json::Json,
-  body: (ctor Json::Json.object (prim append (optionalMember "experimental" (project capabilities experimental)) (prim append (optionalMember "roots" (project capabilities roots)) (prim append (optionalMember "sampling" (project capabilities sampling)) (prim append (optionalMember "elicitation" (project capabilities elicitation)) (optionalMember "extensions" (project capabilities extensions)) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))))
+  body: (ctor Json::Json.object (prim append (optionalMember "experimental" (project capabilities experimental)) (prim append (optionalMember "roots" (project capabilities roots)) (prim append (optionalMember "sampling" (project capabilities sampling)) (prim append (optionalMember "elicitation" (project capabilities elicitation)) (optionalMember "extensions" (project capabilities extensions)) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json)))),
+  executable: true
 }
 
 definition{
@@ -163,7 +206,8 @@ definition{
       | ProviderRefusal.unknownTask taskId => (ctor Option.none [Json::Json])
       | ProviderRefusal.invalidArguments reason => (ctor Option.none [Json::Json])
       | ProviderRefusal.missingCapability required => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("requiredCapabilities", (capabilitiesJson required)) (nil (String * Json::Json)))))
-      | ProviderRefusal.internal reason => (ctor Option.none [Json::Json])))
+      | ProviderRefusal.internal reason => (ctor Option.none [Json::Json]))),
+  executable: true
 }
 
 definition{
@@ -182,14 +226,16 @@ definition{
       | ProviderRefusal.unknownTask taskId => "Invalid params: unknown task"
       | ProviderRefusal.invalidArguments reason => "Invalid params: invalid arguments"
       | ProviderRefusal.missingCapability required => "Missing required client capability"
-      | ProviderRefusal.internal reason => "Internal error"))
+      | ProviderRefusal.internal reason => "Internal error")),
+  executable: true
 }
 
 definition{
   name: errorObjectOf,
   parameters: [refusal : Refusal],
   result: JsonRpc::ErrorObject,
-  body: (record JsonRpc::ErrorObject {code := (codeOf refusal), message := (messageOf refusal), data := (dataOf refusal)})
+  body: (record JsonRpc::ErrorObject {code := (codeOf refusal), message := (messageOf refusal), data := (dataOf refusal)}),
+  executable: true
 }
 
 theorem{

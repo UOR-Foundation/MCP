@@ -18,6 +18,24 @@ The three honesty levels (R2):
 `cargo xtask audit-limits` fails if any code path returns an error the
 model does not sanction.
 
+## http-headers
+
+| ID | Level | Statement |
+| --- | --- | --- |
+| `HH-01` | `build` | An MCP-Protocol-Version header that is absent, repeated, malformed or different from the protocolVersion in _meta is refused as headerMismatch (-32020) with HTTP status 400. |
+| `HH-02` | `build` | An Mcp-Method header that differs from the body method is refused as headerMismatch (-32020) with HTTP status 400. |
+| `HH-03` | `build` | A request without an Mcp-Method header, or with a repeated, empty or malformed one, is refused as headerMismatch (-32020) with HTTP status 400. |
+| `HH-04` | `build` | An Mcp-Name header that differs from params.name, params.uri for resources/read, is refused as headerMismatch (-32020) with HTTP status 400; a Base64-wrapped Mcp-Name is decoded before the comparison. |
+| `HH-05` | `build` | Optional whitespace around a header value is not part of the value, so a padded Mcp-Name equal to params.name is accepted. |
+| `HH-06` | `build` | Mcp-Name is required on tools/call, resources/read and prompts/get, and a request without it is refused as headerMismatch before the method is routed; it is not required on other methods. |
+| `HH-07` | `build` | Header names are compared without regard to case. |
+| `HH-08` | `build` | Header values are compared exactly, so a method value that differs from the body method only in case is refused as headerMismatch (-32020) with HTTP status 400. |
+| `HH-09` | `build` | A parameter header wrapped as =?base64?...?= is decoded before it is compared with the body value, and an unwrapped value is compared as it is. |
+| `HH-10` | `build` | A Base64 parameter header with missing padding, characters outside the alphabet, padding inside the text or non-canonical trailing bits is refused as headerMismatch (-32020) with HTTP status 400. |
+| `HH-11` | `build` | A value that only resembles the sentinel, with a missing closing mark, a missing opening mark or the wrong case, is a literal and is compared as written. |
+| `HH-12` | `build` | A parameter header that is omitted while the body carries a value, that differs from it, or that is repeated or malformed is refused as headerMismatch (-32020) with HTTP status 400; when the body value is null or absent the header is not expected; an unrecognized parameter header is ignored. |
+| `HH-13` | `build` | An integer parameter header is compared numerically with the body number within the safe integer range, and a boolean parameter header is exactly true or false. |
+
 ## json-codec
 
 | ID | Level | Statement |
@@ -35,6 +53,27 @@ model does not sanction.
 | `JC-11` | `build` | For every text of the pinned JSONTestSuite the parser accepts, encoding the parsed value and parsing the result gives the same canonical bytes; the universal statement over all values is not claimed here. |
 | `JC-12` | `build` | The oracle executes the package generated from the LexLean codec root, whose recorded digest and provenance match the committed files, over the corpus whose pin and checksum match the recorded authority. |
 
+## lifecycle
+
+| ID | Level | Statement |
+| --- | --- | --- |
+| `LC-01` | `build` | A request whose params lack _meta, or whose _meta lacks the protocol version or the client capabilities, is refused as invalidParams (-32602) with HTTP status 400 and the request's own id. |
+| `LC-02` | `build` | server/discover answers with the supported protocol versions, the declared capabilities and the server identity, and tools/list answers when the tools capability is declared. |
+| `LC-03` | `build` | A request whose _meta omits clientInfo is served, because the client identity is optional. |
+| `LC-04` | `build` | A request for a protocol version the server does not support is refused as unsupportedProtocolVersion (-32022) with HTTP status 400, listing the supported versions in data.supported and echoing the requested version in data.requested. |
+| `LC-05` | `build` | Every successful result carries resultType and the server identity under _meta io.modelcontextprotocol/serverInfo, and is sent with HTTP status 200. |
+| `LC-06` | `build` | A method the server does not offer, whether removed from the protocol, unknown, or gated on a capability the server did not declare, is refused as methodNotFound (-32601) with HTTP status 404. |
+| `LC-07` | `build` | A request that needs a client capability the client did not declare is refused as missingRequiredClientCapability (-32021) with HTTP status 400, naming the requirement as a ClientCapabilities object in data.requiredCapabilities. |
+| `LC-08` | `build` | Every refusal is a JSON-RPC error response that echoes the request id, or has no id member when the text is not JSON (-32700) or is not a single request with a readable id (-32600: batch, notification, response, bad id, bad version, missing or non-text method, non-object params); the member is never null, and a kernel-checked theorem states that an error built without an id has none. |
+| `LC-09` | `build` | The core decides the HTTP status of every outcome: 200 for a result, 400 for -32700, -32600, -32602, -32020, -32021 and -32022, 404 for -32601, 405 with Allow POST for any request method other than POST, and 500 for a frame it cannot read; a kernel-checked theorem states that the status follows the code. |
+| `LC-10` | `build` | The checks run in a fixed order, _meta then headers then protocol version then route and capability then params, and an earlier fault is reported whatever later faults the same request carries. |
+| `LC-11` | `build` | The response depends only on the request method, the header fields the core reads and the body; the request target and every other header field leave it unchanged. |
+| `LC-12` | `build` | The vectors are taken from the pinned conformance suite, whose requirements file for 2026-07-28 has the recorded checksum, and the vendored files match the recorded manifest checksum; the vectors are falsifying evidence and not the verdict of the suite run. |
+| `LC-13` | `build` | The oracle executes the package generated from the LexLean lifecycle root, whose recorded digest and provenance match the committed files. |
+| `LC-14` | `build` | Every request that the pinned scenarios send is a vector or is listed as a probe that is not run with its owning issue, and every check identifier the scenarios emit is covered, listed as not run, or listed as unreached by the fixture. |
+| `LC-15` | `build` | The response bodies the root writes in the vector and boundary tests validate against the MCP 2026-07-28 JSON Schema at the pinned specification commit, whose vendored file has the recorded checksum: as a JSON-RPC response, as the typed result response of the request's method, and as the typed error of its code. A validator is falsifying evidence and not the oracle for the protocol, which MCP#6 binds. |
+| `LC-16` | `build` | The exported root needs no stack that grows with its input: its recorded effects do not include recursion, no function of the generated package is on a call cycle, and frames with two hundred thousand header fields, four hundred thousand arguments, a quarter-mebibyte string, the deepest admitted JSON nesting and a long Base64 parameter header complete on a 2 MiB stack. |
+
 ## Cited authorities
 
 Never re-derived, vendored, or gated on.
@@ -44,6 +83,11 @@ Never re-derived, vendored, or gated on.
 | `A-RFC8259` | T. Bray (ed.), RFC 8259 (STD 90), December 2017, https://www.rfc-editor.org/rfc/rfc8259 | `JC-03`, `JC-04`, `JC-06`, `JC-07` |
 | `A-RFC3629` | F. Yergeau, RFC 3629 (STD 63), November 2003, section 4 syntax and Table 3-7 of the Unicode Standard, https://www.rfc-editor.org/rfc/rfc3629 | `JC-01`, `JC-02` |
 | `A-JSONTESTSUITE` | N. Seriot, https://github.com/nst/JSONTestSuite at commit 1ef36fa01286573e846ac449e8683f8833c5b26a, directory test_parsing (git tree b936f9acdd24b9f5fefe68b90b9beab2c681137a), MIT licence | `JC-03`, `JC-04`, `JC-05`, `JC-12` |
+| `A-MCP-SPEC-2026-07-28` | https://github.com/modelcontextprotocol/modelcontextprotocol at commit 80041ab0a139a8f4fb3adbc99f7ae9113ea59671, docs/specification/2026-07-28 (basic/lifecycle, basic/transports/streamable-http, server/tools) | `LC-01`, `LC-02`, `LC-03`, `LC-04`, `LC-05`, `LC-06`, `LC-07`, `LC-08`, `LC-09`, `LC-10`, `HH-01`, `HH-02`, `HH-03`, `HH-04`, `HH-06`, `HH-09`, `HH-10`, `HH-11`, `HH-12`, `HH-13` |
+| `A-RFC9110` | R. Fielding, M. Nottingham, J. Reschke (eds.), RFC 9110 (STD 97), June 2022, sections 5.1 (field names are case-insensitive), 5.3 (repeated fields), 5.5 (field values) and 15.5.6 (405 requires Allow), https://www.rfc-editor.org/rfc/rfc9110 | `LC-09`, `HH-05`, `HH-07` |
+| `A-RFC4648` | S. Josefsson, RFC 4648, October 2006, section 4 (Base 64 Encoding) and section 3.5 (canonical encoding), https://www.rfc-editor.org/rfc/rfc4648 | `HH-09`, `HH-10` |
+| `A-MCP-CONFORMANCE` | https://github.com/modelcontextprotocol/conformance at commit 232a9014457eaf4c59559916e3d616d2f7f28f05 (2026-08-07): src/scenarios/server/stateless.ts, src/scenarios/server/http-standard-headers.ts, src/connection/stateless.ts, requirements/2026-07-28.yaml and LICENSE, vendored under crates/lifecycle-oracle/suite | `LC-12`, `LC-14` |
+| `A-MCP-SCHEMA-2026-07-28` | https://github.com/modelcontextprotocol/modelcontextprotocol at commit 80041ab0a139a8f4fb3adbc99f7ae9113ea59671: schema/2026-07-28/schema.json (git blob 213c58f6d9a1c2ce6ad055afe90bbdb095a29ee8, JSON Schema 2020-12) and LICENSE, vendored under crates/lifecycle-oracle/suite | `LC-08`, `LC-15` |
 
 ## Claims that are not conformance IDs
 
@@ -52,3 +96,8 @@ Never re-derived, vendored, or gated on.
 | `AUTH-01` | `some-true` | RFC 8259 defines the JSON text grammar the parser implements. |
 | `AUTH-02` | `some-true` | RFC 3629 defines the well-formed UTF-8 byte sequences the validator implements. |
 | `AUTH-03` | `some-true` | The pinned JSONTestSuite classifies each of its 318 files as must-accept, must-reject or implementation-defined. |
+| `AUTH-04` | `some-true` | The MCP specification revision 2026-07-28 defines the per-request _meta, the discovery result, the header checks and the HTTP statuses the lifecycle implements. |
+| `AUTH-05` | `some-true` | RFC 9110 defines the case-insensitive field names, the optional whitespace and the 405 Allow requirement the header handling implements. |
+| `AUTH-06` | `some-true` | RFC 4648 defines the Base64 alphabet, padding and canonical form the parameter header decoder implements. |
+| `AUTH-07` | `some-true` | The pinned conformance suite lists server-stateless as required for 2026-07-28 and the two HTTP header scenarios as pending and not scored. |
+| `AUTH-08` | `some-true` | The MCP schema for 2026-07-28 defines the JSON-RPC error response with an optional id of type string or number, and the typed results and errors of server/discover, tools/list, tools/call and the codes the lifecycle uses. |

@@ -86,6 +86,13 @@ inductive{
   constructors: [{name: public, fields: []}, {name: private, fields: []}]
 }
 
+inductive{
+  name: ParamKind,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: text, fields: []}, {name: integer, fields: []}, {name: boolean, fields: []}]
+}
+
 structure{
   name: CacheHint,
   type_parameters: [],
@@ -97,7 +104,8 @@ definition{
   name: roleWire,
   parameters: [role : Role],
   result: String,
-  body: (match role | Role.user => "user" | Role.assistant => "assistant")
+  body: (match role | Role.user => "user" | Role.assistant => "assistant"),
+  executable: true
 }
 
 definition{
@@ -112,7 +120,8 @@ definition{
     | LoggingLevel.error => "error"
     | LoggingLevel.critical => "critical"
     | LoggingLevel.alert => "alert"
-    | LoggingLevel.emergency => "emergency")
+    | LoggingLevel.emergency => "emergency"),
+  executable: true
 }
 
 inductive{
@@ -126,7 +135,8 @@ definition{
   name: loggingLevelOfWire,
   parameters: [wire : String],
   result: LoggingLevelRead,
-  body: (if (prim equal wire "debug" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.debug)) else (if (prim equal wire "info" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.info)) else (if (prim equal wire "notice" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.notice)) else (if (prim equal wire "warning" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.warning)) else (if (prim equal wire "error" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.error)) else (if (prim equal wire "critical" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.critical)) else (if (prim equal wire "alert" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.alert)) else (if (prim equal wire "emergency" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.emergency)) else (ctor LoggingLevelRead.unrecognized)))))))))
+  body: (if (prim equal wire "debug" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.debug)) else (if (prim equal wire "info" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.info)) else (if (prim equal wire "notice" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.notice)) else (if (prim equal wire "warning" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.warning)) else (if (prim equal wire "error" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.error)) else (if (prim equal wire "critical" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.critical)) else (if (prim equal wire "alert" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.alert)) else (if (prim equal wire "emergency" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.emergency)) else (ctor LoggingLevelRead.unrecognized))))))))),
+  executable: true
 }
 
 theorem{
@@ -152,14 +162,16 @@ definition{
   name: cacheScopeWire,
   parameters: [scope : CacheScope],
   result: String,
-  body: (match scope | CacheScope.public => "public" | CacheScope.private => "private")
+  body: (match scope | CacheScope.public => "public" | CacheScope.private => "private"),
+  executable: true
 }
 
 definition{
   name: iconThemeWire,
   parameters: [theme : IconTheme],
   result: String,
-  body: (match theme | IconTheme.light => "light" | IconTheme.dark => "dark")
+  body: (match theme | IconTheme.light => "light" | IconTheme.dark => "dark"),
+  executable: true
 }
 \end{semanticmodule}
 \end{lexlean}

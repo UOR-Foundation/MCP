@@ -1,0 +1,302 @@
+\begin{lexlean}{ResultJson}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Capabilities}
+\importmodule{Common}
+\importmodule{Content}
+\importmodule{Dispatch}
+\importmodule{Envelope}
+\importmodule{Json}
+\importmodule{JsonRead}
+\importmodule{Methods}
+\importmodule{Refusal}
+\title{MCP result bodies as JSON}
+\begin{semanticmodule}
+definition{
+  name: natInt,
+  parameters: [count : Nat, total : Int],
+  result: Int,
+  body: (match count
+    | Nat.zero => total
+    | Nat.succ below => (natInt below (prim subtract total (-1 : Int) : Int))),
+  executable: true,
+  recursive_argument: count
+}
+
+definition{
+  name: natJson,
+  parameters: [count : Nat],
+  result: Json::Json,
+  body: (ctor Json::Json.number (record Json::Decimal {mantissa := (natInt count (0 : Int)), exponent := (0 : Int)})),
+  executable: true
+}
+
+definition{
+  name: boolMember,
+  parameters: [key : String, value : (Option Bool)],
+  result: (List (String * Json::Json)),
+  body: (match value
+    | Option.none => (nil (String * Json::Json))
+    | Option.some flag => (cons (key, (ctor Json::Json.bool flag)) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: jsonMember,
+  parameters: [key : String, value : (Option Json::Json)],
+  result: (List (String * Json::Json)),
+  body: (match value
+    | Option.none => (nil (String * Json::Json))
+    | Option.some payload => (cons (key, payload) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: listChangedJson,
+  parameters: [capability : Capabilities::ListChangedCapability],
+  result: Json::Json,
+  body: (ctor Json::Json.object (boolMember "listChanged" (project capability listChanged))),
+  executable: true
+}
+
+definition{
+  name: optionalListChanged,
+  parameters: [key : String, capability : (Option Capabilities::ListChangedCapability)],
+  result: (List (String * Json::Json)),
+  body: (match capability
+    | Option.none => (nil (String * Json::Json))
+    | Option.some declared => (cons (key, (listChangedJson declared)) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: optionalResources,
+  parameters: [capability : (Option Capabilities::ResourcesCapability)],
+  result: (List (String * Json::Json)),
+  body: (match capability
+    | Option.none => (nil (String * Json::Json))
+    | Option.some declared => (cons ("resources", (ctor Json::Json.object (prim append (boolMember "subscribe" (project declared subscribe)) (boolMember "listChanged" (project declared listChanged)) : (List (String * Json::Json))))) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: serverCapabilitiesJson,
+  parameters: [capabilities : Capabilities::ServerCapabilities],
+  result: Json::Json,
+  body: (ctor Json::Json.object (prim append (Refusal::optionalMember "experimental" (project capabilities experimental)) (prim append (Refusal::optionalMember "logging" (project capabilities logging)) (prim append (Refusal::optionalMember "completions" (project capabilities completions)) (prim append (optionalListChanged "prompts" (project capabilities prompts)) (prim append (optionalResources (project capabilities resources)) (prim append (optionalListChanged "tools" (project capabilities tools)) (Refusal::optionalMember "extensions" (project capabilities extensions)) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: cacheMembers,
+  parameters: [cache : Common::CacheHint],
+  result: (List (String * Json::Json)),
+  body: (cons ("ttlMs", (natJson (project cache ttlMs))) (cons ("cacheScope", (ctor Json::Json.text (Common::cacheScopeWire (project cache cacheScope)))) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: rolesOnto,
+  parameters: [roles : (List Common::Role), built : (List Json::Json)],
+  result: (List Json::Json),
+  body: (match roles
+    | List.nil => built
+    | List.cons head tail => (rolesOnto tail (cons (ctor Json::Json.text (Common::roleWire head)) built))),
+  executable: true,
+  recursive_argument: roles
+}
+
+definition{
+  name: rolesJson,
+  parameters: [roles : (List Common::Role)],
+  result: (List Json::Json),
+  body: (JsonRead::reverseOnto [Json::Json] (rolesOnto roles (nil Json::Json)) (nil Json::Json)),
+  executable: true
+}
+
+definition{
+  name: audienceMember,
+  parameters: [audience : (Option (List Common::Role))],
+  result: (List (String * Json::Json)),
+  body: (match audience
+    | Option.none => (nil (String * Json::Json))
+    | Option.some roles => (cons ("audience", (ctor Json::Json.array (rolesJson roles))) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: priorityMember,
+  parameters: [priority : (Option Json::Decimal)],
+  result: (List (String * Json::Json)),
+  body: (match priority
+    | Option.none => (nil (String * Json::Json))
+    | Option.some amount => (cons ("priority", (ctor Json::Json.number amount)) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: annotationsMember,
+  parameters: [annotations : (Option Common::Annotations)],
+  result: (List (String * Json::Json)),
+  body: (match annotations
+    | Option.none => (nil (String * Json::Json))
+    | Option.some declared => (cons ("annotations", (ctor Json::Json.object (prim append (audienceMember (project declared audience)) (prim append (priorityMember (project declared priority)) (Envelope::textMember "lastModified" (project declared lastModified)) : (List (String * Json::Json))) : (List (String * Json::Json))))) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: metaMember,
+  parameters: [meta : (Option Json::JsonObject)],
+  result: (List (String * Json::Json)),
+  body: (Refusal::optionalMember "_meta" meta),
+  executable: true
+}
+
+definition{
+  name: textBlockJson,
+  parameters: [block : Content::TextContent],
+  result: Json::Json,
+  body: (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "text")) (cons ("text", (ctor Json::Json.text (project block text))) (prim append (annotationsMember (project block annotations)) (metaMember (project block meta)) : (List (String * Json::Json)))))),
+  executable: true
+}
+
+definition{
+  name: blockJson,
+  parameters: [block : Content::ContentBlock],
+  result: (Option Json::Json),
+  body: (match block
+    | Content::ContentBlock.text found => (ctor Option.some [Json::Json] (textBlockJson found))
+    | Content::ContentBlock.image found => (ctor Option.none [Json::Json])
+    | Content::ContentBlock.audio found => (ctor Option.none [Json::Json])
+    | Content::ContentBlock.resource_link found => (ctor Option.none [Json::Json])
+    | Content::ContentBlock.resource found => (ctor Option.none [Json::Json])),
+  executable: true
+}
+
+definition{
+  name: blocksOnto,
+  parameters: [blocks : (List Content::ContentBlock), built : (List Json::Json)],
+  result: (Option (List Json::Json)),
+  body: (match blocks
+    | List.nil => (ctor Option.some [(List Json::Json)] built)
+    | List.cons head tail => (match (blockJson head)
+      | Option.none => (ctor Option.none [(List Json::Json)])
+      | Option.some encoded => (blocksOnto tail (cons encoded built)))),
+  executable: true,
+  recursive_argument: blocks
+}
+
+definition{
+  name: blocksJson,
+  parameters: [blocks : (List Content::ContentBlock)],
+  result: (Option (List Json::Json)),
+  body: (match (blocksOnto blocks (nil Json::Json))
+    | Option.none => (ctor Option.none [(List Json::Json)])
+    | Option.some built => (ctor Option.some [(List Json::Json)] (JsonRead::reverseOnto [Json::Json] built (nil Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: toolAnnotationsMember,
+  parameters: [annotations : (Option Content::ToolAnnotations)],
+  result: (List (String * Json::Json)),
+  body: (match annotations
+    | Option.none => (nil (String * Json::Json))
+    | Option.some declared => (cons ("annotations", (ctor Json::Json.object (prim append (Envelope::textMember "title" (project declared title)) (prim append (boolMember "readOnlyHint" (project declared readOnlyHint)) (prim append (boolMember "destructiveHint" (project declared destructiveHint)) (prim append (boolMember "idempotentHint" (project declared idempotentHint)) (boolMember "openWorldHint" (project declared openWorldHint)) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))))) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: toolJson,
+  parameters: [tool : Content::Tool],
+  result: Json::Json,
+  body: (ctor Json::Json.object (cons ("name", (ctor Json::Json.text (project tool name))) (prim append (Envelope::textMember "title" (project tool title)) (prim append (Envelope::iconsMember (project tool icons)) (prim append (Envelope::textMember "description" (project tool description)) (cons ("inputSchema", (ctor Json::Json.object (project (project tool inputSchema) members))) (prim append (Refusal::optionalMember "outputSchema" (project tool outputSchema)) (prim append (toolAnnotationsMember (project tool annotations)) (metaMember (project tool meta)) : (List (String * Json::Json))) : (List (String * Json::Json)))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))))),
+  executable: true
+}
+
+definition{
+  name: toolsOnto,
+  parameters: [tools : (List Content::Tool), built : (List Json::Json)],
+  result: (List Json::Json),
+  body: (match tools
+    | List.nil => built
+    | List.cons head tail => (toolsOnto tail (cons (toolJson head) built))),
+  executable: true,
+  recursive_argument: tools
+}
+
+definition{
+  name: toolsJson,
+  parameters: [tools : (List Content::Tool)],
+  result: (List Json::Json),
+  body: (JsonRead::reverseOnto [Json::Json] (toolsOnto tools (nil Json::Json)) (nil Json::Json)),
+  executable: true
+}
+
+definition{
+  name: textListJson,
+  parameters: [items : (List String)],
+  result: Json::Json,
+  body: (ctor Json::Json.array (Refusal::textList items)),
+  executable: true
+}
+
+definition{
+  name: discoverMembers,
+  parameters: [found : Methods::DiscoverResult],
+  result: (List (String * Json::Json)),
+  body: (cons ("supportedVersions", (textListJson (project found supportedVersions))) (cons ("capabilities", (serverCapabilitiesJson (project found capabilities))) (prim append (Envelope::textMember "instructions" (project found instructions)) (cacheMembers (project found cache)) : (List (String * Json::Json))))),
+  executable: true
+}
+
+definition{
+  name: listToolsMembers,
+  parameters: [found : Methods::ListToolsResult],
+  result: (List (String * Json::Json)),
+  body: (cons ("tools", (ctor Json::Json.array (toolsJson (project found tools)))) (prim append (Envelope::textMember "nextCursor" (project found nextCursor)) (cacheMembers (project found cache)) : (List (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: callToolMembers,
+  parameters: [found : Methods::CallToolResult],
+  result: (Option (List (String * Json::Json))),
+  body: (match (blocksJson (project found content))
+    | Option.none => (ctor Option.none [(List (String * Json::Json))])
+    | Option.some encoded => (ctor Option.some [(List (String * Json::Json))] (cons ("content", (ctor Json::Json.array encoded)) (prim append (jsonMember "structuredContent" (project found structuredContent)) (boolMember "isError" (project found isError)) : (List (String * Json::Json)))))),
+  executable: true
+}
+
+definition{
+  name: bodyMembers,
+  parameters: [body : Methods::ResultBody],
+  result: (Option (List (String * Json::Json))),
+  body: (match body
+    | Methods::ResultBody.discover found => (ctor Option.some [(List (String * Json::Json))] (discoverMembers found))
+    | Methods::ResultBody.listTools found => (ctor Option.some [(List (String * Json::Json))] (listToolsMembers found))
+    | Methods::ResultBody.callTool found => (callToolMembers found)
+    | Methods::ResultBody.acknowledged => (ctor Option.some [(List (String * Json::Json))] (nil (String * Json::Json)))
+    | Methods::ResultBody.listResources found => (ctor Option.none [(List (String * Json::Json))])
+    | Methods::ResultBody.readResource found => (ctor Option.none [(List (String * Json::Json))])
+    | Methods::ResultBody.listResourceTemplates found => (ctor Option.none [(List (String * Json::Json))])
+    | Methods::ResultBody.listPrompts found => (ctor Option.none [(List (String * Json::Json))])
+    | Methods::ResultBody.getPrompt found => (ctor Option.none [(List (String * Json::Json))])
+    | Methods::ResultBody.complete found => (ctor Option.none [(List (String * Json::Json))])
+    | Methods::ResultBody.getTask found => (ctor Option.none [(List (String * Json::Json))])
+    | Methods::ResultBody.inputRequired found => (ctor Option.none [(List (String * Json::Json))])
+    | Methods::ResultBody.taskCreated found => (ctor Option.none [(List (String * Json::Json))])),
+  executable: true
+}
+
+definition{
+  name: resultObject,
+  parameters: [reply : Dispatch::Reply],
+  result: (Option Json::JsonObject),
+  body: (match (bodyMembers (project reply body))
+    | Option.none => (ctor Option.none [Json::JsonObject])
+    | Option.some members => (ctor Option.some [Json::JsonObject] (record Json::JsonObject {members := (prim append members (project (Envelope::envelope reply) members) : (List (String * Json::Json)))}))),
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

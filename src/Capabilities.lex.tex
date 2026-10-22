@@ -51,28 +51,32 @@ definition{
   name: tasksExtensionId,
   parameters: [],
   result: String,
-  body: "io.modelcontextprotocol/tasks"
+  body: "io.modelcontextprotocol/tasks",
+  executable: true
 }
 
 definition{
   name: noObject,
   parameters: [],
   result: Json::JsonObject,
-  body: (record Json::JsonObject {members := (nil (String * Json::Json))})
+  body: (record Json::JsonObject {members := (nil (String * Json::Json))}),
+  executable: true
 }
 
 definition{
   name: noClientCapabilities,
   parameters: [],
   result: ClientCapabilities,
-  body: (record ClientCapabilities {experimental := (ctor Option.none [Json::JsonObject]), roots := (ctor Option.none [Json::JsonObject]), sampling := (ctor Option.none [Json::JsonObject]), elicitation := (ctor Option.none [Json::JsonObject]), extensions := (ctor Option.none [Json::JsonObject])})
+  body: (record ClientCapabilities {experimental := (ctor Option.none [Json::JsonObject]), roots := (ctor Option.none [Json::JsonObject]), sampling := (ctor Option.none [Json::JsonObject]), elicitation := (ctor Option.none [Json::JsonObject]), extensions := (ctor Option.none [Json::JsonObject])}),
+  executable: true
 }
 
 definition{
   name: isDeclared,
   parameters: [capability : (Option Json::JsonObject)],
   result: Bool,
-  body: (match capability | Option.none => false | Option.some declared => true)
+  body: (match capability | Option.none => false | Option.some declared => true),
+  executable: true
 }
 
 definition{
@@ -81,42 +85,48 @@ definition{
   result: Bool,
   body: (match extensions
     | Option.none => false
-    | Option.some declared => (Json::hasKey identifier declared))
+    | Option.some declared => (Json::hasKey identifier declared)),
+  executable: true
 }
 
 definition{
   name: clientDeclaresTasks,
   parameters: [capabilities : ClientCapabilities],
   result: Bool,
-  body: (declaresExtension (project capabilities extensions) (tasksExtensionId))
+  body: (declaresExtension (project capabilities extensions) (tasksExtensionId)),
+  executable: true
 }
 
 definition{
   name: tasksRequirement,
   parameters: [],
   result: ClientCapabilities,
-  body: (record ClientCapabilities {experimental := (ctor Option.none [Json::JsonObject]), roots := (ctor Option.none [Json::JsonObject]), sampling := (ctor Option.none [Json::JsonObject]), elicitation := (ctor Option.none [Json::JsonObject]), extensions := (ctor Option.some [Json::JsonObject] (record Json::JsonObject {members := (cons ((tasksExtensionId), (ctor Json::Json.object (nil (String * Json::Json)))) (nil (String * Json::Json)))}))})
+  body: (record ClientCapabilities {experimental := (ctor Option.none [Json::JsonObject]), roots := (ctor Option.none [Json::JsonObject]), sampling := (ctor Option.none [Json::JsonObject]), elicitation := (ctor Option.none [Json::JsonObject]), extensions := (ctor Option.some [Json::JsonObject] (record Json::JsonObject {members := (cons ((tasksExtensionId), (ctor Json::Json.object (nil (String * Json::Json)))) (nil (String * Json::Json)))}))}),
+  executable: true
 }
 
 definition{
   name: elicitationRequirement,
   parameters: [],
   result: ClientCapabilities,
-  body: (record ClientCapabilities {experimental := (ctor Option.none [Json::JsonObject]), roots := (ctor Option.none [Json::JsonObject]), sampling := (ctor Option.none [Json::JsonObject]), elicitation := (ctor Option.some [Json::JsonObject] (noObject)), extensions := (ctor Option.none [Json::JsonObject])})
+  body: (record ClientCapabilities {experimental := (ctor Option.none [Json::JsonObject]), roots := (ctor Option.none [Json::JsonObject]), sampling := (ctor Option.none [Json::JsonObject]), elicitation := (ctor Option.some [Json::JsonObject] (noObject)), extensions := (ctor Option.none [Json::JsonObject])}),
+  executable: true
 }
 
 definition{
   name: samplingRequirement,
   parameters: [],
   result: ClientCapabilities,
-  body: (record ClientCapabilities {experimental := (ctor Option.none [Json::JsonObject]), roots := (ctor Option.none [Json::JsonObject]), sampling := (ctor Option.some [Json::JsonObject] (noObject)), elicitation := (ctor Option.none [Json::JsonObject]), extensions := (ctor Option.none [Json::JsonObject])})
+  body: (record ClientCapabilities {experimental := (ctor Option.none [Json::JsonObject]), roots := (ctor Option.none [Json::JsonObject]), sampling := (ctor Option.some [Json::JsonObject] (noObject)), elicitation := (ctor Option.none [Json::JsonObject]), extensions := (ctor Option.none [Json::JsonObject])}),
+  executable: true
 }
 
 definition{
   name: rootsRequirement,
   parameters: [],
   result: ClientCapabilities,
-  body: (record ClientCapabilities {experimental := (ctor Option.none [Json::JsonObject]), roots := (ctor Option.some [Json::JsonObject] (noObject)), sampling := (ctor Option.none [Json::JsonObject]), elicitation := (ctor Option.none [Json::JsonObject]), extensions := (ctor Option.none [Json::JsonObject])})
+  body: (record ClientCapabilities {experimental := (ctor Option.none [Json::JsonObject]), roots := (ctor Option.some [Json::JsonObject] (noObject)), sampling := (ctor Option.none [Json::JsonObject]), elicitation := (ctor Option.none [Json::JsonObject]), extensions := (ctor Option.none [Json::JsonObject])}),
+  executable: true
 }
 
 theorem{

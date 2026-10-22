@@ -1,0 +1,208 @@
+\begin{lexlean}{Status}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Capabilities}
+\importmodule{Json}
+\importmodule{JsonRpc}
+\importmodule{Refusal}
+\importmodule{RpcWire}
+\title{MCP HTTP status mapping}
+\begin{semanticmodule}
+definition{name: okStatus, parameters: [], result: Nat, body: 200, executable: true}
+
+definition{name: badRequestStatus, parameters: [], result: Nat, body: 400, executable: true}
+
+definition{name: notFoundStatus, parameters: [], result: Nat, body: 404, executable: true}
+
+definition{name: methodNotAllowedStatus, parameters: [], result: Nat, body: 405, executable: true}
+
+definition{name: serverErrorStatus, parameters: [], result: Nat, body: 500, executable: true}
+
+definition{
+  name: providerStatus,
+  parameters: [inner : Refusal::ProviderRefusal],
+  result: Nat,
+  body: (match inner
+    | Refusal::ProviderRefusal.unknownTool name => (badRequestStatus)
+    | Refusal::ProviderRefusal.unknownPrompt name => (badRequestStatus)
+    | Refusal::ProviderRefusal.resourceNotFound uri => (badRequestStatus)
+    | Refusal::ProviderRefusal.unknownTask taskId => (badRequestStatus)
+    | Refusal::ProviderRefusal.invalidArguments reason => (badRequestStatus)
+    | Refusal::ProviderRefusal.missingCapability required => (badRequestStatus)
+    | Refusal::ProviderRefusal.internal reason => (serverErrorStatus)),
+  executable: true
+}
+
+definition{
+  name: statusOf,
+  parameters: [refusal : Refusal::Refusal],
+  result: Nat,
+  body: (match refusal
+    | Refusal::Refusal.invalidParams problem => (badRequestStatus)
+    | Refusal::Refusal.unsupportedProtocolVersion requested supported => (badRequestStatus)
+    | Refusal::Refusal.headerMismatch problem => (badRequestStatus)
+    | Refusal::Refusal.methodNotFound method => (notFoundStatus)
+    | Refusal::Refusal.provider inner => (providerStatus inner)),
+  executable: true
+}
+
+definition{
+  name: faultStatus,
+  parameters: [fault : RpcWire::Fault],
+  result: Nat,
+  body: (match fault
+    | RpcWire::Fault.parseError => (badRequestStatus)
+    | RpcWire::Fault.invalidRequest ident reason => (badRequestStatus)),
+  executable: true
+}
+
+definition{
+  name: statusForCode,
+  parameters: [code : Int],
+  result: Nat,
+  body: (if (Json::isZero (prim subtract code (JsonRpc::methodNotFoundCode) : Int)) then (notFoundStatus) else (if (Json::isZero (prim subtract code (JsonRpc::internalErrorCode) : Int)) then (serverErrorStatus) else (badRequestStatus))),
+  axioms: [propext],
+  executable: true
+}
+
+theorem{
+  name: a_header_mismatch_is_a_bad_request,
+  parameters: [problem : Refusal::HeaderProblem],
+  statement: ((statusOf (ctor Refusal::Refusal.headerMismatch problem)) = 400),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_unsupported_version_is_a_bad_request,
+  parameters: [requested : String, supported : (List String)],
+  statement: ((statusOf (ctor Refusal::Refusal.unsupportedProtocolVersion requested supported)) = 400),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: invalid_params_is_a_bad_request,
+  parameters: [problem : Refusal::ParamsProblem],
+  statement: ((statusOf (ctor Refusal::Refusal.invalidParams problem)) = 400),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_unknown_method_is_not_found,
+  parameters: [method : String],
+  statement: ((statusOf (ctor Refusal::Refusal.methodNotFound method)) = 404),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_missing_capability_is_a_bad_request,
+  parameters: [required : Capabilities::ClientCapabilities],
+  statement: ((statusOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.missingCapability required))) = 400),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_internal_error_is_a_server_error,
+  parameters: [reason : String],
+  statement: ((statusOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.internal reason))) = 500),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_fault_is_a_bad_request,
+  parameters: [fault : RpcWire::Fault],
+  statement: ((faultStatus fault) = 400),
+  proof: cases{
+    branches: [
+      {proof: reflexivity{}, binders: [], constructor: parseError},
+      {proof: reflexivity{}, binders: [ident, reason], constructor: invalidRequest}
+    ],
+    scrutinee: fault
+  }
+}
+
+theorem{
+  name: the_status_follows_the_code,
+  parameters: [refusal : Refusal::Refusal],
+  statement: ((statusOf refusal) = (statusForCode (Refusal::codeOf refusal))),
+  proof: cases{
+    branches: [
+      {proof: reflexivity{}, binders: [problem], constructor: invalidParams},
+      {
+        proof: reflexivity{},
+        binders: [requested, supported],
+        constructor: unsupportedProtocolVersion
+      },
+      {proof: reflexivity{}, binders: [problem], constructor: headerMismatch},
+      {proof: reflexivity{}, binders: [method], constructor: methodNotFound},
+      {
+        proof: cases{
+          branches: [
+            {proof: reflexivity{}, binders: [name], constructor: unknownTool},
+            {proof: reflexivity{}, binders: [name], constructor: unknownPrompt},
+            {proof: reflexivity{}, binders: [uri], constructor: resourceNotFound},
+            {proof: reflexivity{}, binders: [taskId], constructor: unknownTask},
+            {proof: reflexivity{}, binders: [reason], constructor: invalidArguments},
+            {proof: reflexivity{}, binders: [required], constructor: missingCapability},
+            {proof: reflexivity{}, binders: [reason], constructor: internal}
+          ],
+          scrutinee: inner
+        },
+        binders: [inner],
+        constructor: provider
+      }
+    ],
+    scrutinee: refusal
+  },
+  axioms: [propext]
+}
+
+theorem{
+  name: the_header_mismatch_code_has_status_400,
+  parameters: [],
+  statement: ((statusForCode (JsonRpc::headerMismatchCode)) = 400),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: the_invalid_params_code_has_status_400,
+  parameters: [],
+  statement: ((statusForCode (JsonRpc::invalidParamsCode)) = 400),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: the_unsupported_version_code_has_status_400,
+  parameters: [],
+  statement: ((statusForCode (JsonRpc::unsupportedProtocolVersionCode)) = 400),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: the_missing_capability_code_has_status_400,
+  parameters: [],
+  statement: ((statusForCode (JsonRpc::missingRequiredClientCapabilityCode)) = 400),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: the_method_not_found_code_has_status_404,
+  parameters: [],
+  statement: ((statusForCode (JsonRpc::methodNotFoundCode)) = 404),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: the_parse_and_invalid_request_codes_have_status_400,
+  parameters: [],
+  statement: (((statusForCode (JsonRpc::parseErrorCode)) = 400) /\ ((statusForCode (JsonRpc::invalidRequestCode)) = 400)),
+  proof: decide{},
+  axioms: [propext]
+}
+\end{semanticmodule}
+\end{lexlean}

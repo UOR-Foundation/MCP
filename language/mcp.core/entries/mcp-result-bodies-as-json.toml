@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-result-bodies-as-json"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "ResultJson"
+component = "ResultJson"
+
+[[form]]
+id = "mcp-result-bodies-as-json"
+channel = "text"
+surface = "MCP result bodies as JSON"
+canonical_source = true
+features = ["sentence-case", "singular"]

@@ -22,7 +22,10 @@ version = 2
 # A dependency arriving under a licence not below fails this gate. That is the
 # point: it is a decision a reviewer makes at the time, not one a pre-granted
 # allowance made for them in advance.
-allow = ["Apache-2.0", "MIT", "Unicode-3.0"]
+allow = ["Apache-2.0", "MIT", "MIT-0", "Unicode-3.0"]
+# MIT-0 is `borrow-or-share`, reached only through the JSON Schema validator `boon`
+# that `crates/lifecycle-oracle` uses as a dev-dependency (LC-15). It is an MIT
+# licence without the notice requirement, so it asks no more of a user than MIT.
 confidence-threshold = 0.93
 
 [bans]

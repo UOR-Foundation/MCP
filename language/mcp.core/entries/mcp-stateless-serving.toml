@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-stateless-serving"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Serve"
+component = "Serve"
+
+[[form]]
+id = "mcp-stateless-serving"
+channel = "text"
+surface = "MCP stateless serving"
+canonical_source = true
+features = ["sentence-case", "singular"]

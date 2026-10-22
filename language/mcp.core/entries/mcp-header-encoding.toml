@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-header-encoding"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Base64"
+component = "Base64"
+
+[[form]]
+id = "mcp-header-encoding"
+channel = "text"
+surface = "MCP header encoding"
+canonical_source = true
+features = ["sentence-case", "singular"]

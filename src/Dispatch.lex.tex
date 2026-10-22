@@ -39,7 +39,8 @@ definition{
   type_parameters: [T],
   parameters: [capability : (Option 'T)],
   result: Bool,
-  body: (match capability | Option.none => false | Option.some declared => true)
+  body: (match capability | Option.none => false | Option.some declared => true),
+  executable: true
 }
 
 definition{
@@ -58,136 +59,267 @@ definition{
     | Methods::Method.completionComplete => (Capabilities::isDeclared (project capabilities completions))
     | Methods::Method.tasksGet => (Capabilities::declaresExtension (project capabilities extensions) (Capabilities::tasksExtensionId))
     | Methods::Method.tasksUpdate => (Capabilities::declaresExtension (project capabilities extensions) (Capabilities::tasksExtensionId))
-    | Methods::Method.tasksCancel => (Capabilities::declaresExtension (project capabilities extensions) (Capabilities::tasksExtensionId)))
+    | Methods::Method.tasksCancel => (Capabilities::declaresExtension (project capabilities extensions) (Capabilities::tasksExtensionId))),
+  executable: true
 }
 
 definition{
   name: replyOf,
-  parameters: [provider : Extension::Provider, body : Methods::ResultBody],
+  parameters: [info : Extension::ProviderInfo, body : Methods::ResultBody],
   result: Reply,
-  body: (record Reply {body := body, meta := (record Meta::ResultMeta {serverInfo := (ctor Option.some [Common::Implementation] (project provider serverInfo)), others := (ctor Option.none [Json::JsonObject])})})
+  body: (record Reply {body := body, meta := (record Meta::ResultMeta {serverInfo := (ctor Option.some [Common::Implementation] (project info serverInfo)), others := (ctor Option.none [Json::JsonObject])})}),
+  executable: true
 }
 
 definition{
   name: pendingGate,
-  parameters: [provider : Extension::Provider, needed : Input::InputRequiredResult, covered : Bool],
+  parameters: [info : Extension::ProviderInfo, needed : Input::InputRequiredResult, covered : Bool],
   result: (Result Reply Refusal::Refusal),
-  body: (if covered then (ctor Result.ok [Reply, Refusal::Refusal] (replyOf provider (ctor Methods::ResultBody.inputRequired needed))) else (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.missingCapability (Input::requiredCapabilities (Input::requestsOf needed))))))
+  body: (if covered then (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info (ctor Methods::ResultBody.inputRequired needed))) else (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.missingCapability (Input::requiredCapabilities (Input::requestsOf needed)))))),
+  executable: true
 }
 
 definition{
   name: pendingReply,
   parameters: [
-    provider : Extension::Provider,
+    info : Extension::ProviderInfo,
     meta : Meta::RequestMeta,
     needed : Input::InputRequiredResult
   ],
   result: (Result Reply Refusal::Refusal),
-  body: (pendingGate provider needed (Input::covers (project meta clientCapabilities) (Input::requestsOf needed)))
+  body: (pendingGate info needed (Input::covers (project meta clientCapabilities) (Input::requestsOf needed))),
+  executable: true
 }
 
 definition{
   name: taskGate,
-  parameters: [provider : Extension::Provider, created : Tasks::CreateTaskResult, declared : Bool],
+  parameters: [info : Extension::ProviderInfo, created : Tasks::CreateTaskResult, declared : Bool],
   result: (Result Reply Refusal::Refusal),
-  body: (if declared then (ctor Result.ok [Reply, Refusal::Refusal] (replyOf provider (ctor Methods::ResultBody.taskCreated created))) else (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.missingCapability (Capabilities::tasksRequirement)))))
+  body: (if declared then (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info (ctor Methods::ResultBody.taskCreated created))) else (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.missingCapability (Capabilities::tasksRequirement))))),
+  executable: true
 }
 
 definition{
   name: taskReply,
   parameters: [
-    provider : Extension::Provider,
+    info : Extension::ProviderInfo,
     meta : Meta::RequestMeta,
     created : Tasks::CreateTaskResult
   ],
   result: (Result Reply Refusal::Refusal),
-  body: (taskGate provider created (Capabilities::clientDeclaresTasks (project meta clientCapabilities)))
+  body: (taskGate info created (Capabilities::clientDeclaresTasks (project meta clientCapabilities))),
+  executable: true
+}
+
+definition{
+  name: metaOfRequest,
+  parameters: [request : Methods::ClientRequest],
+  result: Meta::RequestMeta,
+  body: (match request
+    | Methods::ClientRequest.serverDiscover params => (project params meta)
+    | Methods::ClientRequest.toolsList params => (project params meta)
+    | Methods::ClientRequest.toolsCall params => (project params meta)
+    | Methods::ClientRequest.resourcesList params => (project params meta)
+    | Methods::ClientRequest.resourcesRead params => (project params meta)
+    | Methods::ClientRequest.resourcesTemplatesList params => (project params meta)
+    | Methods::ClientRequest.promptsList params => (project params meta)
+    | Methods::ClientRequest.promptsGet params => (project params meta)
+    | Methods::ClientRequest.completionComplete params => (project params meta)
+    | Methods::ClientRequest.tasksGet params => (project params meta)
+    | Methods::ClientRequest.tasksUpdate params => (project params meta)
+    | Methods::ClientRequest.tasksCancel params => (project params meta)),
+  executable: true
+}
+
+definition{
+  name: sameMethod,
+  parameters: [left : Methods::Method, right : Methods::Method],
+  result: Bool,
+  body: (prim equal (Methods::methodWire left) (Methods::methodWire right) : Bool),
+  executable: true
+}
+
+definition{
+  name: bodyFits,
+  parameters: [method : Methods::Method, body : Methods::ResultBody],
+  result: Bool,
+  body: (match body
+    | Methods::ResultBody.discover found => (sameMethod method (ctor Methods::Method.serverDiscover))
+    | Methods::ResultBody.listTools found => (sameMethod method (ctor Methods::Method.toolsList))
+    | Methods::ResultBody.callTool found => (sameMethod method (ctor Methods::Method.toolsCall))
+    | Methods::ResultBody.listResources found => (sameMethod method (ctor Methods::Method.resourcesList))
+    | Methods::ResultBody.readResource found => (sameMethod method (ctor Methods::Method.resourcesRead))
+    | Methods::ResultBody.listResourceTemplates found => (sameMethod method (ctor Methods::Method.resourcesTemplatesList))
+    | Methods::ResultBody.listPrompts found => (sameMethod method (ctor Methods::Method.promptsList))
+    | Methods::ResultBody.getPrompt found => (sameMethod method (ctor Methods::Method.promptsGet))
+    | Methods::ResultBody.complete found => (sameMethod method (ctor Methods::Method.completionComplete))
+    | Methods::ResultBody.getTask found => (sameMethod method (ctor Methods::Method.tasksGet))
+    | Methods::ResultBody.acknowledged => ((sameMethod method (ctor Methods::Method.tasksUpdate)) || (sameMethod method (ctor Methods::Method.tasksCancel)))
+    | Methods::ResultBody.inputRequired needed => (Methods::supportsInputRequired method)
+    | Methods::ResultBody.taskCreated created => (Methods::supportsTaskResult method)),
+  executable: true
+}
+
+definition{
+  name: admitBody,
+  parameters: [
+    info : Extension::ProviderInfo,
+    request : Methods::ClientRequest,
+    body : Methods::ResultBody
+  ],
+  result: (Result Reply Refusal::Refusal),
+  body: (match body
+    | Methods::ResultBody.inputRequired needed => (pendingReply info (metaOfRequest request) needed)
+    | Methods::ResultBody.taskCreated created => (taskReply info (metaOfRequest request) created)
+    | Methods::ResultBody.discover found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))
+    | Methods::ResultBody.listTools found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))
+    | Methods::ResultBody.callTool found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))
+    | Methods::ResultBody.listResources found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))
+    | Methods::ResultBody.readResource found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))
+    | Methods::ResultBody.listResourceTemplates found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))
+    | Methods::ResultBody.listPrompts found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))
+    | Methods::ResultBody.getPrompt found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))
+    | Methods::ResultBody.complete found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))
+    | Methods::ResultBody.getTask found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))
+    | Methods::ResultBody.acknowledged => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))),
+  executable: true
+}
+
+definition{
+  name: strayResult,
+  parameters: [],
+  result: Refusal::ProviderRefusal,
+  body: (ctor Refusal::ProviderRefusal.internal "the provider answered with a result that does not belong to the method"),
+  executable: true
+}
+
+definition{
+  name: settle,
+  parameters: [
+    info : Extension::ProviderInfo,
+    request : Methods::ClientRequest,
+    answered : (Result Methods::ResultBody Refusal::ProviderRefusal)
+  ],
+  result: (Result Reply Refusal::Refusal),
+  body: (match answered
+    | Result.error pr => (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider pr))
+    | Result.ok body => (if (bodyFits (Methods::methodOfRequest request) body) then (admitBody info request body) else (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider (strayResult))))),
+  executable: true
+}
+
+definition{
+  name: isDiscoverMethod,
+  parameters: [method : Methods::Method],
+  result: Bool,
+  body: (match method
+    | Methods::Method.serverDiscover => true
+    | Methods::Method.toolsList => false
+    | Methods::Method.toolsCall => false
+    | Methods::Method.resourcesList => false
+    | Methods::Method.resourcesRead => false
+    | Methods::Method.resourcesTemplatesList => false
+    | Methods::Method.promptsList => false
+    | Methods::Method.promptsGet => false
+    | Methods::Method.completionComplete => false
+    | Methods::Method.tasksGet => false
+    | Methods::Method.tasksUpdate => false
+    | Methods::Method.tasksCancel => false),
+  executable: true
+}
+
+definition{
+  name: discoverOf,
+  parameters: [info : Extension::ProviderInfo],
+  result: Methods::DiscoverResult,
+  body: (record Methods::DiscoverResult {cache := (project info discoverCache), supportedVersions := (Validation::supportedVersions), capabilities := (project info capabilities), instructions := (project info instructions)}),
+  executable: true
 }
 
 definition{
   name: run,
-  parameters: [provider : Extension::Provider, request : Methods::ClientRequest],
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    request : Methods::ClientRequest
+  ],
   result: (Result Reply Refusal::Refusal),
-  body: (match request
-    | Methods::ClientRequest.serverDiscover params => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf provider (ctor Methods::ResultBody.discover (record Methods::DiscoverResult {cache := (project provider discoverCache), supportedVersions := (Validation::supportedVersions), capabilities := (project provider capabilities), instructions := (project provider instructions)}))))
-    | Methods::ClientRequest.toolsList params => (match (apply (project provider listTools) params)
-      | Result.ok found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf provider (ctor Methods::ResultBody.listTools found)))
-      | Result.error pr => (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider pr)))
-    | Methods::ClientRequest.resourcesList params => (match (apply (project provider listResources) params)
-      | Result.ok found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf provider (ctor Methods::ResultBody.listResources found)))
-      | Result.error pr => (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider pr)))
-    | Methods::ClientRequest.resourcesTemplatesList params => (match (apply (project provider listResourceTemplates) params)
-      | Result.ok found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf provider (ctor Methods::ResultBody.listResourceTemplates found)))
-      | Result.error pr => (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider pr)))
-    | Methods::ClientRequest.promptsList params => (match (apply (project provider listPrompts) params)
-      | Result.ok found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf provider (ctor Methods::ResultBody.listPrompts found)))
-      | Result.error pr => (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider pr)))
-    | Methods::ClientRequest.completionComplete params => (match (apply (project provider complete) params)
-      | Result.ok found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf provider (ctor Methods::ResultBody.complete found)))
-      | Result.error pr => (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider pr)))
-    | Methods::ClientRequest.tasksGet params => (match (apply (project provider getTask) params)
-      | Result.ok found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf provider (ctor Methods::ResultBody.getTask found)))
-      | Result.error pr => (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider pr)))
-    | Methods::ClientRequest.toolsCall params => (match (apply (project provider callTool) params)
-      | Result.ok outcome => (match outcome
-        | Extension::CallOutcome.complete found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf provider (ctor Methods::ResultBody.callTool found)))
-        | Extension::CallOutcome.pending needed => (pendingReply provider (project params meta) needed)
-        | Extension::CallOutcome.task created => (taskReply provider (project params meta) created))
-      | Result.error pr => (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider pr)))
-    | Methods::ClientRequest.resourcesRead params => (match (apply (project provider readResource) params)
-      | Result.ok outcome => (match outcome
-        | Extension::ReadOutcome.complete found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf provider (ctor Methods::ResultBody.readResource found)))
-        | Extension::ReadOutcome.pending needed => (pendingReply provider (project params meta) needed))
-      | Result.error pr => (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider pr)))
-    | Methods::ClientRequest.promptsGet params => (match (apply (project provider getPrompt) params)
-      | Result.ok outcome => (match outcome
-        | Extension::PromptOutcome.complete found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf provider (ctor Methods::ResultBody.getPrompt found)))
-        | Extension::PromptOutcome.pending needed => (pendingReply provider (project params meta) needed))
-      | Result.error pr => (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider pr)))
-    | Methods::ClientRequest.tasksUpdate params => (match (apply (project provider updateTask) params)
-      | Option.none => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf provider (ctor Methods::ResultBody.acknowledged)))
-      | Option.some pr => (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider pr)))
-    | Methods::ClientRequest.tasksCancel params => (match (apply (project provider cancelTask) params)
-      | Option.none => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf provider (ctor Methods::ResultBody.acknowledged)))
-      | Option.some pr => (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider pr))))
+  body: (if (isDiscoverMethod (Methods::methodOfRequest request)) then (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info (ctor Methods::ResultBody.discover (discoverOf info)))) else (settle info request (apply answer request))),
+  executable: true
 }
 
 definition{
   name: afterDecode,
   parameters: [
-    provider : Extension::Provider,
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
     decoded : (Result Methods::ClientRequest Refusal::ParamsProblem)
   ],
   result: (Result Reply Refusal::Refusal),
   body: (match decoded
     | Result.error problem => (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.invalidParams problem))
-    | Result.ok typed => (run provider typed))
+    | Result.ok typed => (run info answer typed)),
+  executable: true
 }
 
 definition{
   name: gateOffer,
-  parameters: [provider : Extension::Provider, routed : Validation::Routed, offered : Bool],
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    routed : Validation::Routed,
+    offered : Bool
+  ],
   result: (Result Reply Refusal::Refusal),
-  body: (if offered then (afterDecode provider (Decode::decodeParams (project routed method) (project routed meta) (project routed params))) else (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound (Methods::methodWire (project routed method)))))
+  body: (if offered then (afterDecode info answer (Decode::decodeParams (project routed method) (project routed meta) (project routed params))) else (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound (Methods::methodWire (project routed method))))),
+  executable: true
 }
 
 definition{
   name: dispatch,
-  parameters: [provider : Extension::Provider, routed : Validation::Routed],
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    routed : Validation::Routed
+  ],
   result: (Result Reply Refusal::Refusal),
-  body: (gateOffer provider routed (offers (project provider capabilities) (project routed method)))
+  body: (gateOffer info answer routed (offers (project info capabilities) (project routed method))),
+  executable: true
 }
 
 definition{
   name: afterValidation,
   parameters: [
-    provider : Extension::Provider,
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
     validated : (Result Validation::Routed Refusal::Refusal)
   ],
   result: (Result Reply Refusal::Refusal),
   body: (match validated
     | Result.error refusal => (ctor Result.error [Reply, Refusal::Refusal] refusal)
-    | Result.ok routed => (dispatch provider routed))
+    | Result.ok routed => (dispatch info answer routed)),
+  executable: true
+}
+
+definition{
+  name: handleWith,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    headers : (Option Validation::Headers),
+    versions : (List String),
+    request : JsonRpc::Request
+  ],
+  result: Handled,
+  body: (record Handled {id := (project request id), outcome := (afterValidation info answer (Validation::validate headers versions request))}),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: answerFn,
+  parameters: [provider : Extension::Provider],
+  result: (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+  body: (fun [provider] (typed : Methods::ClientRequest) => (Extension::answerOf provider typed))
 }
 
 definition{
@@ -199,15 +331,15 @@ definition{
     request : JsonRpc::Request
   ],
   result: Handled,
-  body: (record Handled {id := (project request id), outcome := (afterValidation provider (Validation::validate headers versions request))}),
-  axioms: [propext]
+  body: (handleWith (Extension::infoOf provider) (answerFn provider) headers versions request),
+  axioms: [Quot.sound, propext]
 }
 
 definition{
   name: toolsProvider,
   parameters: [],
   result: Extension::Provider,
-  body: (record Extension::Provider {serverInfo := (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])}), instructions := (ctor Option.none [String]), capabilities := (record Capabilities::ServerCapabilities {experimental := (ctor Option.none [Json::JsonObject]), logging := (ctor Option.none [Json::JsonObject]), completions := (ctor Option.none [Json::JsonObject]), prompts := (ctor Option.none [Capabilities::ListChangedCapability]), resources := (ctor Option.none [Capabilities::ResourcesCapability]), tools := (ctor Option.some [Capabilities::ListChangedCapability] (record Capabilities::ListChangedCapability {listChanged := (ctor Option.some [Bool] false)})), extensions := (ctor Option.none [Json::JsonObject])}), discoverCache := (record Common::CacheHint {ttlMs := 0, cacheScope := (ctor Common::CacheScope.private)}), listTools := (fun (params : Methods::PaginatedParams) => (ctor Result.ok [Methods::ListToolsResult, Refusal::ProviderRefusal] (record Methods::ListToolsResult {cache := (record Common::CacheHint {ttlMs := 60000, cacheScope := (ctor Common::CacheScope.public)}), nextCursor := (ctor Option.none [String]), tools := (cons (record Content::Tool {name := "echo", title := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)]), description := (ctor Option.none [String]), inputSchema := (Capabilities::noObject), outputSchema := (ctor Option.none [Json::JsonObject]), annotations := (ctor Option.none [Content::ToolAnnotations]), meta := (ctor Option.none [Json::JsonObject])}) (nil Content::Tool))}))), callTool := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) callTool), listResources := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) listResources), listResourceTemplates := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) listResourceTemplates), readResource := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) readResource), listPrompts := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) listPrompts), getPrompt := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) getPrompt), complete := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) complete), getTask := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) getTask), updateTask := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) updateTask), cancelTask := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) cancelTask)})
+  body: (record Extension::Provider {serverInfo := (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])}), instructions := (ctor Option.none [String]), capabilities := (record Capabilities::ServerCapabilities {experimental := (ctor Option.none [Json::JsonObject]), logging := (ctor Option.none [Json::JsonObject]), completions := (ctor Option.none [Json::JsonObject]), prompts := (ctor Option.none [Capabilities::ListChangedCapability]), resources := (ctor Option.none [Capabilities::ResourcesCapability]), tools := (ctor Option.some [Capabilities::ListChangedCapability] (record Capabilities::ListChangedCapability {listChanged := (ctor Option.some [Bool] false)})), extensions := (ctor Option.none [Json::JsonObject])}), discoverCache := (record Common::CacheHint {ttlMs := 0, cacheScope := (ctor Common::CacheScope.private)}), paramRules := (nil Extension::ParamRule), listTools := (fun (params : Methods::PaginatedParams) => (ctor Result.ok [Methods::ListToolsResult, Refusal::ProviderRefusal] (record Methods::ListToolsResult {cache := (record Common::CacheHint {ttlMs := 60000, cacheScope := (ctor Common::CacheScope.public)}), nextCursor := (ctor Option.none [String]), tools := (cons (record Content::Tool {name := "echo", title := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)]), description := (ctor Option.none [String]), inputSchema := (Capabilities::noObject), outputSchema := (ctor Option.none [Json::JsonObject]), annotations := (ctor Option.none [Content::ToolAnnotations]), meta := (ctor Option.none [Json::JsonObject])}) (nil Content::Tool))}))), callTool := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) callTool), listResources := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) listResources), listResourceTemplates := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) listResourceTemplates), readResource := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) readResource), listPrompts := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) listPrompts), getPrompt := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) getPrompt), complete := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) complete), getTask := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) getTask), updateTask := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) updateTask), cancelTask := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) cancelTask)})
 }
 
 definition{
@@ -231,25 +363,6 @@ definition{
     | Methods::MethodRoute.unknown => (match outcome
       | Result.ok reply => false
       | Result.error refusal => true))
-}
-
-definition{
-  name: isDiscoverMethod,
-  parameters: [method : Methods::Method],
-  result: Bool,
-  body: (match method
-    | Methods::Method.serverDiscover => true
-    | Methods::Method.toolsList => false
-    | Methods::Method.toolsCall => false
-    | Methods::Method.resourcesList => false
-    | Methods::Method.resourcesRead => false
-    | Methods::Method.resourcesTemplatesList => false
-    | Methods::Method.promptsList => false
-    | Methods::Method.promptsGet => false
-    | Methods::Method.completionComplete => false
-    | Methods::Method.tasksGet => false
-    | Methods::Method.tasksUpdate => false
-    | Methods::Method.tasksCancel => false)
 }
 
 definition{
@@ -300,63 +413,63 @@ theorem{
 theorem{
   name: uncovered_input_request_is_a_missing_capability,
   parameters: [provider : Extension::Provider, needed : Input::InputRequiredResult],
-  statement: ((pendingGate provider needed false) = (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.missingCapability (Input::requiredCapabilities (Input::requestsOf needed)))))),
+  statement: ((pendingGate (Extension::infoOf provider) needed false) = (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.missingCapability (Input::requiredCapabilities (Input::requestsOf needed)))))),
   proof: reflexivity{}
 }
 
 theorem{
   name: covered_input_request_is_an_input_required_reply,
   parameters: [provider : Extension::Provider, needed : Input::InputRequiredResult],
-  statement: ((pendingGate provider needed true) = (ctor Result.ok [Reply, Refusal::Refusal] (replyOf provider (ctor Methods::ResultBody.inputRequired needed)))),
+  statement: ((pendingGate (Extension::infoOf provider) needed true) = (ctor Result.ok [Reply, Refusal::Refusal] (replyOf (Extension::infoOf provider) (ctor Methods::ResultBody.inputRequired needed)))),
   proof: reflexivity{}
 }
 
 theorem{
   name: task_for_a_client_without_the_extension_is_a_missing_capability,
   parameters: [provider : Extension::Provider, created : Tasks::CreateTaskResult],
-  statement: ((taskGate provider created false) = (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.missingCapability (Capabilities::tasksRequirement))))),
+  statement: ((taskGate (Extension::infoOf provider) created false) = (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.missingCapability (Capabilities::tasksRequirement))))),
   proof: reflexivity{}
 }
 
 theorem{
   name: task_for_a_client_with_the_extension_is_a_task_reply,
   parameters: [provider : Extension::Provider, created : Tasks::CreateTaskResult],
-  statement: ((taskGate provider created true) = (ctor Result.ok [Reply, Refusal::Refusal] (replyOf provider (ctor Methods::ResultBody.taskCreated created)))),
+  statement: ((taskGate (Extension::infoOf provider) created true) = (ctor Result.ok [Reply, Refusal::Refusal] (replyOf (Extension::infoOf provider) (ctor Methods::ResultBody.taskCreated created)))),
   proof: reflexivity{}
 }
 
 theorem{
   name: unoffered_method_never_reaches_the_provider,
   parameters: [provider : Extension::Provider, routed : Validation::Routed],
-  statement: ((gateOffer provider routed false) = (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound (Methods::methodWire (project routed method))))),
+  statement: ((gateOffer (Extension::infoOf provider) (answerFn provider) routed false) = (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound (Methods::methodWire (project routed method))))),
   proof: reflexivity{}
 }
 
 theorem{
   name: dispatch_gates_on_the_declared_capability,
   parameters: [provider : Extension::Provider, routed : Validation::Routed],
-  statement: ((dispatch provider routed) = (gateOffer provider routed (offers (project provider capabilities) (project routed method)))),
+  statement: ((dispatch (Extension::infoOf provider) (answerFn provider) routed) = (gateOffer (Extension::infoOf provider) (answerFn provider) routed (offers (project provider capabilities) (project routed method)))),
   proof: reflexivity{}
 }
 
 theorem{
   name: offered_method_decodes_its_params_before_running,
   parameters: [provider : Extension::Provider, routed : Validation::Routed],
-  statement: ((gateOffer provider routed true) = (afterDecode provider (Decode::decodeParams (project routed method) (project routed meta) (project routed params)))),
+  statement: ((gateOffer (Extension::infoOf provider) (answerFn provider) routed true) = (afterDecode (Extension::infoOf provider) (answerFn provider) (Decode::decodeParams (project routed method) (project routed meta) (project routed params)))),
   proof: reflexivity{}
 }
 
 theorem{
   name: undecodable_params_are_invalid_params,
   parameters: [provider : Extension::Provider, problem : Refusal::ParamsProblem],
-  statement: ((afterDecode provider (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)) = (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.invalidParams problem))),
+  statement: ((afterDecode (Extension::infoOf provider) (answerFn provider) (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)) = (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.invalidParams problem))),
   proof: reflexivity{}
 }
 
 theorem{
   name: decoded_params_are_run,
   parameters: [provider : Extension::Provider, typed : Methods::ClientRequest],
-  statement: ((afterDecode provider (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] typed)) = (run provider typed)),
+  statement: ((afterDecode (Extension::infoOf provider) (answerFn provider) (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] typed)) = (run (Extension::infoOf provider) (answerFn provider) typed)),
   proof: reflexivity{}
 }
 
@@ -369,7 +482,7 @@ theorem{
     meta : Meta::RequestMeta,
     params : Json::JsonObject
   ],
-  statement: ((discoverOrRefused method (dispatch (Extension::inertProvider info) (record Validation::Routed {id := identifier, method := method, meta := meta, params := params}))) = true),
+  statement: ((discoverOrRefused method (dispatch (Extension::infoOf (Extension::inertProvider info)) (answerFn (Extension::inertProvider info)) (record Validation::Routed {id := identifier, method := method, meta := meta, params := params}))) = true),
   proof: cases{
     branches: [
       {proof: reflexivity{}, binders: [], constructor: serverDiscover},
@@ -396,7 +509,7 @@ theorem{
     route : Methods::MethodRoute,
     admission : Validation::Admission
   ],
-  statement: ((refusesUnknown route (afterValidation provider (Validation::afterAdmit route admission))) = true),
+  statement: ((refusesUnknown route (afterValidation (Extension::infoOf provider) (answerFn provider) (Validation::afterAdmit route admission))) = true),
   proof: cases{
     branches: [
       {proof: reflexivity{}, binders: [method], constructor: known},
@@ -433,13 +546,13 @@ theorem{
     ],
     theorem: an_unknown_method_never_gets_a_result_whatever_the_admission
   },
-  axioms: [propext]
+  axioms: [Quot.sound, propext]
 }
 
 theorem{
   name: every_reply_names_the_server,
   parameters: [provider : Extension::Provider, body : Methods::ResultBody],
-  statement: ((project (project (replyOf provider body) meta) serverInfo) = (ctor Option.some [Common::Implementation] (project provider serverInfo))),
+  statement: ((project (project (replyOf (Extension::infoOf provider) body) meta) serverInfo) = (ctor Option.some [Common::Implementation] (project provider serverInfo))),
   proof: reflexivity{}
 }
 
@@ -453,7 +566,7 @@ theorem{
   ],
   statement: ((project (handle provider headers versions request) id) = (project request id)),
   proof: reflexivity{},
-  axioms: [propext]
+  axioms: [Quot.sound, propext]
 }
 
 theorem{
@@ -461,7 +574,7 @@ theorem{
   parameters: [],
   statement: ((typeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCallMetaOnly "tools/list"))) = (ctor Option.some [Meta::ResultType] (ctor Meta::ResultType.complete))),
   proof: reflexivity{},
-  axioms: [propext]
+  axioms: [Quot.sound, propext]
 }
 
 theorem{
@@ -469,7 +582,7 @@ theorem{
   parameters: [],
   statement: ((serverNameOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCallMetaOnly "tools/list"))) = (ctor Option.some [String] "sample")),
   proof: reflexivity{},
-  axioms: [propext]
+  axioms: [Quot.sound, propext]
 }
 
 theorem{
@@ -477,7 +590,7 @@ theorem{
   parameters: [],
   statement: ((codeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCallMetaOnly "prompts/list"))) = (ctor Option.some [Int] (-32601 : Int))),
   proof: reflexivity{},
-  axioms: [propext]
+  axioms: [Quot.sound, propext]
 }
 
 theorem{
@@ -485,7 +598,7 @@ theorem{
   parameters: [],
   statement: ((codeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCall "tools/call" "2026-07-28"))) = (ctor Option.some [Int] (-32603 : Int))),
   proof: reflexivity{},
-  axioms: [propext]
+  axioms: [Quot.sound, propext]
 }
 
 theorem{
@@ -493,7 +606,7 @@ theorem{
   parameters: [],
   statement: ((codeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCallWithoutMeta "tools/list"))) = (ctor Option.some [Int] (-32602 : Int))),
   proof: reflexivity{},
-  axioms: [propext]
+  axioms: [Quot.sound, propext]
 }
 
 theorem{
@@ -501,7 +614,7 @@ theorem{
   parameters: [],
   statement: ((codeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCallMetaOnly "tools/call"))) = (ctor Option.some [Int] (-32602 : Int))),
   proof: reflexivity{},
-  axioms: [propext]
+  axioms: [Quot.sound, propext]
 }
 
 theorem{
@@ -509,7 +622,7 @@ theorem{
   parameters: [],
   statement: ((codeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCallMetaOnly "prompts/get"))) = (ctor Option.some [Int] (-32601 : Int))),
   proof: reflexivity{},
-  axioms: [propext]
+  axioms: [Quot.sound, propext]
 }
 
 theorem{
@@ -517,7 +630,7 @@ theorem{
   parameters: [],
   statement: ((codeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCall "initialize" "2025-11-25"))) = (ctor Option.some [Int] (-32022 : Int))),
   proof: reflexivity{},
-  axioms: [propext]
+  axioms: [Quot.sound, propext]
 }
 
 theorem{
@@ -525,7 +638,7 @@ theorem{
   parameters: [],
   statement: ((codeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCall "prompts/list" "2025-11-25"))) = (ctor Option.some [Int] (-32022 : Int))),
   proof: reflexivity{},
-  axioms: [propext]
+  axioms: [Quot.sound, propext]
 }
 
 theorem{
@@ -533,7 +646,7 @@ theorem{
   parameters: [],
   statement: ((codeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCallWithoutMeta "initialize"))) = (ctor Option.some [Int] (-32602 : Int))),
   proof: reflexivity{},
-  axioms: [propext]
+  axioms: [Quot.sound, propext]
 }
 
 theorem{
@@ -541,7 +654,7 @@ theorem{
   parameters: [],
   statement: ((codeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCall "initialize" "2026-07-28"))) = (ctor Option.some [Int] (-32601 : Int))),
   proof: reflexivity{},
-  axioms: [propext]
+  axioms: [Quot.sound, propext]
 }
 \end{semanticmodule}
 \end{lexlean}

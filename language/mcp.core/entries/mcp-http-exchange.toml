@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-http-exchange"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Http"
+component = "Http"
+
+[[form]]
+id = "mcp-http-exchange"
+channel = "text"
+surface = "MCP HTTP exchange"
+canonical_source = true
+features = ["sentence-case", "singular"]
