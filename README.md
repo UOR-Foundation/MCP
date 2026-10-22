@@ -1,36 +1,38 @@
-# UOR project template
+# MCP
 
-Shared repository policy for projects consuming PrismPM as an SDK. No
-application or organizational model is included.
+The [Model Context Protocol](https://modelcontextprotocol.io) revision
+`2026-07-28`, implemented as a server protocol core in
+[LexLean](https://github.com/UOR-Foundation/LexLean).
 
-## Create a repository
+Conformance to MCP is established only by MCP's own oracles: the
+`2026-07-28` schema and the `modelcontextprotocol/conformance` suite, run
+against a conformance build of this core with the suite's fixture tools. The
+same core artifact, by digest, is linked unchanged by
+[UOR-Foundation/lexlean-mcp](https://github.com/UOR-Foundation/lexlean-mcp)
+and by any other LexLean-authored MCP server.
 
-1. Create a GitHub repository from this template and clone it.
-2. Set `workspace.package.repository` and `homepage` in `Cargo.toml`.
-3. Replace this README with the project's name, purpose, and current status.
-4. Keep the claim and authority registers empty until capabilities are defined.
-   Follow [AGENTS.md](AGENTS.md) when adding them.
+## Status
 
-## SDK status
+Nothing is built yet.
 
-This template is not yet bound to a public SDK release. `prismpm.lock` and
-`template.lock` are absent; the devcontainer and complete `just vv` gate require
-those immutable bindings. Creating and naming a repository does
-not require selecting its model, standards, views, or deployment targets.
+- The claim registers in `model/` are empty, so `CONFORMANCE.md` lists no
+  capability and this repository claims none.
+- The repository is not bound to a PrismPM SDK release (#4): `prismpm.lock` and
+  `template.lock` are absent, so `just vv` and the devcontainer cannot run.
+- v0.1.0 is tracked in #16.
 
-Once bound, open the repository in its digest-pinned devcontainer and run
-`just vv`. The host needs only Git, Docker with Buildx, and a devcontainer
-client. Do not substitute a vendored PrismPM checkout or host toolchain.
+v0.1 is scoped to Streamable HTTP. stdio servers, MCP Apps and resource-server
+authorization have no executable oracle at the pinned revisions, so no
+conformance claim is made for them (#15).
 
-## Repository boundary
+## Repository
 
-- `model/`, `features/suites/`, and generated `CONFORMANCE.md` describe project
-  claims. They begin empty; repository tooling is not a product implementation.
+This is an instance of the [UOR template](https://github.com/UOR-Foundation/template).
+
+- [AGENTS.md](AGENTS.md) sets the rules every change follows (R1–R6).
 - [TEMPLATE-CONTRACT.md](TEMPLATE-CONTRACT.md) defines inherited policy and the
-  immutable SDK/template update process.
-- [VERIFICATION.md](VERIFICATION.md) defines the full acceptance boundary;
-  [TEMPLATE-VERIFICATION.md](TEMPLATE-VERIFICATION.md) maps the scaffold's gates.
-- Reusable workflows are infrastructure. Do not enable publication or
-  deployment before the project model and its acceptance criteria exist.
+  SDK and template update process.
+- [VERIFICATION.md](VERIFICATION.md) defines the acceptance boundary; `just vv`
+  is the complete gate.
 
 Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE).
