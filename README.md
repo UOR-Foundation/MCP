@@ -27,7 +27,7 @@ MCP's own oracles, so this repository makes no conformance claim.
 | `Capabilities` | client and server capabilities and the `io.modelcontextprotocol/tasks` extension identifier |
 | `Content` | content blocks, resources, resource templates, prompts and tools |
 | `Input` | multi-round-trip input: elicitation, sampling and roots requests and responses, `InputRequiredResult`, and the capability each request needs |
-| `Tasks` | the tasks extension state machine, `DetailedTask` and `CreateTaskResult` |
+| `Tasks`, `TaskJson`, `TaskServe`, `TaskFixture`, `TaskLaws` | the tasks extension: the task state machine (`DetailedTask`, `CreateTaskResult`, the plan a task follows, `settle`, `answer` and `cancel`), the wire form of a task and of the host's task table, `tasks/get`, `tasks/update`, `tasks/cancel` and the decision of `tools/call` to answer a task, the seven fixture tools of the tasks scenarios, and the theorems of the lifecycle ([TASKS.md](TASKS.md)) |
 | `Meta` | the request `_meta` keys (`protocolVersion`, `clientCapabilities`, `clientInfo`, `logLevel`, `progressToken`), `resultType` and the result `_meta` with `serverInfo` |
 | `Methods` | the server method names, typed params and results for `server/discover`, `tools/list`, `tools/call`, `resources/list`, `resources/read`, `resources/templates/list`, `prompts/list`, `prompts/get`, `completion/complete`, `tasks/get`, `tasks/update` and `tasks/cancel`, and which methods may answer `input_required` or `task` |
 | `Refusal` | the typed, closed refusals (`-32602`, `-32601`, `-32020`, `-32022`, `-32021`, `-32603`) and their JSON-RPC error objects |
@@ -45,19 +45,19 @@ MCP's own oracles, so this repository makes no conformance claim.
 | `Resources`, `ResourceFixture`, `ResourceLaws` | the resources layer: `resources/list`, `resources/read`, `resources/templates/list`, `prompts/list`, `prompts/get` and `completion/complete`, their refusals and cache hints, the catalogs of the conformance fixture, and their theorems ([RESOURCES.md](RESOURCES.md)) |
 | `Transport`, `TransportLaws` | the Streamable HTTP transport: the response event stream and its framing, the `Accept` negotiation, the `Origin` and `Host` allow-list against DNS rebinding, and their theorems ([TRANSPORT.md](TRANSPORT.md)) |
 
-What is not modeled: the JSON encoding of the result bodies of `tasks/get`, `tasks/update`,
-`tasks/cancel` and of the interim `input_required` and `task` results,
-the `subscriptions/listen` stream (its params and result types are declared,
-but the method is not dispatched), server notifications other than progress, and host effects
-(sockets, the loopback binding, closing a stream).
+What is not modeled: the `subscriptions/listen` stream (its params and result types are
+declared, but the method is not dispatched), server notifications other than progress and task
+status, and host effects (sockets, the loopback binding, closing a stream). The core keeps no
+state: the host holds the task table ([TASKS.md](TASKS.md)).
 
-- The claim registers in `model/` hold the JSON text codec (JC-01 to JC-14) and the
+- The claim registers in `model/` hold the JSON text codec (JC-01 to JC-14), the
   stateless lifecycle and HTTP header capabilities of #7 (LC-01 to LC-16, HH-01 to HH-13),
   the tools of #8 (TL-01 to TL-18), the resources, resource templates, prompts,
-  completion and caching capabilities of #9 (RP-01 to RP-19) and the Streamable HTTP
-  transport of #11 (SH-01 to SH-10).
+  completion and caching capabilities of #9 (RP-01 to RP-19), the Streamable HTTP
+  transport of #11 (SH-01 to SH-10) and the tasks extension of #12 (TK-01 to TK-16).
   No other protocol capability is registered and none is claimed, and the conformance
-  scenarios have not been run against a conformance build (#13).
+  scenarios have not been run against a conformance build (#13). The ten tasks scenarios
+  are extension scenarios that the pinned requirements run and do not score.
 - The repository is not bound to a PrismPM SDK release (#4): `prismpm.lock` and
   `template.lock` are absent, so `just vv` and the devcontainer cannot run.
 - v0.1.0 is tracked in #16.

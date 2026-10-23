@@ -104,7 +104,8 @@ definition{
       | Methods::ResultBody.getTask found => (ctor Option.none [Common::CacheHint])
       | Methods::ResultBody.acknowledged => (ctor Option.none [Common::CacheHint])
       | Methods::ResultBody.inputRequired found => (ctor Option.none [Common::CacheHint])
-      | Methods::ResultBody.taskCreated found => (ctor Option.none [Common::CacheHint]))),
+      | Methods::ResultBody.taskCreated found => (ctor Option.none [Common::CacheHint])
+      | Methods::ResultBody.stored found => (ctor Option.none [Common::CacheHint]))),
   executable: true
 }
 

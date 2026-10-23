@@ -1,0 +1,3696 @@
+{
+ "spec": "task-vectors/1",
+ "suite": {
+  "repository": "https://github.com/modelcontextprotocol/conformance",
+  "commit": "232a9014457eaf4c59559916e3d616d2f7f28f05",
+  "requirements_sha256": "ae2f4f6210fd729e2e318edd5bbfa31a43cee0bc608e48052fa26dbf1d939b57"
+ },
+ "extension": {
+  "repository": "https://github.com/modelcontextprotocol/ext-tasks",
+  "commit": "899c1bbc869567670093face3591b39c28ce3219"
+ },
+ "scripts": [
+  {
+   "id": "TS-LIFECYCLE",
+   "scenario": "tasks-lifecycle",
+   "file": "src/scenarios/server/tasks/lifecycle.ts",
+   "sessions": {
+    "main": {
+     "elicitation": {},
+     "sampling": {},
+     "extensions": {
+      "io.modelcontextprotocol/tasks": {}
+     }
+    }
+   },
+   "steps": [
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "greet",
+      "arguments": {
+       "name": "World"
+      }
+     },
+     "register": [
+      "TK-03",
+      "TK-07"
+     ],
+     "suite_checks": [
+      "tasks-sync-tool-call"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/taskId",
+        "absent": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/content",
+        "nonempty_array": true
+       },
+       {
+        "at": "/result/content/0/text",
+        "eq": "Hello, World!"
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/lifecycle.ts",
+     "line": 115,
+     "quote": "const result = (await conn.request('tools/call', {",
+     "id": "TS-LIFECYCLE-01"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "slow_compute",
+      "arguments": {
+       "seconds": 2,
+       "label": "lifecycle-create"
+      }
+     },
+     "register": [
+      "TK-05"
+     ],
+     "suite_checks": [
+      "sep-2663-result-type-task-on-create"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "task"
+       },
+       {
+        "at": "/result/taskId",
+        "type": "string"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       },
+       {
+        "at": "/result/createdAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/lastUpdatedAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       },
+       {
+        "at": "/result/ttlMs",
+        "positive_integer_or_null": true
+       }
+      ]
+     },
+     "capture": {
+      "task": "/result/taskId"
+     },
+     "file": "src/scenarios/server/tasks/lifecycle.ts",
+     "line": 158,
+     "quote": "const result = (await conn.request('tools/call', {",
+     "id": "TS-LIFECYCLE-02"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${task}"
+     },
+     "register": [
+      "TK-07"
+     ],
+     "suite_checks": [
+      "sep-2663-tasks-get-status-working"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/taskId",
+        "eq_var": "task"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/lifecycle.ts",
+     "line": 245,
+     "quote": "const task = (await conn.request('tasks/get', {",
+     "id": "TS-LIFECYCLE-03"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${task}"
+     },
+     "register": [
+      "TK-07"
+     ],
+     "suite_checks": [
+      "sep-2663-tasks-get-status-completed"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/status",
+        "eq": "completed"
+       },
+       {
+        "at": "/result/result/content",
+        "nonempty_array": true
+       }
+      ]
+     },
+     "poll": {
+      "kind": "terminal",
+      "interval_ms": 200,
+      "timeout_ms": 10000
+     },
+     "file": "src/scenarios/server/tasks/helpers.ts",
+     "line": 78,
+     "quote": "const task = (await conn.request('tasks/get', { taskId })) as any;",
+     "via": "src/scenarios/server/tasks/lifecycle.ts",
+     "id": "TS-LIFECYCLE-04"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "failing_job",
+      "arguments": {}
+     },
+     "register": [
+      "TK-03",
+      "TK-05"
+     ],
+     "suite_checks": [
+      "sep-2663-tool-error-uses-completed-status"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "task"
+       },
+       {
+        "at": "/result/taskId",
+        "type": "string"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       },
+       {
+        "at": "/result/createdAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/lastUpdatedAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       }
+      ]
+     },
+     "capture": {
+      "failed_job": "/result/taskId"
+     },
+     "file": "src/scenarios/server/tasks/lifecycle.ts",
+     "line": 337,
+     "quote": "const created = (await conn.request('tools/call', {",
+     "id": "TS-LIFECYCLE-05"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${failed_job}"
+     },
+     "register": [
+      "TK-07"
+     ],
+     "suite_checks": [
+      "sep-2663-tool-error-uses-completed-status"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/status",
+        "eq": "completed"
+       },
+       {
+        "at": "/result/result/isError",
+        "eq": true
+       }
+      ]
+     },
+     "poll": {
+      "kind": "terminal",
+      "interval_ms": 200,
+      "timeout_ms": 10000
+     },
+     "file": "src/scenarios/server/tasks/helpers.ts",
+     "line": 78,
+     "quote": "const task = (await conn.request('tasks/get', { taskId })) as any;",
+     "via": "src/scenarios/server/tasks/lifecycle.ts",
+     "id": "TS-LIFECYCLE-06"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "protocol_error_job",
+      "arguments": {}
+     },
+     "register": [
+      "TK-05"
+     ],
+     "suite_checks": [
+      "sep-2663-tasks-get-status-failed"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "task"
+       },
+       {
+        "at": "/result/taskId",
+        "type": "string"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       },
+       {
+        "at": "/result/createdAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/lastUpdatedAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       }
+      ]
+     },
+     "capture": {
+      "protocol_job": "/result/taskId"
+     },
+     "file": "src/scenarios/server/tasks/lifecycle.ts",
+     "line": 378,
+     "quote": "const created = (await conn.request('tools/call', {",
+     "id": "TS-LIFECYCLE-07"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${protocol_job}"
+     },
+     "register": [
+      "TK-07"
+     ],
+     "suite_checks": [
+      "sep-2663-tasks-get-status-failed"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/status",
+        "eq": "failed"
+       },
+       {
+        "at": "/result/error/code",
+        "type": "integer"
+       },
+       {
+        "at": "/result/error/message",
+        "type": "string"
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       }
+      ]
+     },
+     "poll": {
+      "kind": "terminal",
+      "interval_ms": 200,
+      "timeout_ms": 10000
+     },
+     "file": "src/scenarios/server/tasks/helpers.ts",
+     "line": 78,
+     "quote": "const task = (await conn.request('tasks/get', { taskId })) as any;",
+     "via": "src/scenarios/server/tasks/lifecycle.ts",
+     "id": "TS-LIFECYCLE-08"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "slow_compute",
+      "arguments": {
+       "seconds": 60,
+       "label": "lifecycle-cancel"
+      }
+     },
+     "register": [
+      "TK-05"
+     ],
+     "suite_checks": [
+      "sep-2663-cancel-ack-empty-result"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "task"
+       },
+       {
+        "at": "/result/taskId",
+        "type": "string"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       },
+       {
+        "at": "/result/createdAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/lastUpdatedAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       }
+      ]
+     },
+     "capture": {
+      "long": "/result/taskId"
+     },
+     "file": "src/scenarios/server/tasks/lifecycle.ts",
+     "line": 429,
+     "quote": "const created = (await conn.request('tools/call', {",
+     "id": "TS-LIFECYCLE-09"
+    },
+    {
+     "method": "tasks/cancel",
+     "params": {
+      "taskId": "${long}"
+     },
+     "register": [
+      "TK-09"
+     ],
+     "suite_checks": [
+      "sep-2663-cancel-ack-empty-result"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/taskId",
+        "absent": true
+       },
+       {
+        "at": "/result/status",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/lifecycle.ts",
+     "line": 445,
+     "quote": "const ack = (await conn.request('tasks/cancel', {",
+     "id": "TS-LIFECYCLE-10"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${long}"
+     },
+     "register": [
+      "TK-09"
+     ],
+     "suite_checks": [
+      "sep-2663-cancel-ack-empty-result"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/status",
+        "eq": "cancelled"
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       }
+      ]
+     },
+     "poll": {
+      "kind": "terminal",
+      "interval_ms": 200,
+      "timeout_ms": 10000
+     },
+     "file": "src/scenarios/server/tasks/helpers.ts",
+     "line": 78,
+     "quote": "const task = (await conn.request('tasks/get', { taskId })) as any;",
+     "via": "src/scenarios/server/tasks/lifecycle.ts",
+     "id": "TS-LIFECYCLE-11"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "slow_compute",
+      "arguments": {
+       "seconds": 1,
+       "label": "lifecycle-cancel-terminal"
+      }
+     },
+     "register": [
+      "TK-05"
+     ],
+     "suite_checks": [
+      "tasks-cancel-terminal-idempotent-ack"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "task"
+       },
+       {
+        "at": "/result/taskId",
+        "type": "string"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       },
+       {
+        "at": "/result/createdAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/lastUpdatedAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       }
+      ]
+     },
+     "capture": {
+      "brief": "/result/taskId"
+     },
+     "file": "src/scenarios/server/tasks/lifecycle.ts",
+     "line": 494,
+     "quote": "const created = (await conn.request('tools/call', {",
+     "id": "TS-LIFECYCLE-12"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${brief}"
+     },
+     "register": [
+      "TK-07"
+     ],
+     "suite_checks": [
+      "tasks-cancel-terminal-idempotent-ack"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/status",
+        "eq": "completed"
+       }
+      ]
+     },
+     "poll": {
+      "kind": "terminal",
+      "interval_ms": 200,
+      "timeout_ms": 10000
+     },
+     "file": "src/scenarios/server/tasks/helpers.ts",
+     "line": 78,
+     "quote": "const task = (await conn.request('tasks/get', { taskId })) as any;",
+     "via": "src/scenarios/server/tasks/lifecycle.ts",
+     "id": "TS-LIFECYCLE-13"
+    },
+    {
+     "method": "tasks/cancel",
+     "params": {
+      "taskId": "${brief}"
+     },
+     "register": [
+      "TK-09"
+     ],
+     "suite_checks": [
+      "tasks-cancel-terminal-idempotent-ack"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/taskId",
+        "absent": true
+       },
+       {
+        "at": "/result/status",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/lifecycle.ts",
+     "line": 511,
+     "quote": "const ack = (await conn.request('tasks/cancel', {",
+     "id": "TS-LIFECYCLE-14"
+    }
+   ]
+  },
+  {
+   "id": "TS-CAPABILITY",
+   "scenario": "tasks-capability-negotiation",
+   "file": "src/scenarios/server/tasks/capability.ts",
+   "sessions": {
+    "ext": {
+     "elicitation": {},
+     "sampling": {},
+     "extensions": {
+      "io.modelcontextprotocol/tasks": {}
+     }
+    },
+    "plain": {}
+   },
+   "steps": [
+    {
+     "method": "server/discover",
+     "params": {},
+     "register": [
+      "TK-01"
+     ],
+     "suite_checks": [
+      "tasks-extension-advertised"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/capabilities/extensions/io.modelcontextprotocol~1tasks",
+        "is_object": true
+       },
+       {
+        "at": "/result/capabilities/tasks",
+        "absent": true
+       }
+      ]
+     },
+     "session": "ext",
+     "file": "src/scenarios/server/tasks/capability.ts",
+     "line": 90,
+     "quote": "const discovered = await withExt.discover();",
+     "id": "TS-CAPABILITY-01"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "gate-test"
+     },
+     "register": [
+      "TK-02"
+     ],
+     "suite_checks": [
+      "sep-2663-tasks-methods-non-declaring"
+     ],
+     "expect": {
+      "status": 400,
+      "checks": [
+       {
+        "at": "/error/code",
+        "eq": -32021
+       },
+       {
+        "at": "/error/data/requiredCapabilities/extensions/io.modelcontextprotocol~1tasks",
+        "present": true
+       }
+      ]
+     },
+     "session": "plain",
+     "file": "src/scenarios/server/tasks/capability.ts",
+     "line": 142,
+     "quote": "await withoutExt.request(tc.method, tc.params);",
+     "id": "TS-CAPABILITY-02"
+    },
+    {
+     "method": "tasks/update",
+     "params": {
+      "taskId": "gate-test",
+      "inputResponses": {}
+     },
+     "register": [
+      "TK-02"
+     ],
+     "suite_checks": [
+      "sep-2663-tasks-methods-non-declaring"
+     ],
+     "expect": {
+      "status": 400,
+      "checks": [
+       {
+        "at": "/error/code",
+        "eq": -32021
+       },
+       {
+        "at": "/error/data/requiredCapabilities/extensions/io.modelcontextprotocol~1tasks",
+        "present": true
+       }
+      ]
+     },
+     "session": "plain",
+     "file": "src/scenarios/server/tasks/capability.ts",
+     "line": 142,
+     "quote": "await withoutExt.request(tc.method, tc.params);",
+     "id": "TS-CAPABILITY-03"
+    },
+    {
+     "method": "tasks/cancel",
+     "params": {
+      "taskId": "gate-test"
+     },
+     "register": [
+      "TK-02"
+     ],
+     "suite_checks": [
+      "sep-2663-tasks-methods-non-declaring"
+     ],
+     "expect": {
+      "status": 400,
+      "checks": [
+       {
+        "at": "/error/code",
+        "eq": -32021
+       },
+       {
+        "at": "/error/data/requiredCapabilities/extensions/io.modelcontextprotocol~1tasks",
+        "present": true
+       }
+      ]
+     },
+     "session": "plain",
+     "file": "src/scenarios/server/tasks/capability.ts",
+     "line": 142,
+     "quote": "await withoutExt.request(tc.method, tc.params);",
+     "id": "TS-CAPABILITY-04"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "slow_compute",
+      "arguments": {
+       "seconds": 0,
+       "label": "capability-no-ext"
+      }
+     },
+     "register": [
+      "TK-03"
+     ],
+     "suite_checks": [
+      "sep-2663-server-rejects-undeclared-client"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/taskId",
+        "absent": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/content",
+        "nonempty_array": true
+       }
+      ]
+     },
+     "session": "plain",
+     "file": "src/scenarios/server/tasks/capability.ts",
+     "line": 170,
+     "quote": "const result = (await withoutExt.request('tools/call', {",
+     "id": "TS-CAPABILITY-05"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "slow_compute",
+      "arguments": {
+       "seconds": 1,
+       "label": "capability-meta-opt"
+      },
+      "_meta": {
+       "io.modelcontextprotocol/clientCapabilities": {
+        "extensions": {
+         "io.modelcontextprotocol/tasks": {}
+        }
+       }
+      }
+     },
+     "register": [
+      "TK-03",
+      "TK-05"
+     ],
+     "suite_checks": [
+      "tasks-per-request-meta-opt-in"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "task"
+       },
+       {
+        "at": "/result/taskId",
+        "type": "string"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       },
+       {
+        "at": "/result/createdAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/lastUpdatedAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       }
+      ]
+     },
+     "capture": {
+      "task": "/result/taskId"
+     },
+     "session": "plain",
+     "file": "src/scenarios/server/tasks/capability.ts",
+     "line": 220,
+     "quote": "const result = (await withoutExt.request('tools/call', {",
+     "id": "TS-CAPABILITY-06"
+    },
+    {
+     "method": "tasks/cancel",
+     "params": {
+      "taskId": "${task}"
+     },
+     "register": [
+      "TK-09"
+     ],
+     "suite_checks": [
+      "tasks-per-request-meta-opt-in"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/taskId",
+        "absent": true
+       },
+       {
+        "at": "/result/status",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       }
+      ]
+     },
+     "session": "ext",
+     "file": "src/scenarios/server/tasks/capability.ts",
+     "line": 249,
+     "quote": "await withExt.request('tasks/cancel', { taskId: result.taskId });",
+     "id": "TS-CAPABILITY-07"
+    }
+   ]
+  },
+  {
+   "id": "TS-COMPOSITION",
+   "scenario": "tasks-mrtr-composition",
+   "file": "src/scenarios/server/tasks/composition.ts",
+   "sessions": {
+    "main": {
+     "elicitation": {},
+     "extensions": {
+      "io.modelcontextprotocol/tasks": {}
+     }
+    }
+   },
+   "steps": [
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "test_tool_with_task",
+      "arguments": {}
+     },
+     "register": [
+      "TK-13"
+     ],
+     "suite_checks": [
+      "sep-2663-mrtr-synchronous-before-task-creation"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "input_required"
+       },
+       {
+        "at": "/result/taskId",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "min_keys": 1
+       }
+      ]
+     },
+     "capture_key": {
+      "var": "key",
+      "at": "/result/inputRequests",
+      "index": 0
+     },
+     "file": "src/scenarios/server/tasks/composition.ts",
+     "line": 83,
+     "quote": "const r1 = (await conn.request('tools/call', {",
+     "id": "TS-COMPOSITION-01"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "test_tool_with_task",
+      "arguments": {},
+      "inputResponses": {
+       "${key}": {
+        "action": "accept",
+        "content": {
+         "name": "Alice"
+        }
+       }
+      }
+     },
+     "register": [
+      "TK-13"
+     ],
+     "suite_checks": [
+      "sep-2663-mrtr-synchronous-before-task-creation"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "task"
+       },
+       {
+        "at": "/result/taskId",
+        "type": "string"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       },
+       {
+        "at": "/result/createdAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/lastUpdatedAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       }
+      ]
+     },
+     "capture": {
+      "task": "/result/taskId"
+     },
+     "file": "src/scenarios/server/tasks/composition.ts",
+     "line": 113,
+     "quote": "r2 = (await conn.request('tools/call', {",
+     "id": "TS-COMPOSITION-02"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${task}"
+     },
+     "register": [
+      "TK-13"
+     ],
+     "suite_checks": [
+      "sep-2663-mrtr-synchronous-before-task-creation"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/status",
+        "eq": "completed"
+       },
+       {
+        "at": "/result/result/content/0/text",
+        "contains": "Alice"
+       }
+      ]
+     },
+     "poll": {
+      "kind": "terminal",
+      "interval_ms": 200,
+      "timeout_ms": 10000
+     },
+     "file": "src/scenarios/server/tasks/helpers.ts",
+     "line": 78,
+     "quote": "const task = (await conn.request('tasks/get', { taskId })) as any;",
+     "via": "src/scenarios/server/tasks/composition.ts",
+     "id": "TS-COMPOSITION-03"
+    }
+   ]
+  },
+  {
+   "id": "TS-REQUIRED",
+   "scenario": "tasks-required-task-error",
+   "file": "src/scenarios/server/tasks/required-task-error.ts",
+   "sessions": {
+    "plain": {}
+   },
+   "steps": [
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "failing_job",
+      "arguments": {}
+     },
+     "register": [
+      "TK-04"
+     ],
+     "suite_checks": [
+      "sep-2663-server-returns-missing-capability-when-required",
+      "sep-2663-server-returns-missing-capability-data-shape"
+     ],
+     "expect": {
+      "status": 400,
+      "checks": [
+       {
+        "at": "/error/code",
+        "eq": -32021
+       },
+       {
+        "at": "/error/data/requiredCapabilities/extensions/io.modelcontextprotocol~1tasks",
+        "present": true
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/required-task-error.ts",
+     "line": 115,
+     "quote": "await conn.request('tools/call', {",
+     "id": "TS-REQUIRED-01"
+    }
+   ]
+  },
+  {
+   "id": "TS-REQUEST-STATE",
+   "scenario": "tasks-request-state-removal",
+   "file": "src/scenarios/server/tasks/request-state.ts",
+   "sessions": {
+    "main": {
+     "extensions": {
+      "io.modelcontextprotocol/tasks": {}
+     }
+    }
+   },
+   "steps": [
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "slow_compute",
+      "arguments": {
+       "seconds": 60,
+       "label": "request-state-removal"
+      }
+     },
+     "register": [
+      "TK-05"
+     ],
+     "suite_checks": [
+      "tasks-create-result-no-request-state"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "task"
+       },
+       {
+        "at": "/result/taskId",
+        "type": "string"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       },
+       {
+        "at": "/result/createdAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/lastUpdatedAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       }
+      ]
+     },
+     "capture": {
+      "task": "/result/taskId"
+     },
+     "file": "src/scenarios/server/tasks/request-state.ts",
+     "line": 85,
+     "quote": "createdTask = (await conn.request('tools/call', {",
+     "id": "TS-REQUEST-STATE-01"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${task}"
+     },
+     "register": [
+      "TK-07"
+     ],
+     "suite_checks": [
+      "tasks-get-detailed-no-request-state"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/status",
+        "eq": "working"
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/request-state.ts",
+     "line": 148,
+     "quote": "const detailed = (await conn.request('tasks/get', {",
+     "id": "TS-REQUEST-STATE-02"
+    },
+    {
+     "method": "tasks/cancel",
+     "params": {
+      "taskId": "${task}"
+     },
+     "register": [
+      "TK-09"
+     ],
+     "suite_checks": [
+      "tasks-get-detailed-no-request-state"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/taskId",
+        "absent": true
+       },
+       {
+        "at": "/result/status",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/request-state.ts",
+     "line": 173,
+     "quote": "await conn.request('tasks/cancel', { taskId });",
+     "id": "TS-REQUEST-STATE-03"
+    }
+   ]
+  },
+  {
+   "id": "TS-WIRE",
+   "scenario": "tasks-wire-fields",
+   "file": "src/scenarios/server/tasks/wire-fields.ts",
+   "sessions": {
+    "main": {
+     "extensions": {
+      "io.modelcontextprotocol/tasks": {}
+     }
+    }
+   },
+   "steps": [
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "slow_compute",
+      "arguments": {
+       "seconds": 1,
+       "label": "wire-fields"
+      }
+     },
+     "register": [
+      "TK-05",
+      "TK-06"
+     ],
+     "suite_checks": [
+      "tasks-wire-field-renames"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "task"
+       },
+       {
+        "at": "/result/taskId",
+        "type": "string"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       },
+       {
+        "at": "/result/createdAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/lastUpdatedAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       },
+       {
+        "at": "/result/ttlMs",
+        "positive_integer_or_null": true
+       },
+       {
+        "at": "/result/ttl",
+        "absent": true
+       },
+       {
+        "at": "/result/pollIntervalMs",
+        "positive_integer": true
+       },
+       {
+        "at": "/result/pollInterval",
+        "absent": true
+       }
+      ]
+     },
+     "capture": {
+      "task": "/result/taskId"
+     },
+     "file": "src/scenarios/server/tasks/wire-fields.ts",
+     "line": 85,
+     "quote": "const result = (await conn.request('tools/call', {",
+     "id": "TS-WIRE-01"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${task}"
+     },
+     "register": [
+      "TK-06"
+     ],
+     "suite_checks": [
+      "tasks-no-early-ttl-expiry"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/status",
+        "eq": "completed"
+       }
+      ]
+     },
+     "poll": {
+      "kind": "terminal",
+      "interval_ms": 200,
+      "timeout_ms": 10000
+     },
+     "file": "src/scenarios/server/tasks/helpers.ts",
+     "line": 78,
+     "quote": "const task = (await conn.request('tasks/get', { taskId })) as any;",
+     "via": "src/scenarios/server/tasks/wire-fields.ts",
+     "id": "TS-WIRE-02"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${task}"
+     },
+     "register": [
+      "TK-06"
+     ],
+     "suite_checks": [
+      "tasks-no-early-ttl-expiry"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/taskId",
+        "eq_var": "task"
+       }
+      ]
+     },
+     "after_ms": 500,
+     "file": "src/scenarios/server/tasks/wire-fields.ts",
+     "line": 174,
+     "quote": "const after = (await conn.request('tasks/get', {",
+     "id": "TS-WIRE-03"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "slow_compute",
+      "arguments": {
+       "seconds": 1,
+       "label": "wire-fields-meta"
+      }
+     },
+     "register": [
+      "TK-05"
+     ],
+     "suite_checks": [
+      "tasks-no-related-task-meta-on-inlined-result"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "task"
+       },
+       {
+        "at": "/result/taskId",
+        "type": "string"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       },
+       {
+        "at": "/result/createdAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/lastUpdatedAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       }
+      ]
+     },
+     "capture": {
+      "second": "/result/taskId"
+     },
+     "file": "src/scenarios/server/tasks/wire-fields.ts",
+     "line": 207,
+     "quote": "const created = (await conn.request('tools/call', {",
+     "id": "TS-WIRE-04"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${second}"
+     },
+     "register": [
+      "TK-06"
+     ],
+     "suite_checks": [
+      "tasks-no-related-task-meta-on-inlined-result"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/status",
+        "eq": "completed"
+       },
+       {
+        "at": "/result/result/_meta/io.modelcontextprotocol~1related-task",
+        "absent": true
+       }
+      ]
+     },
+     "poll": {
+      "kind": "terminal",
+      "interval_ms": 200,
+      "timeout_ms": 10000
+     },
+     "file": "src/scenarios/server/tasks/helpers.ts",
+     "line": 78,
+     "quote": "const task = (await conn.request('tasks/get', { taskId })) as any;",
+     "via": "src/scenarios/server/tasks/wire-fields.ts",
+     "id": "TS-WIRE-05"
+    }
+   ]
+  },
+  {
+   "id": "TS-HEADERS",
+   "scenario": "tasks-request-headers",
+   "file": "src/scenarios/server/tasks/headers.ts",
+   "sessions": {
+    "main": {
+     "extensions": {
+      "io.modelcontextprotocol/tasks": {}
+     }
+    }
+   },
+   "steps": [
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "greet",
+      "arguments": {
+       "name": "sep-2243"
+      }
+     },
+     "register": [
+      "TK-11"
+     ],
+     "suite_checks": [
+      "tasks-headers-tolerate-mcp-method-on-tools-call"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/content/0/text",
+        "eq": "Hello, sep-2243!"
+       }
+      ]
+     },
+     "headers": {
+      "Mcp-Method": "tools/call"
+     },
+     "file": "src/scenarios/server/tasks/headers.ts",
+     "line": 94,
+     "quote": "const result = (await conn.request(",
+     "id": "TS-HEADERS-01"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "slow_compute",
+      "arguments": {
+       "seconds": 60,
+       "label": "headers-tasks-get"
+      }
+     },
+     "register": [
+      "TK-05",
+      "TK-11"
+     ],
+     "suite_checks": [
+      "sep-2663-routing-headers-accepted-on-tasks-get"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "task"
+       },
+       {
+        "at": "/result/taskId",
+        "type": "string"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       },
+       {
+        "at": "/result/createdAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/lastUpdatedAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       }
+      ]
+     },
+     "capture": {
+      "task": "/result/taskId"
+     },
+     "file": "src/scenarios/server/tasks/headers.ts",
+     "line": 139,
+     "quote": "const created = (await conn.request('tools/call', {",
+     "id": "TS-HEADERS-02"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${task}"
+     },
+     "register": [
+      "TK-11"
+     ],
+     "suite_checks": [
+      "sep-2663-routing-headers-accepted-on-tasks-get"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/taskId",
+        "eq_var": "task"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       }
+      ]
+     },
+     "headers": {
+      "Mcp-Method": "tasks/get",
+      "Mcp-Name": "${task}"
+     },
+     "file": "src/scenarios/server/tasks/headers.ts",
+     "line": 155,
+     "quote": "const got = (await conn.request(",
+     "id": "TS-HEADERS-03"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "greet",
+      "arguments": {
+       "name": "header-mismatch"
+      }
+     },
+     "register": [
+      "TK-11"
+     ],
+     "suite_checks": [
+      "tasks-headers-reject-mismatched-method"
+     ],
+     "expect": {
+      "status": 400,
+      "checks": [
+       {
+        "at": "/error/code",
+        "eq": -32020
+       }
+      ]
+     },
+     "headers": {
+      "Mcp-Method": "tasks/get"
+     },
+     "file": "src/scenarios/server/tasks/headers.ts",
+     "line": 196,
+     "quote": "await conn.request(",
+     "id": "TS-HEADERS-04"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${task}"
+     },
+     "register": [
+      "TK-11"
+     ],
+     "suite_checks": [
+      "sep-2663-server-rejects-mismatched-mcp-name-on-tasks-get"
+     ],
+     "expect": {
+      "status": 400,
+      "checks": [
+       {
+        "at": "/error/code",
+        "eq": -32020
+       }
+      ]
+     },
+     "headers": {
+      "Mcp-Name": "sep-2663-wrong-task-id-for-routing-header-mismatch"
+     },
+     "file": "src/scenarios/server/tasks/headers.ts",
+     "line": 260,
+     "quote": "await conn.request(",
+     "id": "TS-HEADERS-05"
+    },
+    {
+     "method": "tasks/cancel",
+     "params": {
+      "taskId": "${task}"
+     },
+     "register": [
+      "TK-09",
+      "TK-11"
+     ],
+     "suite_checks": [
+      "sep-2663-server-rejects-mismatched-mcp-name-on-tasks-get"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/taskId",
+        "absent": true
+       },
+       {
+        "at": "/result/status",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/headers.ts",
+     "line": 304,
+     "quote": "await conn.request('tasks/cancel', { taskId: routingTaskId });",
+     "id": "TS-HEADERS-06"
+    }
+   ]
+  },
+  {
+   "id": "TS-DISPATCH",
+   "scenario": "tasks-dispatch-and-envelope",
+   "file": "src/scenarios/server/tasks/dispatch.ts",
+   "sessions": {
+    "main": {
+     "elicitation": {},
+     "sampling": {},
+     "extensions": {
+      "io.modelcontextprotocol/tasks": {}
+     }
+    }
+   },
+   "steps": [
+    {
+     "method": "tasks/result",
+     "params": {
+      "taskId": "tasks-conformance-isolation-probe"
+     },
+     "register": [
+      "TK-08"
+     ],
+     "suite_checks": [
+      "sep-2663-tasks-result-removed-method-not-found"
+     ],
+     "expect": {
+      "status": 404,
+      "checks": [
+       {
+        "at": "/error/code",
+        "eq": -32601
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/dispatch.ts",
+     "line": 144,
+     "quote": "await conn.request('tasks/result', validTasksParams('tasks/result'));",
+     "id": "TS-DISPATCH-01"
+    },
+    {
+     "method": "tasks/list",
+     "params": {},
+     "register": [
+      "TK-08"
+     ],
+     "suite_checks": [
+      "tasks-removed-tasks-list"
+     ],
+     "expect": {
+      "status": 404,
+      "checks": [
+       {
+        "at": "/error/code",
+        "eq": -32601
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/dispatch.ts",
+     "line": 184,
+     "quote": "await conn.request('tasks/list', validTasksParams('tasks/list'));",
+     "id": "TS-DISPATCH-02"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "failing_job",
+      "arguments": {}
+     },
+     "register": [
+      "TK-03",
+      "TK-05"
+     ],
+     "suite_checks": [
+      "tasks-server-directed-creation-no-hint"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "task"
+       },
+       {
+        "at": "/result/taskId",
+        "type": "string"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       },
+       {
+        "at": "/result/createdAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/lastUpdatedAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/dispatch.ts",
+     "line": 220,
+     "quote": "const result = (await conn.request('tools/call', {",
+     "id": "TS-DISPATCH-03"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "greet",
+      "arguments": {
+       "name": "legacy-hint"
+      },
+      "task": {
+       "ttl": 60000,
+       "pollInterval": 100
+      }
+     },
+     "register": [
+      "TK-03"
+     ],
+     "suite_checks": [
+      "sep-2663-legacy-task-param-ignored"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/taskId",
+        "absent": true
+       },
+       {
+        "at": "/result/content",
+        "nonempty_array": true
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/dispatch.ts",
+     "line": 259,
+     "quote": "const result = (await conn.request('tools/call', {",
+     "id": "TS-DISPATCH-04"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "slow_compute",
+      "arguments": {
+       "seconds": 0,
+       "label": "instant"
+      }
+     },
+     "register": [
+      "TK-03"
+     ],
+     "suite_checks": [
+      "tasks-immediate-result-shortcut"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "one_of": [
+         "task",
+         "complete"
+        ]
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/dispatch.ts",
+     "line": 301,
+     "quote": "const result = (await conn.request('tools/call', {",
+     "id": "TS-DISPATCH-05"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "greet",
+      "arguments": {
+       "name": "rt"
+      }
+     },
+     "register": [
+      "TK-07"
+     ],
+     "suite_checks": [
+      "tasks-result-type-complete-on-non-task-responses"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/dispatch.ts",
+     "line": 344,
+     "quote": "const sync = (await conn.request('tools/call', {",
+     "id": "TS-DISPATCH-06"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "slow_compute",
+      "arguments": {
+       "seconds": 0,
+       "label": "rt-get"
+      }
+     },
+     "register": [
+      "TK-05"
+     ],
+     "suite_checks": [
+      "tasks-result-type-complete-on-non-task-responses"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "task"
+       },
+       {
+        "at": "/result/taskId",
+        "type": "string"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       },
+       {
+        "at": "/result/createdAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/lastUpdatedAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       }
+      ]
+     },
+     "capture": {
+      "task": "/result/taskId"
+     },
+     "file": "src/scenarios/server/tasks/dispatch.ts",
+     "line": 355,
+     "quote": "const created = (await conn.request('tools/call', {",
+     "id": "TS-DISPATCH-07"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${task}"
+     },
+     "register": [
+      "TK-07"
+     ],
+     "suite_checks": [
+      "tasks-result-type-complete-on-non-task-responses"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/status",
+        "eq": "completed"
+       }
+      ]
+     },
+     "poll": {
+      "kind": "terminal",
+      "interval_ms": 200,
+      "timeout_ms": 10000
+     },
+     "file": "src/scenarios/server/tasks/helpers.ts",
+     "line": 78,
+     "quote": "const task = (await conn.request('tasks/get', { taskId })) as any;",
+     "via": "src/scenarios/server/tasks/dispatch.ts",
+     "id": "TS-DISPATCH-08"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${task}"
+     },
+     "register": [
+      "TK-07"
+     ],
+     "suite_checks": [
+      "tasks-result-type-complete-on-non-task-responses"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/dispatch.ts",
+     "line": 362,
+     "quote": "const got = (await conn.request('tasks/get', {",
+     "id": "TS-DISPATCH-09"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "slow_compute",
+      "arguments": {
+       "seconds": 60,
+       "label": "rt-cancel"
+      }
+     },
+     "register": [
+      "TK-05"
+     ],
+     "suite_checks": [
+      "tasks-result-type-complete-on-non-task-responses"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "task"
+       },
+       {
+        "at": "/result/taskId",
+        "type": "string"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       },
+       {
+        "at": "/result/createdAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/lastUpdatedAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       }
+      ]
+     },
+     "capture": {
+      "long": "/result/taskId"
+     },
+     "file": "src/scenarios/server/tasks/dispatch.ts",
+     "line": 373,
+     "quote": "const longLived = (await conn.request('tools/call', {",
+     "id": "TS-DISPATCH-10"
+    },
+    {
+     "method": "tasks/cancel",
+     "params": {
+      "taskId": "${long}"
+     },
+     "register": [
+      "TK-09"
+     ],
+     "suite_checks": [
+      "tasks-result-type-complete-on-non-task-responses"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/dispatch.ts",
+     "line": 378,
+     "quote": "const cancelAck = (await conn.request('tasks/cancel', {",
+     "id": "TS-DISPATCH-11"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "confirm_delete",
+      "arguments": {
+       "filename": "rt.txt"
+      }
+     },
+     "register": [
+      "TK-05",
+      "TK-10"
+     ],
+     "suite_checks": [
+      "tasks-result-type-complete-on-non-task-responses"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "task"
+       },
+       {
+        "at": "/result/taskId",
+        "type": "string"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       },
+       {
+        "at": "/result/createdAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/lastUpdatedAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       }
+      ]
+     },
+     "capture": {
+      "parked": "/result/taskId"
+     },
+     "file": "src/scenarios/server/tasks/dispatch.ts",
+     "line": 389,
+     "quote": "const elicit = (await conn.request('tools/call', {",
+     "id": "TS-DISPATCH-12"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${parked}"
+     },
+     "register": [
+      "TK-10"
+     ],
+     "suite_checks": [
+      "tasks-result-type-complete-on-non-task-responses"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/status",
+        "eq": "input_required"
+       }
+      ]
+     },
+     "poll": {
+      "kind": "status",
+      "status": "input_required",
+      "interval_ms": 200,
+      "timeout_ms": 5000
+     },
+     "file": "src/scenarios/server/tasks/helpers.ts",
+     "line": 98,
+     "quote": "const task = (await conn.request('tasks/get', { taskId })) as any;",
+     "via": "src/scenarios/server/tasks/dispatch.ts",
+     "id": "TS-DISPATCH-13"
+    },
+    {
+     "method": "tasks/update",
+     "params": {
+      "taskId": "${parked}",
+      "inputResponses": {
+       "unknown-key": {
+        "ignored": true
+       }
+      }
+     },
+     "register": [
+      "TK-10"
+     ],
+     "suite_checks": [
+      "tasks-result-type-complete-on-non-task-responses"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/taskId",
+        "absent": true
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/dispatch.ts",
+     "line": 396,
+     "quote": "const updateAck = (await conn.request('tasks/update', {",
+     "id": "TS-DISPATCH-14"
+    },
+    {
+     "method": "tasks/cancel",
+     "params": {
+      "taskId": "${parked}"
+     },
+     "register": [
+      "TK-09"
+     ],
+     "suite_checks": [
+      "tasks-result-type-complete-on-non-task-responses"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/taskId",
+        "absent": true
+       },
+       {
+        "at": "/result/status",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/dispatch.ts",
+     "line": 406,
+     "quote": "await conn.request('tasks/cancel', { taskId: elicitTaskId });",
+     "id": "TS-DISPATCH-15"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "slow_compute",
+      "arguments": {
+       "seconds": 60,
+       "label": "consistency"
+      }
+     },
+     "register": [
+      "TK-05"
+     ],
+     "suite_checks": [
+      "sep-2663-durable-create-strong-consistency"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "task"
+       },
+       {
+        "at": "/result/taskId",
+        "type": "string"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       },
+       {
+        "at": "/result/createdAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/lastUpdatedAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       }
+      ]
+     },
+     "capture": {
+      "consistent": "/result/taskId"
+     },
+     "file": "src/scenarios/server/tasks/dispatch.ts",
+     "line": 432,
+     "quote": "const created = (await conn.request('tools/call', {",
+     "id": "TS-DISPATCH-16"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${consistent}"
+     },
+     "register": [
+      "TK-05"
+     ],
+     "suite_checks": [
+      "sep-2663-durable-create-strong-consistency"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/taskId",
+        "eq_var": "consistent"
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/dispatch.ts",
+     "line": 450,
+     "quote": "const got = (await conn.request('tasks/get', { taskId })) as any;",
+     "id": "TS-DISPATCH-17"
+    },
+    {
+     "method": "tasks/cancel",
+     "params": {
+      "taskId": "${consistent}"
+     },
+     "register": [
+      "TK-09"
+     ],
+     "suite_checks": [
+      "sep-2663-durable-create-strong-consistency"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/taskId",
+        "absent": true
+       },
+       {
+        "at": "/result/status",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/dispatch.ts",
+     "line": 459,
+     "quote": "await conn.request('tasks/cancel', { taskId });",
+     "id": "TS-DISPATCH-18"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "tasks-conformance-nonexistent-12345"
+     },
+     "register": [
+      "TK-08"
+     ],
+     "suite_checks": [
+      "sep-2663-tasks-get-invalid-task-id-32602"
+     ],
+     "expect": {
+      "status": 400,
+      "checks": [
+       {
+        "at": "/error/code",
+        "eq": -32602
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/dispatch.ts",
+     "line": 492,
+     "quote": "await conn.request(",
+     "id": "TS-DISPATCH-19"
+    }
+   ]
+  },
+  {
+   "id": "TS-MRTR-INPUT",
+   "scenario": "tasks-mrtr-input",
+   "file": "src/scenarios/server/tasks/mrtr-input.ts",
+   "sessions": {
+    "main": {
+     "elicitation": {},
+     "sampling": {},
+     "extensions": {
+      "io.modelcontextprotocol/tasks": {}
+     }
+    }
+   },
+   "steps": [
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "confirm_delete",
+      "arguments": {
+       "filename": "mrtr-input.txt"
+      }
+     },
+     "register": [
+      "TK-10"
+     ],
+     "suite_checks": [
+      "sep-2663-tasks-get-status-input-required"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "task"
+       },
+       {
+        "at": "/result/taskId",
+        "type": "string"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       },
+       {
+        "at": "/result/createdAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/lastUpdatedAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       }
+      ]
+     },
+     "capture": {
+      "task": "/result/taskId"
+     },
+     "file": "src/scenarios/server/tasks/mrtr-input.ts",
+     "line": 94,
+     "quote": "const created = (await conn.request('tools/call', {",
+     "id": "TS-MRTR-INPUT-01"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${task}"
+     },
+     "register": [
+      "TK-10"
+     ],
+     "suite_checks": [
+      "sep-2663-tasks-get-status-input-required"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/status",
+        "eq": "input_required"
+       },
+       {
+        "at": "/result/inputRequests",
+        "min_keys": 1
+       },
+       {
+        "at": "/result/inputRequests",
+        "each_value_has": [
+         "method"
+        ]
+       }
+      ]
+     },
+     "poll": {
+      "kind": "status",
+      "status": "input_required",
+      "interval_ms": 200,
+      "timeout_ms": 5000
+     },
+     "file": "src/scenarios/server/tasks/helpers.ts",
+     "line": 98,
+     "quote": "const task = (await conn.request('tasks/get', { taskId })) as any;",
+     "via": "src/scenarios/server/tasks/mrtr-input.ts",
+     "id": "TS-MRTR-INPUT-02"
+    },
+    {
+     "method": "tasks/cancel",
+     "params": {
+      "taskId": "${task}"
+     },
+     "register": [
+      "TK-09",
+      "TK-10"
+     ],
+     "suite_checks": [
+      "sep-2663-tasks-get-status-input-required"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/taskId",
+        "absent": true
+       },
+       {
+        "at": "/result/status",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/mrtr-input.ts",
+     "line": 143,
+     "quote": "await conn.request('tasks/cancel', { taskId });",
+     "id": "TS-MRTR-INPUT-03"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "confirm_delete",
+      "arguments": {
+       "filename": "mrtr-resume.txt"
+      }
+     },
+     "register": [
+      "TK-10"
+     ],
+     "suite_checks": [
+      "tasks-mrtr-tasks-update-resumes"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "task"
+       },
+       {
+        "at": "/result/taskId",
+        "type": "string"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       },
+       {
+        "at": "/result/createdAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/lastUpdatedAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       }
+      ]
+     },
+     "capture": {
+      "resume": "/result/taskId"
+     },
+     "file": "src/scenarios/server/tasks/mrtr-input.ts",
+     "line": 169,
+     "quote": "const created = (await conn.request('tools/call', {",
+     "id": "TS-MRTR-INPUT-04"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${resume}"
+     },
+     "register": [
+      "TK-10"
+     ],
+     "suite_checks": [
+      "tasks-mrtr-tasks-update-resumes"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/status",
+        "eq": "input_required"
+       }
+      ]
+     },
+     "capture_key": {
+      "var": "confirm_key",
+      "at": "/result/inputRequests",
+      "index": 0
+     },
+     "poll": {
+      "kind": "status",
+      "status": "input_required",
+      "interval_ms": 200,
+      "timeout_ms": 5000
+     },
+     "file": "src/scenarios/server/tasks/helpers.ts",
+     "line": 98,
+     "quote": "const task = (await conn.request('tasks/get', { taskId })) as any;",
+     "via": "src/scenarios/server/tasks/mrtr-input.ts",
+     "id": "TS-MRTR-INPUT-05"
+    },
+    {
+     "method": "tasks/update",
+     "params": {
+      "taskId": "${resume}",
+      "inputResponses": {
+       "${confirm_key}": {
+        "action": "accept",
+        "content": {
+         "confirm": true
+        }
+       }
+      }
+     },
+     "register": [
+      "TK-10"
+     ],
+     "suite_checks": [
+      "tasks-mrtr-tasks-update-resumes"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/taskId",
+        "absent": true
+       },
+       {
+        "at": "/result/status",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/mrtr-input.ts",
+     "line": 199,
+     "quote": "const ack = (await conn.request('tasks/update', {",
+     "id": "TS-MRTR-INPUT-06"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${resume}"
+     },
+     "register": [
+      "TK-10"
+     ],
+     "suite_checks": [
+      "tasks-mrtr-tasks-update-resumes"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/status",
+        "eq": "completed"
+       }
+      ]
+     },
+     "poll": {
+      "kind": "terminal",
+      "interval_ms": 200,
+      "timeout_ms": 10000
+     },
+     "file": "src/scenarios/server/tasks/helpers.ts",
+     "line": 78,
+     "quote": "const task = (await conn.request('tasks/get', { taskId })) as any;",
+     "via": "src/scenarios/server/tasks/mrtr-input.ts",
+     "id": "TS-MRTR-INPUT-07"
+    },
+    {
+     "method": "tools/call",
+     "params": {
+      "name": "multi_input",
+      "arguments": {}
+     },
+     "register": [
+      "TK-10"
+     ],
+     "suite_checks": [
+      "tasks-mrtr-partial-fulfillment"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "task"
+       },
+       {
+        "at": "/result/taskId",
+        "type": "string"
+       },
+       {
+        "at": "/result/status",
+        "type": "string"
+       },
+       {
+        "at": "/result/createdAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/lastUpdatedAt",
+        "iso8601": true
+       },
+       {
+        "at": "/result/task",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       },
+       {
+        "at": "/result/requestState",
+        "absent": true
+       }
+      ]
+     },
+     "capture": {
+      "multi": "/result/taskId"
+     },
+     "file": "src/scenarios/server/tasks/mrtr-input.ts",
+     "line": 249,
+     "quote": "const created = (await conn.request('tools/call', {",
+     "id": "TS-MRTR-INPUT-08"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${multi}"
+     },
+     "register": [
+      "TK-10"
+     ],
+     "suite_checks": [
+      "tasks-mrtr-partial-fulfillment"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/status",
+        "eq": "input_required"
+       },
+       {
+        "at": "/result/inputRequests",
+        "min_keys": 2
+       }
+      ]
+     },
+     "capture_key": {
+      "var": "first_key",
+      "at": "/result/inputRequests",
+      "index": 0
+     },
+     "file": "src/scenarios/server/tasks/mrtr-input.ts",
+     "line": 270,
+     "quote": "inputTask = (await conn.request('tasks/get', { taskId })) as any;",
+     "id": "TS-MRTR-INPUT-09"
+    },
+    {
+     "method": "tasks/update",
+     "params": {
+      "taskId": "${multi}",
+      "inputResponses": {
+       "${first_key}": {
+        "action": "accept",
+        "content": {
+         "name": "partial-1",
+         "confirm": true
+        }
+       }
+      }
+     },
+     "register": [
+      "TK-10"
+     ],
+     "suite_checks": [
+      "tasks-mrtr-partial-fulfillment"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/taskId",
+        "absent": true
+       },
+       {
+        "at": "/result/status",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/mrtr-input.ts",
+     "line": 295,
+     "quote": "const firstAck = (await conn.request('tasks/update', {",
+     "id": "TS-MRTR-INPUT-10"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${multi}"
+     },
+     "register": [
+      "TK-10"
+     ],
+     "suite_checks": [
+      "tasks-mrtr-partial-fulfillment"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/status",
+        "eq": "input_required"
+       },
+       {
+        "at": "/result/inputRequests",
+        "keys_exclude_var": "first_key"
+       },
+       {
+        "at": "/result/inputRequests",
+        "min_keys": 1
+       }
+      ]
+     },
+     "capture_key": {
+      "var": "second_key",
+      "at": "/result/inputRequests",
+      "index": 0
+     },
+     "file": "src/scenarios/server/tasks/mrtr-input.ts",
+     "line": 312,
+     "quote": "const afterFirst = (await conn.request('tasks/get', {",
+     "id": "TS-MRTR-INPUT-11"
+    },
+    {
+     "method": "tasks/update",
+     "params": {
+      "taskId": "${multi}",
+      "inputResponses": {
+       "${second_key}": {
+        "action": "accept",
+        "content": {
+         "name": "partial-2",
+         "confirm": true
+        }
+       }
+      }
+     },
+     "register": [
+      "TK-10"
+     ],
+     "suite_checks": [
+      "tasks-mrtr-partial-fulfillment"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/taskId",
+        "absent": true
+       },
+       {
+        "at": "/result/status",
+        "absent": true
+       },
+       {
+        "at": "/result/result",
+        "absent": true
+       },
+       {
+        "at": "/result/error",
+        "absent": true
+       },
+       {
+        "at": "/result/inputRequests",
+        "absent": true
+       }
+      ]
+     },
+     "file": "src/scenarios/server/tasks/mrtr-input.ts",
+     "line": 333,
+     "quote": "await conn.request('tasks/update', {",
+     "id": "TS-MRTR-INPUT-12"
+    },
+    {
+     "method": "tasks/get",
+     "params": {
+      "taskId": "${multi}"
+     },
+     "register": [
+      "TK-10"
+     ],
+     "suite_checks": [
+      "tasks-mrtr-partial-fulfillment"
+     ],
+     "expect": {
+      "status": 200,
+      "checks": [
+       {
+        "at": "/error",
+        "absent": true
+       },
+       {
+        "at": "/result/resultType",
+        "eq": "complete"
+       },
+       {
+        "at": "/result/status",
+        "eq": "completed"
+       }
+      ]
+     },
+     "poll": {
+      "kind": "terminal",
+      "interval_ms": 200,
+      "timeout_ms": 10000
+     },
+     "file": "src/scenarios/server/tasks/helpers.ts",
+     "line": 78,
+     "quote": "const task = (await conn.request('tasks/get', { taskId })) as any;",
+     "via": "src/scenarios/server/tasks/mrtr-input.ts",
+     "id": "TS-MRTR-INPUT-13"
+    }
+   ]
+  }
+ ],
+ "unreached": [
+  {
+   "id": "tasks-status-notifications",
+   "file": "src/scenarios/server/tasks/notifications.ts",
+   "reason": "The suite skips this scenario at the pinned commit: its run returns one SKIPPED check and sends no request, because notifications/tasks travels on the subscriptions/listen stream and the harness observes the POST response. The notification is modelled and tested here without a vector (TK-12)."
+  },
+  {
+   "id": "tasks-lifecycle-bootstrap",
+   "file": "src/scenarios/server/tasks/lifecycle.ts",
+   "reason": "Emitted only when the connection cannot be opened; no request of the scenario is sent."
+  },
+  {
+   "id": "tasks-capability-bootstrap",
+   "file": "src/scenarios/server/tasks/capability.ts",
+   "reason": "Emitted only when the connection cannot be opened; no request of the scenario is sent."
+  },
+  {
+   "id": "tasks-dispatch-bootstrap",
+   "file": "src/scenarios/server/tasks/dispatch.ts",
+   "reason": "Emitted only when the connection cannot be opened; no request of the scenario is sent."
+  },
+  {
+   "id": "tasks-headers-bootstrap",
+   "file": "src/scenarios/server/tasks/headers.ts",
+   "reason": "Emitted only when the connection cannot be opened; no request of the scenario is sent."
+  },
+  {
+   "id": "tasks-mrtr-input-bootstrap",
+   "file": "src/scenarios/server/tasks/mrtr-input.ts",
+   "reason": "Emitted only when the connection cannot be opened; no request of the scenario is sent."
+  },
+  {
+   "id": "tasks-request-state-bootstrap",
+   "file": "src/scenarios/server/tasks/request-state.ts",
+   "reason": "Emitted only when the connection cannot be opened; no request of the scenario is sent."
+  },
+  {
+   "id": "tasks-request-state-removal-setup",
+   "file": "src/scenarios/server/tasks/request-state.ts",
+   "reason": "Emitted only when slow_compute does not create a task; the first step of the script asserts that it does."
+  },
+  {
+   "id": "tasks-required-error-bootstrap",
+   "file": "src/scenarios/server/tasks/required-task-error.ts",
+   "reason": "Emitted only when the connection cannot be opened; no request of the scenario is sent."
+  },
+  {
+   "id": "tasks-wire-fields-bootstrap",
+   "file": "src/scenarios/server/tasks/wire-fields.ts",
+   "reason": "Emitted only when the connection cannot be opened; no request of the scenario is sent."
+  }
+ ]
+}

@@ -1,0 +1,473 @@
+\begin{lexlean}{TaskJson}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Input}
+\importmodule{Json}
+\importmodule{JsonRead}
+\importmodule{JsonRpc}
+\importmodule{JsonText}
+\importmodule{JsonWrite}
+\importmodule{RpcWire}
+\importmodule{Tasks}
+\title{MCP task wire}
+\begin{semanticmodule}
+definition{
+  name: intJson,
+  parameters: [value : Int],
+  result: Json::Json,
+  body: (ctor Json::Json.number (record Json::Decimal {mantissa := value, exponent := (0 : Int)})),
+  executable: true
+}
+
+definition{
+  name: textMember,
+  parameters: [key : String, value : (Option String)],
+  result: (List (String * Json::Json)),
+  body: (match value
+    | Option.none => (nil (String * Json::Json))
+    | Option.some content => (cons (key, (ctor Json::Json.text content)) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: intMember,
+  parameters: [key : String, value : (Option Int)],
+  result: (List (String * Json::Json)),
+  body: (match value
+    | Option.none => (nil (String * Json::Json))
+    | Option.some whole => (cons (key, (intJson whole)) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: limitJson,
+  parameters: [value : (Option Int)],
+  result: Json::Json,
+  body: (match value
+    | Option.none => (ctor Json::Json.null)
+    | Option.some whole => (intJson whole)),
+  executable: true
+}
+
+definition{
+  name: taskMembers,
+  parameters: [fields : Tasks::TaskFields, status : String],
+  result: (List (String * Json::Json)),
+  body: (cons ("taskId", (ctor Json::Json.text (project fields taskId))) (cons ("status", (ctor Json::Json.text status)) (prim append (textMember "statusMessage" (project fields statusMessage)) (cons ("createdAt", (ctor Json::Json.text (project fields createdAt))) (cons ("lastUpdatedAt", (ctor Json::Json.text (project fields lastUpdatedAt))) (cons ("ttlMs", (limitJson (project fields ttlMs))) (intMember "pollIntervalMs" (project fields pollIntervalMs))))) : (List (String * Json::Json))))),
+  executable: true
+}
+
+definition{
+  name: elicitMembers,
+  parameters: [params : Input::ElicitRequestParams],
+  result: (List (String * Json::Json)),
+  body: (match params
+    | Input::ElicitRequestParams.form found => (prim append (match (project found mode)
+      | Option.none => (nil (String * Json::Json))
+      | Option.some chosen => (cons ("mode", (ctor Json::Json.text "form")) (nil (String * Json::Json)))) (cons ("message", (ctor Json::Json.text (project found message))) (cons ("requestedSchema", (ctor Json::Json.object (project (project found requestedSchema) members))) (nil (String * Json::Json)))) : (List (String * Json::Json)))
+    | Input::ElicitRequestParams.url found => (cons ("mode", (ctor Json::Json.text "url")) (cons ("message", (ctor Json::Json.text (project found message))) (cons ("url", (ctor Json::Json.text (project found url))) (nil (String * Json::Json)))))),
+  executable: true
+}
+
+definition{
+  name: requestJson,
+  parameters: [request : Input::InputRequest],
+  result: (Option Json::Json),
+  body: (match request
+    | Input::InputRequest.elicitation params => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("method", (ctor Json::Json.text "elicitation/create")) (cons ("params", (ctor Json::Json.object (elicitMembers params))) (nil (String * Json::Json))))))
+    | Input::InputRequest.sampling params => (ctor Option.none [Json::Json])
+    | Input::InputRequest.roots params => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("method", (ctor Json::Json.text "roots/list")) (match params
+      | Option.none => (nil (String * Json::Json))
+      | Option.some given => (cons ("params", (ctor Json::Json.object (project given members))) (nil (String * Json::Json)))))))),
+  executable: true
+}
+
+definition{
+  name: requestsOnto,
+  parameters: [
+    requests : (List (String * Input::InputRequest)),
+    built : (List (String * Json::Json))
+  ],
+  result: (Option (List (String * Json::Json))),
+  body: (match requests
+    | List.nil => (ctor Option.some [(List (String * Json::Json))] built)
+    | List.cons head rest => (match (requestJson (second head))
+      | Option.none => (ctor Option.none [(List (String * Json::Json))])
+      | Option.some encoded => (requestsOnto rest (cons ((first head), encoded) built)))),
+  executable: true,
+  recursive_argument: requests
+}
+
+definition{
+  name: requestsJson,
+  parameters: [requests : (List (String * Input::InputRequest))],
+  result: (Option Json::Json),
+  body: (match (requestsOnto requests (nil (String * Json::Json)))
+    | Option.none => (ctor Option.none [Json::Json])
+    | Option.some built => (ctor Option.some [Json::Json] (ctor Json::Json.object (JsonRead::reverseOnto [(String * Json::Json)] built (nil (String * Json::Json)))))),
+  executable: true
+}
+
+definition{
+  name: extraMembers,
+  parameters: [task : Tasks::DetailedTask],
+  result: (Option (List (String * Json::Json))),
+  body: (match task
+    | Tasks::DetailedTask.working fields => (ctor Option.some [(List (String * Json::Json))] (nil (String * Json::Json)))
+    | Tasks::DetailedTask.input_required fields requests => (match (requestsJson requests)
+      | Option.none => (ctor Option.none [(List (String * Json::Json))])
+      | Option.some encoded => (ctor Option.some [(List (String * Json::Json))] (cons ("inputRequests", encoded) (nil (String * Json::Json)))))
+    | Tasks::DetailedTask.completed fields result => (ctor Option.some [(List (String * Json::Json))] (cons ("result", (ctor Json::Json.object (project result members))) (nil (String * Json::Json))))
+    | Tasks::DetailedTask.failed fields error => (ctor Option.some [(List (String * Json::Json))] (cons ("error", (RpcWire::errorObjectJson error)) (nil (String * Json::Json))))
+    | Tasks::DetailedTask.cancelled fields => (ctor Option.some [(List (String * Json::Json))] (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: detailedMembers,
+  parameters: [task : Tasks::DetailedTask],
+  result: (Option (List (String * Json::Json))),
+  body: (match (extraMembers task)
+    | Option.none => (ctor Option.none [(List (String * Json::Json))])
+    | Option.some extra => (ctor Option.some [(List (String * Json::Json))] (prim append (taskMembers (Tasks::fieldsOf task) (Tasks::taskStatusWire (Tasks::statusOf task))) extra : (List (String * Json::Json))))),
+  executable: true
+}
+
+definition{
+  name: storedMembers,
+  parameters: [found : Tasks::StoredTask],
+  result: (Option (List (String * Json::Json))),
+  body: (match (project found shape)
+    | Tasks::StoredShape.read => (detailedMembers (project (project found entry) task))
+    | Tasks::StoredShape.acked => (ctor Option.some [(List (String * Json::Json))] (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: inputRequiredMembers,
+  parameters: [found : Input::InputRequiredResult],
+  result: (Option (List (String * Json::Json))),
+  body: (match (requestsJson (Input::requestsOf found))
+    | Option.none => (ctor Option.none [(List (String * Json::Json))])
+    | Option.some encoded => (ctor Option.some [(List (String * Json::Json))] (prim append (match (Input::requestsOf found)
+      | List.nil => (nil (String * Json::Json))
+      | List.cons head rest => (cons ("inputRequests", encoded) (nil (String * Json::Json)))) (textMember "requestState" (Input::stateOf found)) : (List (String * Json::Json))))),
+  executable: true
+}
+
+definition{
+  name: outcomeJson,
+  parameters: [outcome : Tasks::PlanOutcome],
+  result: Json::Json,
+  body: (match outcome
+    | Tasks::PlanOutcome.completes found => (ctor Json::Json.object (cons ("completes", (ctor Json::Json.object (project found members))) (nil (String * Json::Json))))
+    | Tasks::PlanOutcome.fails error => (ctor Json::Json.object (cons ("fails", (RpcWire::errorObjectJson error)) (nil (String * Json::Json))))),
+  executable: true
+}
+
+definition{
+  name: planJson,
+  parameters: [plan : Tasks::TaskPlan],
+  result: (Option Json::Json),
+  body: (match (requestsJson (project plan parked))
+    | Option.none => (ctor Option.none [Json::Json])
+    | Option.some parked => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("parkAfterMs", (intJson (project plan parkAfterMs))) (cons ("parked", parked) (cons ("finishAfterMs", (intJson (project plan finishAfterMs))) (cons ("outcome", (outcomeJson (project plan outcome))) (nil (String * Json::Json))))))))),
+  executable: true
+}
+
+definition{
+  name: entryJson,
+  parameters: [entry : Tasks::TaskEntry],
+  result: (Option Json::Json),
+  body: (match (detailedMembers (project entry task))
+    | Option.none => (ctor Option.none [Json::Json])
+    | Option.some members => (match (planJson (project entry plan))
+      | Option.none => (ctor Option.none [Json::Json])
+      | Option.some plan => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("task", (ctor Json::Json.object members)) (cons ("createdMs", (intJson (project entry createdMs))) (cons ("plan", plan) (nil (String * Json::Json))))))))),
+  executable: true
+}
+
+definition{
+  name: entriesOnto,
+  parameters: [entries : (List Tasks::TaskEntry), built : (List Json::Json)],
+  result: (Option (List Json::Json)),
+  body: (match entries
+    | List.nil => (ctor Option.some [(List Json::Json)] built)
+    | List.cons head rest => (match (entryJson head)
+      | Option.none => (ctor Option.none [(List Json::Json)])
+      | Option.some encoded => (entriesOnto rest (cons encoded built)))),
+  executable: true,
+  recursive_argument: entries
+}
+
+definition{
+  name: tableJson,
+  parameters: [entries : (List Tasks::TaskEntry)],
+  result: (Option Json::Json),
+  body: (match (entriesOnto entries (nil Json::Json))
+    | Option.none => (ctor Option.none [Json::Json])
+    | Option.some built => (ctor Option.some [Json::Json] (ctor Json::Json.array (JsonRead::reverseOnto [Json::Json] built (nil Json::Json))))),
+  executable: true
+}
+
+definition{
+  name: tableBytes,
+  parameters: [entries : (List Tasks::TaskEntry)],
+  result: (Option (List Nat)),
+  body: (match (tableJson entries)
+    | Option.none => (ctor Option.none [(List Nat)])
+    | Option.some encoded => (match (JsonWrite::writeList encoded)
+      | Result.error refusal => (ctor Option.none [(List Nat)])
+      | Result.ok produced => (ctor Option.some [(List Nat)] produced))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: textAt,
+  parameters: [key : String, object : Json::JsonObject],
+  result: (Option String),
+  body: (match (Json::lookup key object)
+    | Json::Lookup.absent => (ctor Option.none [String])
+    | Json::Lookup.present value => (Json::asText value)),
+  executable: true
+}
+
+definition{
+  name: objectAt,
+  parameters: [key : String, object : Json::JsonObject],
+  result: (Option Json::JsonObject),
+  body: (match (Json::lookup key object)
+    | Json::Lookup.absent => (ctor Option.none [Json::JsonObject])
+    | Json::Lookup.present value => (Json::asObject value)),
+  executable: true
+}
+
+definition{
+  name: intAt,
+  parameters: [key : String, object : Json::JsonObject],
+  result: (Option Int),
+  body: (match (Json::lookup key object)
+    | Json::Lookup.absent => (ctor Option.none [Int])
+    | Json::Lookup.present value => (Json::asInteger value)),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: elicitationOf,
+  parameters: [params : Json::JsonObject],
+  result: (Option Input::InputRequest),
+  body: (match (textAt "message" params)
+    | Option.none => (ctor Option.none [Input::InputRequest])
+    | Option.some message => (match (Json::lookup "mode" params)
+      | Json::Lookup.absent => (match (objectAt "requestedSchema" params)
+        | Option.none => (ctor Option.none [Input::InputRequest])
+        | Option.some schema => (ctor Option.some [Input::InputRequest] (ctor Input::InputRequest.elicitation (ctor Input::ElicitRequestParams.form (record Input::ElicitFormParams {mode := (ctor Option.none [Input::ElicitFormMode]), message := message, requestedSchema := schema})))))
+      | Json::Lookup.present chosen => (match (Json::asText chosen)
+        | Option.none => (ctor Option.none [Input::InputRequest])
+        | Option.some wire => (if (prim equal wire "url" : Bool) then (match (textAt "url" params)
+          | Option.none => (ctor Option.none [Input::InputRequest])
+          | Option.some target => (ctor Option.some [Input::InputRequest] (ctor Input::InputRequest.elicitation (ctor Input::ElicitRequestParams.url (record Input::ElicitUrlParams {message := message, url := target}))))) else (if (prim equal wire "form" : Bool) then (match (objectAt "requestedSchema" params)
+          | Option.none => (ctor Option.none [Input::InputRequest])
+          | Option.some schema => (ctor Option.some [Input::InputRequest] (ctor Input::InputRequest.elicitation (ctor Input::ElicitRequestParams.form (record Input::ElicitFormParams {mode := (ctor Option.some [Input::ElicitFormMode] (ctor Input::ElicitFormMode.form)), message := message, requestedSchema := schema}))))) else (ctor Option.none [Input::InputRequest])))))),
+  executable: true
+}
+
+definition{
+  name: rootsOf,
+  parameters: [object : Json::JsonObject],
+  result: (Option Input::InputRequest),
+  body: (match (Json::lookup "params" object)
+    | Json::Lookup.absent => (ctor Option.some [Input::InputRequest] (ctor Input::InputRequest.roots (ctor Option.none [Json::JsonObject])))
+    | Json::Lookup.present value => (match (Json::asObject value)
+      | Option.none => (ctor Option.none [Input::InputRequest])
+      | Option.some given => (ctor Option.some [Input::InputRequest] (ctor Input::InputRequest.roots (ctor Option.some [Json::JsonObject] given))))),
+  executable: true
+}
+
+definition{
+  name: requestOf,
+  parameters: [value : Json::Json],
+  result: (Option Input::InputRequest),
+  body: (match (Json::asObject value)
+    | Option.none => (ctor Option.none [Input::InputRequest])
+    | Option.some object => (match (textAt "method" object)
+      | Option.none => (ctor Option.none [Input::InputRequest])
+      | Option.some method => (if (prim equal method "elicitation/create" : Bool) then (match (objectAt "params" object)
+        | Option.none => (ctor Option.none [Input::InputRequest])
+        | Option.some params => (elicitationOf params)) else (if (prim equal method "roots/list" : Bool) then (rootsOf object) else (ctor Option.none [Input::InputRequest]))))),
+  executable: true
+}
+
+definition{
+  name: requestsFrom,
+  parameters: [
+    members : (List (String * Json::Json)),
+    built : (List (String * Input::InputRequest))
+  ],
+  result: (Option (List (String * Input::InputRequest))),
+  body: (match members
+    | List.nil => (ctor Option.some [(List (String * Input::InputRequest))] (JsonRead::reverseOnto [(String * Input::InputRequest)] built (nil (String * Input::InputRequest))))
+    | List.cons head rest => (match (requestOf (second head))
+      | Option.none => (ctor Option.none [(List (String * Input::InputRequest))])
+      | Option.some decoded => (requestsFrom rest (cons ((first head), decoded) built)))),
+  executable: true,
+  recursive_argument: members
+}
+
+definition{
+  name: requestsAt,
+  parameters: [key : String, object : Json::JsonObject],
+  result: (Option (List (String * Input::InputRequest))),
+  body: (match (objectAt key object)
+    | Option.none => (ctor Option.none [(List (String * Input::InputRequest))])
+    | Option.some found => (requestsFrom (project found members) (nil (String * Input::InputRequest)))),
+  executable: true
+}
+
+definition{
+  name: errorOf,
+  parameters: [object : Json::JsonObject],
+  result: (Option JsonRpc::ErrorObject),
+  body: (match (intAt "code" object)
+    | Option.none => (ctor Option.none [JsonRpc::ErrorObject])
+    | Option.some code => (match (textAt "message" object)
+      | Option.none => (ctor Option.none [JsonRpc::ErrorObject])
+      | Option.some message => (ctor Option.some [JsonRpc::ErrorObject] (record JsonRpc::ErrorObject {code := code, message := message, data := (match (Json::lookup "data" object)
+        | Json::Lookup.absent => (ctor Option.none [Json::Json])
+        | Json::Lookup.present value => (ctor Option.some [Json::Json] value))})))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: fieldsFrom,
+  parameters: [object : Json::JsonObject],
+  result: (Option Tasks::TaskFields),
+  body: (match (textAt "taskId" object)
+    | Option.none => (ctor Option.none [Tasks::TaskFields])
+    | Option.some taskId => (match (textAt "createdAt" object)
+      | Option.none => (ctor Option.none [Tasks::TaskFields])
+      | Option.some createdAt => (match (textAt "lastUpdatedAt" object)
+        | Option.none => (ctor Option.none [Tasks::TaskFields])
+        | Option.some lastUpdatedAt => (ctor Option.some [Tasks::TaskFields] (record Tasks::TaskFields {taskId := taskId, statusMessage := (textAt "statusMessage" object), createdAt := createdAt, lastUpdatedAt := lastUpdatedAt, ttlMs := (intAt "ttlMs" object), pollIntervalMs := (intAt "pollIntervalMs" object)}))))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: taskFrom,
+  parameters: [object : Json::JsonObject],
+  result: (Option Tasks::DetailedTask),
+  body: (match (fieldsFrom object)
+    | Option.none => (ctor Option.none [Tasks::DetailedTask])
+    | Option.some fields => (match (textAt "status" object)
+      | Option.none => (ctor Option.none [Tasks::DetailedTask])
+      | Option.some status => (if (prim equal status "working" : Bool) then (ctor Option.some [Tasks::DetailedTask] (ctor Tasks::DetailedTask.working fields)) else (if (prim equal status "cancelled" : Bool) then (ctor Option.some [Tasks::DetailedTask] (ctor Tasks::DetailedTask.cancelled fields)) else (if (prim equal status "input_required" : Bool) then (match (requestsAt "inputRequests" object)
+        | Option.none => (ctor Option.none [Tasks::DetailedTask])
+        | Option.some requests => (ctor Option.some [Tasks::DetailedTask] (ctor Tasks::DetailedTask.input_required fields requests))) else (if (prim equal status "completed" : Bool) then (match (objectAt "result" object)
+        | Option.none => (ctor Option.none [Tasks::DetailedTask])
+        | Option.some result => (ctor Option.some [Tasks::DetailedTask] (ctor Tasks::DetailedTask.completed fields result))) else (if (prim equal status "failed" : Bool) then (match (objectAt "error" object)
+        | Option.none => (ctor Option.none [Tasks::DetailedTask])
+        | Option.some failure => (match (errorOf failure)
+          | Option.none => (ctor Option.none [Tasks::DetailedTask])
+          | Option.some error => (ctor Option.some [Tasks::DetailedTask] (ctor Tasks::DetailedTask.failed fields error)))) else (ctor Option.none [Tasks::DetailedTask])))))))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: outcomeFrom,
+  parameters: [object : Json::JsonObject],
+  result: (Option Tasks::PlanOutcome),
+  body: (match (objectAt "completes" object)
+    | Option.some found => (ctor Option.some [Tasks::PlanOutcome] (ctor Tasks::PlanOutcome.completes found))
+    | Option.none => (match (objectAt "fails" object)
+      | Option.none => (ctor Option.none [Tasks::PlanOutcome])
+      | Option.some failure => (match (errorOf failure)
+        | Option.none => (ctor Option.none [Tasks::PlanOutcome])
+        | Option.some error => (ctor Option.some [Tasks::PlanOutcome] (ctor Tasks::PlanOutcome.fails error))))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: planFrom,
+  parameters: [object : Json::JsonObject],
+  result: (Option Tasks::TaskPlan),
+  body: (match (intAt "parkAfterMs" object)
+    | Option.none => (ctor Option.none [Tasks::TaskPlan])
+    | Option.some parkAfterMs => (match (requestsAt "parked" object)
+      | Option.none => (ctor Option.none [Tasks::TaskPlan])
+      | Option.some parked => (match (intAt "finishAfterMs" object)
+        | Option.none => (ctor Option.none [Tasks::TaskPlan])
+        | Option.some finishAfterMs => (match (objectAt "outcome" object)
+          | Option.none => (ctor Option.none [Tasks::TaskPlan])
+          | Option.some wrapped => (match (outcomeFrom wrapped)
+            | Option.none => (ctor Option.none [Tasks::TaskPlan])
+            | Option.some outcome => (ctor Option.some [Tasks::TaskPlan] (record Tasks::TaskPlan {parkAfterMs := parkAfterMs, parked := parked, finishAfterMs := finishAfterMs, outcome := outcome}))))))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: entryFrom,
+  parameters: [value : Json::Json],
+  result: (Option Tasks::TaskEntry),
+  body: (match (Json::asObject value)
+    | Option.none => (ctor Option.none [Tasks::TaskEntry])
+    | Option.some object => (match (objectAt "task" object)
+      | Option.none => (ctor Option.none [Tasks::TaskEntry])
+      | Option.some taskObject => (match (taskFrom taskObject)
+        | Option.none => (ctor Option.none [Tasks::TaskEntry])
+        | Option.some task => (match (intAt "createdMs" object)
+          | Option.none => (ctor Option.none [Tasks::TaskEntry])
+          | Option.some createdMs => (match (objectAt "plan" object)
+            | Option.none => (ctor Option.none [Tasks::TaskEntry])
+            | Option.some planObject => (match (planFrom planObject)
+              | Option.none => (ctor Option.none [Tasks::TaskEntry])
+              | Option.some plan => (ctor Option.some [Tasks::TaskEntry] (record Tasks::TaskEntry {task := task, createdMs := createdMs, plan := plan})))))))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: entriesFrom,
+  parameters: [items : (List Json::Json), built : (List Tasks::TaskEntry)],
+  result: (Option (List Tasks::TaskEntry)),
+  body: (match items
+    | List.nil => (ctor Option.some [(List Tasks::TaskEntry)] (JsonRead::reverseOnto [Tasks::TaskEntry] built (nil Tasks::TaskEntry)))
+    | List.cons head rest => (match (entryFrom head)
+      | Option.none => (ctor Option.none [(List Tasks::TaskEntry)])
+      | Option.some decoded => (entriesFrom rest (cons decoded built)))),
+  axioms: [propext],
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: readTable,
+  parameters: [source : Bytes],
+  result: (Option (List Tasks::TaskEntry)),
+  body: (if ((prim length source : Nat) =? 0) then (ctor Option.some [(List Tasks::TaskEntry)] (nil Tasks::TaskEntry)) else (match (JsonRead::readJson source)
+    | Result.error refusal => (ctor Option.none [(List Tasks::TaskEntry)])
+    | Result.ok parsed => (match (Json::asArray parsed)
+      | Option.none => (ctor Option.none [(List Tasks::TaskEntry)])
+      | Option.some items => (entriesFrom items (nil Tasks::TaskEntry))))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: notificationJson,
+  parameters: [task : Tasks::DetailedTask],
+  result: (Option Json::Json),
+  body: (match (detailedMembers task)
+    | Option.none => (ctor Option.none [Json::Json])
+    | Option.some members => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("jsonrpc", (ctor Json::Json.text "2.0")) (cons ("method", (ctor Json::Json.text "notifications/tasks")) (cons ("params", (ctor Json::Json.object members)) (nil (String * Json::Json)))))))),
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

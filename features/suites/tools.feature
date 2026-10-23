@@ -4,7 +4,7 @@ Feature: Tools
 
   @TL-01 @build
   Scenario: tools/list answers with the tool catalog in its fixed declaration order, every tool with a name of 1 to 64 characters from A-Z, a-z, 0-9, underscore, dot and hyphen (the intersection of the specification and of the suite check), a description and an inputSchema, and an outputSchema when it declares one; the catalog is one page, so a request that carries a cursor is refused as invalidParams (-32602); a kernel-checked theorem states the order.
-    Given the fixture catalog of eighteen tools
+    Given the fixture catalog of twenty-five tools
     When tools/list is requested, with and without a cursor
     Then the names are the catalog's in its declared order, every tool has the members and the name format, and a cursor is refused as -32602
 

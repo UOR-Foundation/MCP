@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-task-serving"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "TaskServe"
+component = "TaskServe"
+
+[[form]]
+id = "mcp-task-serving"
+channel = "text"
+surface = "MCP task serving"
+canonical_source = true
+features = ["sentence-case", "singular"]

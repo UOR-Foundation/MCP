@@ -542,7 +542,8 @@ inductive{
     {name: getTask, fields: [Tasks::DetailedTask]},
     {name: acknowledged, fields: []},
     {name: inputRequired, fields: [Input::InputRequiredResult]},
-    {name: taskCreated, fields: [Tasks::CreateTaskResult]}
+    {name: taskCreated, fields: [Tasks::CreateTaskResult]},
+    {name: stored, fields: [Tasks::StoredTask]}
   ]
 }
 
@@ -564,7 +565,31 @@ definition{
     | ResultBody.getTask task => (ctor Meta::ResultType.complete)
     | ResultBody.acknowledged => (ctor Meta::ResultType.complete)
     | ResultBody.inputRequired pending => (ctor Meta::ResultType.input_required)
-    | ResultBody.taskCreated created => (ctor Meta::ResultType.task)),
+    | ResultBody.taskCreated created => (ctor Meta::ResultType.task)
+    | ResultBody.stored found => (ctor Meta::ResultType.complete)),
+  executable: true
+}
+
+definition{
+  name: storedOf,
+  parameters: [body : ResultBody],
+  result: (Option Tasks::StoredTask),
+  body: (match body
+    | ResultBody.discover result => (ctor Option.none [Tasks::StoredTask])
+    | ResultBody.listTools result => (ctor Option.none [Tasks::StoredTask])
+    | ResultBody.callTool result => (ctor Option.none [Tasks::StoredTask])
+    | ResultBody.progressed result => (ctor Option.none [Tasks::StoredTask])
+    | ResultBody.listResources result => (ctor Option.none [Tasks::StoredTask])
+    | ResultBody.readResource result => (ctor Option.none [Tasks::StoredTask])
+    | ResultBody.listResourceTemplates result => (ctor Option.none [Tasks::StoredTask])
+    | ResultBody.listPrompts result => (ctor Option.none [Tasks::StoredTask])
+    | ResultBody.getPrompt result => (ctor Option.none [Tasks::StoredTask])
+    | ResultBody.complete result => (ctor Option.none [Tasks::StoredTask])
+    | ResultBody.getTask task => (ctor Option.none [Tasks::StoredTask])
+    | ResultBody.acknowledged => (ctor Option.none [Tasks::StoredTask])
+    | ResultBody.inputRequired pending => (ctor Option.none [Tasks::StoredTask])
+    | ResultBody.taskCreated created => (ctor Option.some [Tasks::StoredTask] (record Tasks::StoredTask {entry := (project created entry), shape := (ctor Tasks::StoredShape.read), changed := false}))
+    | ResultBody.stored found => (ctor Option.some [Tasks::StoredTask] found)),
   executable: true
 }
 
@@ -608,7 +633,8 @@ definition{
     | ResultBody.getTask task => false
     | ResultBody.acknowledged => false
     | ResultBody.inputRequired pending => false
-    | ResultBody.taskCreated created => false),
+    | ResultBody.taskCreated created => false
+    | ResultBody.stored found => false),
   executable: true
 }
 
@@ -631,7 +657,8 @@ theorem{
       {proof: reflexivity{}, binders: [task], constructor: getTask},
       {proof: reflexivity{}, binders: [], constructor: acknowledged},
       {proof: reflexivity{}, binders: [pending], constructor: inputRequired},
-      {proof: reflexivity{}, binders: [created], constructor: taskCreated}
+      {proof: reflexivity{}, binders: [created], constructor: taskCreated},
+      {proof: reflexivity{}, binders: [found], constructor: stored}
     ],
     scrutinee: body
   }
