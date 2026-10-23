@@ -15,8 +15,10 @@
 // The package carries its own lint table (`warnings = deny`, `clippy::all = deny`
 // with ten named exceptions) and is clean under it as a crate. Included here as a
 // module it inherits this workspace's table instead, so the same ten exceptions are
-// named, plus the two the include itself causes: items nothing here calls, and no
-// documentation on generated items.
+// named, plus `infallible_destructuring_match` (a pair is a one-constructor type that the
+// export destructures with a match; the resource catalogs are lists of pairs), and the two
+// the include itself causes: items nothing here calls, and no documentation on generated
+// items.
 #[allow(
     dead_code,
     unused,
@@ -31,7 +33,8 @@
     clippy::manual_unwrap_or_default,
     clippy::manual_map,
     clippy::manual_ok_err,
-    clippy::collapsible_match
+    clippy::collapsible_match,
+    clippy::infallible_destructuring_match
 )]
 #[rustfmt::skip]
 #[path = "../generated/mcp_lifecycle/src/lib.rs"]
@@ -52,7 +55,8 @@ mod lifecycle;
     clippy::manual_unwrap_or_default,
     clippy::manual_map,
     clippy::manual_ok_err,
-    clippy::collapsible_match
+    clippy::collapsible_match,
+    clippy::infallible_destructuring_match
 )]
 #[rustfmt::skip]
 #[path = "../generated/mcp_crowd/src/lib.rs"]
