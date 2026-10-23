@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-catalog-admission"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Admission"
+component = "Admission"
+
+[[form]]
+id = "mcp-catalog-admission"
+channel = "text"
+surface = "MCP catalog admission"
+canonical_source = true
+features = ["sentence-case", "singular"]

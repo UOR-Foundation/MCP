@@ -15,6 +15,8 @@ definition{name: badRequestStatus, parameters: [], result: Nat, body: 400, execu
 
 definition{name: notFoundStatus, parameters: [], result: Nat, body: 404, executable: true}
 
+definition{name: tooManyRequestsStatus, parameters: [], result: Nat, body: 429, executable: true}
+
 definition{name: methodNotAllowedStatus, parameters: [], result: Nat, body: 405, executable: true}
 
 definition{name: serverErrorStatus, parameters: [], result: Nat, body: 500, executable: true}
@@ -29,6 +31,9 @@ definition{
     | Refusal::ProviderRefusal.resourceNotFound uri => (badRequestStatus)
     | Refusal::ProviderRefusal.unknownTask taskId => (badRequestStatus)
     | Refusal::ProviderRefusal.invalidArguments reason => (badRequestStatus)
+    | Refusal::ProviderRefusal.invalidCursor cursor => (badRequestStatus)
+    | Refusal::ProviderRefusal.badToolOutput reason => (serverErrorStatus)
+    | Refusal::ProviderRefusal.rateLimited limit => (tooManyRequestsStatus)
     | Refusal::ProviderRefusal.missingCapability required => (badRequestStatus)
     | Refusal::ProviderRefusal.internal reason => (serverErrorStatus)),
   executable: true
@@ -61,7 +66,7 @@ definition{
   name: statusForCode,
   parameters: [code : Int],
   result: Nat,
-  body: (if (Json::isZero (prim subtract code (JsonRpc::methodNotFoundCode) : Int)) then (notFoundStatus) else (if (Json::isZero (prim subtract code (JsonRpc::internalErrorCode) : Int)) then (serverErrorStatus) else (badRequestStatus))),
+  body: (if (Json::isZero (prim subtract code (JsonRpc::methodNotFoundCode) : Int)) then (notFoundStatus) else (if (Json::isZero (prim subtract code (JsonRpc::internalErrorCode) : Int)) then (serverErrorStatus) else (if (Json::isZero (prim subtract code (JsonRpc::rateLimitedCode) : Int)) then (tooManyRequestsStatus) else (badRequestStatus)))),
   axioms: [propext],
   executable: true
 }
@@ -143,6 +148,9 @@ theorem{
             {proof: reflexivity{}, binders: [uri], constructor: resourceNotFound},
             {proof: reflexivity{}, binders: [taskId], constructor: unknownTask},
             {proof: reflexivity{}, binders: [reason], constructor: invalidArguments},
+            {proof: reflexivity{}, binders: [cursor], constructor: invalidCursor},
+            {proof: reflexivity{}, binders: [reason], constructor: badToolOutput},
+            {proof: reflexivity{}, binders: [limit], constructor: rateLimited},
             {proof: reflexivity{}, binders: [required], constructor: missingCapability},
             {proof: reflexivity{}, binders: [reason], constructor: internal}
           ],
@@ -202,6 +210,35 @@ theorem{
   parameters: [],
   statement: (((statusForCode (JsonRpc::parseErrorCode)) = 400) /\ ((statusForCode (JsonRpc::invalidRequestCode)) = 400)),
   proof: decide{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_rate_limit_is_too_many_requests,
+  parameters: [limit : Nat],
+  statement: ((statusOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.rateLimited limit))) = 429),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_invalid_cursor_is_a_bad_request,
+  parameters: [cursor : String],
+  statement: ((statusOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.invalidCursor cursor))) = 400),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_refused_tool_output_is_a_server_error,
+  parameters: [reason : String],
+  statement: ((statusOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.badToolOutput reason))) = 500),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_rate_limit_code_has_status_429,
+  parameters: [],
+  statement: ((statusForCode (JsonRpc::rateLimitedCode)) = 429),
+  proof: reflexivity{},
   axioms: [propext]
 }
 \end{semanticmodule}

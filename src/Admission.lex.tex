@@ -1,0 +1,744 @@
+\begin{lexlean}{Admission}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Common}
+\importmodule{Content}
+\importmodule{Extension}
+\importmodule{Json}
+\importmodule{JsonRead}
+\importmodule{JsonText}
+\importmodule{Schema}
+\title{MCP catalog admission}
+\begin{semanticmodule}
+inductive{
+  name: AdmitFault,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: nameInvalid, fields: [String]},
+    {name: nameDuplicate, fields: [String]},
+    {name: dialectUnsupported, fields: [String]},
+    {name: rootNotObject, fields: [String]},
+    {name: keywordUnsupported, fields: [String, String]},
+    {name: keywordMalformed, fields: [String, String]},
+    {name: referenceUnresolved, fields: [String, String]},
+    {name: headerNotText, fields: [String]},
+    {name: headerEmpty, fields: [String]},
+    {name: headerNotToken, fields: [String]},
+    {name: headerUnreachable, fields: [String]},
+    {name: headerType, fields: [String]},
+    {name: headerDuplicate, fields: [String, String]}
+  ]
+}
+
+inductive{
+  name: Visit,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: visit, fields: [Json::Json, Bool, (List String)]}]
+}
+
+structure{
+  name: Acc,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: rules, type: (List Extension::ParamRule)}, {name: seen, type: (List (List Nat))}]
+}
+
+definition{name: admitBudget, parameters: [], result: Nat, body: 67108864, executable: true}
+
+definition{name: maxNameLength, parameters: [], result: Nat, body: 64, executable: true}
+
+definition{
+  name: unsupportedKeywords,
+  parameters: [],
+  result: (List String),
+  body: (cons "pattern" (cons "patternProperties" (cons "propertyNames" (cons "multipleOf" (cons "uniqueItems" (cons "contains" (cons "minContains" (cons "maxContains" (cons "prefixItems" (cons "dependentRequired" (cons "dependentSchemas" (cons "dependencies" (cons "additionalItems" (cons "unevaluatedProperties" (cons "unevaluatedItems" (cons "$dynamicRef" (cons "$dynamicAnchor" (cons "$id" (cons "$vocabulary" (cons "contentEncoding" (cons "contentMediaType" (cons "contentSchema" (nil String))))))))))))))))))))))),
+  executable: true
+}
+
+definition{
+  name: shapeTable,
+  parameters: [],
+  result: (List (String * Nat)),
+  body: (cons ("$schema", 0) (cons ("$ref", 0) (cons ("$anchor", 0) (cons ("$comment", 0) (cons ("title", 0) (cons ("description", 0) (cons ("format", 0) (cons ("type", 7) (cons ("enum", 3) (cons ("required", 5) (cons ("properties", 4) (cons ("$defs", 4) (cons ("allOf", 8) (cons ("anyOf", 8) (cons ("oneOf", 8) (cons ("minimum", 1) (cons ("maximum", 1) (cons ("exclusiveMinimum", 1) (cons ("exclusiveMaximum", 1) (cons ("minItems", 2) (cons ("maxItems", 2) (cons ("minLength", 2) (cons ("maxLength", 2) (cons ("minProperties", 2) (cons ("maxProperties", 2) (cons ("deprecated", 6) (cons ("readOnly", 6) (cons ("writeOnly", 6) (nil (String * Nat)))))))))))))))))))))))))))))),
+  executable: true
+}
+
+definition{
+  name: allTexts,
+  parameters: [items : (List Json::Json)],
+  result: Bool,
+  body: (match items
+    | List.nil => true
+    | List.cons head tail => (match (Json::asText head)
+      | Option.none => false
+      | Option.some name => (allTexts tail))),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: allTypeNames,
+  parameters: [items : (List Json::Json)],
+  result: Bool,
+  body: (match items
+    | List.nil => true
+    | List.cons head tail => (match (Json::asText head)
+      | Option.none => false
+      | Option.some name => (if (Schema::validTypeName name) then (allTypeNames tail) else false))),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: okText,
+  parameters: [value : Json::Json],
+  result: Bool,
+  body: (match (Json::asText value) | Option.none => false | Option.some content => true),
+  executable: true
+}
+
+definition{
+  name: okNumber,
+  parameters: [value : Json::Json],
+  result: Bool,
+  body: (match (Json::asNumber value) | Option.none => false | Option.some amount => true),
+  executable: true
+}
+
+definition{
+  name: okCount,
+  parameters: [value : Json::Json],
+  result: Bool,
+  body: (match (Json::asInteger value)
+    | Option.none => false
+    | Option.some whole => (not (prim less_than whole (0 : Int) : Bool))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: okArray,
+  parameters: [value : Json::Json],
+  result: Bool,
+  body: (match (Json::asArray value) | Option.none => false | Option.some items => true),
+  executable: true
+}
+
+definition{
+  name: okObject,
+  parameters: [value : Json::Json],
+  result: Bool,
+  body: (match (Json::asObject value) | Option.none => false | Option.some table => true),
+  executable: true
+}
+
+definition{
+  name: okTexts,
+  parameters: [value : Json::Json],
+  result: Bool,
+  body: (match (Json::asArray value)
+    | Option.none => false
+    | Option.some items => (allTexts items)),
+  executable: true
+}
+
+definition{
+  name: okBool,
+  parameters: [value : Json::Json],
+  result: Bool,
+  body: (match (Json::asBool value) | Option.none => false | Option.some flag => true),
+  executable: true
+}
+
+definition{
+  name: okType,
+  parameters: [value : Json::Json],
+  result: Bool,
+  body: (match (Json::asText value)
+    | Option.some name => (Schema::validTypeName name)
+    | Option.none => (match (Json::asArray value)
+      | Option.none => false
+      | Option.some names => (allTypeNames names))),
+  executable: true
+}
+
+definition{
+  name: okSchemas,
+  parameters: [value : Json::Json],
+  result: Bool,
+  body: (match (Json::asArray value)
+    | Option.none => false
+    | Option.some items => (match items | List.nil => false | List.cons head tail => true)),
+  executable: true
+}
+
+definition{
+  name: shapeOk,
+  parameters: [code : Nat, value : Json::Json],
+  result: Bool,
+  body: (if (code =? 0) then (okText value) else (if (code =? 1) then (okNumber value) else (if (code =? 2) then (okCount value) else (if (code =? 3) then (okArray value) else (if (code =? 4) then (okObject value) else (if (code =? 5) then (okTexts value) else (if (code =? 6) then (okBool value) else (if (code =? 7) then (okType value) else (okSchemas value))))))))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: shapeProblem,
+  parameters: [table : (List (String * Nat)), members : (List (String * Json::Json))],
+  result: (Option String),
+  body: (match table
+    | List.nil => (ctor Option.none [String])
+    | List.cons entry rest => (match (Json::lookupIn (first entry) members)
+      | Json::Lookup.absent => (shapeProblem rest members)
+      | Json::Lookup.present value => (if (shapeOk (second entry) value) then (shapeProblem rest members) else (ctor Option.some [String] (first entry))))),
+  axioms: [propext],
+  executable: true,
+  recursive_argument: table
+}
+
+definition{
+  name: unsupportedIn,
+  parameters: [table : (List String), members : (List (String * Json::Json))],
+  result: (Option String),
+  body: (match table
+    | List.nil => (ctor Option.none [String])
+    | List.cons keyword rest => (match (Json::lookupIn keyword members)
+      | Json::Lookup.absent => (unsupportedIn rest members)
+      | Json::Lookup.present value => (ctor Option.some [String] keyword))),
+  executable: true,
+  recursive_argument: table
+}
+
+definition{
+  name: isTchar,
+  parameters: [byte : Nat],
+  result: Bool,
+  body: (((48 <=? byte) && (byte <=? 57)) || (((65 <=? byte) && (byte <=? 90)) || (((97 <=? byte) && (byte <=? 122)) || ((byte =? 33) || ((byte =? 35) || ((byte =? 36) || ((byte =? 37) || ((byte =? 38) || ((byte =? 39) || ((byte =? 42) || ((byte =? 43) || ((byte =? 45) || ((byte =? 46) || ((byte =? 94) || ((byte =? 95) || ((byte =? 96) || ((byte =? 124) || (byte =? 126)))))))))))))))))),
+  executable: true
+}
+
+definition{
+  name: isNameByte,
+  parameters: [byte : Nat],
+  result: Bool,
+  body: (((48 <=? byte) && (byte <=? 57)) || (((65 <=? byte) && (byte <=? 90)) || (((97 <=? byte) && (byte <=? 122)) || ((byte =? 95) || ((byte =? 45) || (byte =? 46)))))),
+  executable: true
+}
+
+definition{
+  name: allBytes,
+  parameters: [bytes : (List Nat), token : Bool],
+  result: Bool,
+  body: (match bytes
+    | List.nil => true
+    | List.cons byte rest => (if (if token then (isTchar byte) else (isNameByte byte)) then (allBytes rest token) else false)),
+  executable: true,
+  recursive_argument: bytes
+}
+
+definition{
+  name: lowerBytes,
+  parameters: [bytes : (List Nat), built : (List Nat)],
+  result: (List Nat),
+  body: (match bytes
+    | List.nil => built
+    | List.cons byte rest => (if ((65 <=? byte) && (byte <=? 90)) then (lowerBytes rest (cons (byte + 32) built)) else (lowerBytes rest (cons byte built)))),
+  executable: true,
+  recursive_argument: bytes
+}
+
+definition{
+  name: loweredBytes,
+  parameters: [bytes : (List Nat)],
+  result: (List Nat),
+  body: (JsonRead::reverseOnto [Nat] (lowerBytes bytes (nil Nat)) (nil Nat)),
+  executable: true
+}
+
+definition{
+  name: bytesOf,
+  parameters: [text : String],
+  result: (List Nat),
+  body: (JsonText::bytesToList (prim utf8_encode text : Bytes)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: seenBefore,
+  parameters: [name : String, seen : (List String)],
+  result: Bool,
+  body: (match seen
+    | List.nil => false
+    | List.cons head tail => (if (prim equal name head : Bool) then true else (seenBefore name tail))),
+  executable: true,
+  recursive_argument: seen
+}
+
+definition{
+  name: sameBytes,
+  parameters: [left : (List Nat), right : (List Nat)],
+  result: Bool,
+  body: (match left
+    | List.nil => (match right | List.nil => true | List.cons other more => false)
+    | List.cons byte rest => (match right
+      | List.nil => false
+      | List.cons other more => (if (byte =? other) then (sameBytes rest more) else false))),
+  executable: true,
+  recursive_argument: left
+}
+
+definition{
+  name: seenBytes,
+  parameters: [folded : (List Nat), seen : (List (List Nat))],
+  result: Bool,
+  body: (match seen
+    | List.nil => false
+    | List.cons head tail => (if (sameBytes folded head) then true else (seenBytes folded tail))),
+  executable: true,
+  recursive_argument: seen
+}
+
+definition{
+  name: nameProblemBytes,
+  parameters: [bytes : (List Nat)],
+  result: Bool,
+  body: (match bytes
+    | List.nil => true
+    | List.cons head tail => (not ((allBytes bytes false) && ((prim length bytes : Nat) <=? (maxNameLength))))),
+  executable: true
+}
+
+definition{
+  name: nameFault,
+  parameters: [name : String, bytes : (List Nat)],
+  result: (Option AdmitFault),
+  body: (if (nameProblemBytes bytes) then (ctor Option.some [AdmitFault] (ctor AdmitFault.nameInvalid name)) else (ctor Option.none [AdmitFault])),
+  executable: true
+}
+
+definition{
+  name: kindOfType,
+  parameters: [name : String],
+  result: (Option Common::ParamKind),
+  body: (if (prim equal name "string" : Bool) then (ctor Option.some [Common::ParamKind] (ctor Common::ParamKind.text)) else (if (prim equal name "integer" : Bool) then (ctor Option.some [Common::ParamKind] (ctor Common::ParamKind.integer)) else (if (prim equal name "boolean" : Bool) then (ctor Option.some [Common::ParamKind] (ctor Common::ParamKind.boolean)) else (ctor Option.none [Common::ParamKind])))),
+  executable: true
+}
+
+definition{
+  name: nodeKind,
+  parameters: [members : (List (String * Json::Json))],
+  result: (Option Common::ParamKind),
+  body: (match (Json::lookupIn "type" members)
+    | Json::Lookup.absent => (ctor Option.none [Common::ParamKind])
+    | Json::Lookup.present declared => (match (Json::asText declared)
+      | Option.none => (ctor Option.none [Common::ParamKind])
+      | Option.some name => (kindOfType name))),
+  executable: true
+}
+
+inductive{
+  name: HeaderStep,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: refused, fields: [AdmitFault]}, {name: accepted, fields: [Acc]}]
+}
+
+definition{
+  name: headerTextStep,
+  parameters: [
+    tool : String,
+    members : (List (String * Json::Json)),
+    header : String,
+    bytes : (List Nat),
+    path : (List String),
+    acc : Acc
+  ],
+  result: HeaderStep,
+  body: (match bytes
+    | List.nil => (ctor HeaderStep.refused (ctor AdmitFault.headerEmpty tool))
+    | List.cons head tail => (if (allBytes bytes true) then (match (nodeKind members)
+      | Option.none => (ctor HeaderStep.refused (ctor AdmitFault.headerType tool))
+      | Option.some kind => (let folded : (List Nat) := (loweredBytes bytes); (if (seenBytes folded (project acc seen)) then (ctor HeaderStep.refused (ctor AdmitFault.headerDuplicate tool header)) else (ctor HeaderStep.accepted (record Acc {rules := (cons (record Extension::ParamRule {tool := tool, header := header, path := (JsonRead::reverseOnto [String] path (nil String)), kind := kind}) (project acc rules)), seen := (cons folded (project acc seen))}))))) else (ctor HeaderStep.refused (ctor AdmitFault.headerNotToken tool)))),
+  executable: true
+}
+
+definition{
+  name: headerStep,
+  parameters: [
+    tool : String,
+    members : (List (String * Json::Json)),
+    declared : Json::Json,
+    static : Bool,
+    path : (List String),
+    acc : Acc
+  ],
+  result: HeaderStep,
+  body: (if static then (match (Json::asText declared)
+    | Option.none => (ctor HeaderStep.refused (ctor AdmitFault.headerNotText tool))
+    | Option.some header => (headerTextStep tool members header (bytesOf header) path acc)) else (ctor HeaderStep.refused (ctor AdmitFault.headerUnreachable tool))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: afterHeader,
+  parameters: [
+    tool : String,
+    members : (List (String * Json::Json)),
+    static : Bool,
+    path : (List String),
+    acc : Acc
+  ],
+  result: HeaderStep,
+  body: (match (Json::lookupIn "x-mcp-header" members)
+    | Json::Lookup.absent => (ctor HeaderStep.accepted acc)
+    | Json::Lookup.present declared => (headerStep tool members declared static path acc)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: propertyTasks,
+  parameters: [
+    entries : (List (String * Json::Json)),
+    static : Bool,
+    path : (List String),
+    built : (List Visit)
+  ],
+  result: (List Visit),
+  body: (match entries
+    | List.nil => built
+    | List.cons entry rest => (propertyTasks rest static path (cons (ctor Visit.visit (second entry) static (cons (first entry) path)) built))),
+  executable: true,
+  recursive_argument: entries
+}
+
+definition{
+  name: valueTasks,
+  parameters: [entries : (List (String * Json::Json)), built : (List Visit)],
+  result: (List Visit),
+  body: (match entries
+    | List.nil => built
+    | List.cons entry rest => (valueTasks rest (cons (ctor Visit.visit (second entry) false (nil String)) built))),
+  executable: true,
+  recursive_argument: entries
+}
+
+definition{
+  name: itemTasks,
+  parameters: [items : (List Json::Json), built : (List Visit)],
+  result: (List Visit),
+  body: (match items
+    | List.nil => built
+    | List.cons head tail => (itemTasks tail (cons (ctor Visit.visit head false (nil String)) built))),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: tableTasks,
+  parameters: [
+    key : String,
+    members : (List (String * Json::Json)),
+    static : Bool,
+    path : (List String),
+    built : (List Visit)
+  ],
+  result: (List Visit),
+  body: (match (Json::lookupIn key members)
+    | Json::Lookup.absent => built
+    | Json::Lookup.present declared => (match (Json::asObject declared)
+      | Option.none => built
+      | Option.some table => (if (prim equal key "properties" : Bool) then (propertyTasks (project table members) static path built) else (valueTasks (project table members) built)))),
+  executable: true
+}
+
+definition{
+  name: singleTask,
+  parameters: [key : String, members : (List (String * Json::Json)), built : (List Visit)],
+  result: (List Visit),
+  body: (match (Json::lookupIn key members)
+    | Json::Lookup.absent => built
+    | Json::Lookup.present declared => (cons (ctor Visit.visit declared false (nil String)) built)),
+  executable: true
+}
+
+definition{
+  name: listTasks,
+  parameters: [key : String, members : (List (String * Json::Json)), built : (List Visit)],
+  result: (List Visit),
+  body: (match (Json::lookupIn key members)
+    | Json::Lookup.absent => built
+    | Json::Lookup.present declared => (match (Json::asArray declared)
+      | Option.none => built
+      | Option.some items => (itemTasks items built))),
+  executable: true
+}
+
+definition{
+  name: childTasks,
+  parameters: [
+    members : (List (String * Json::Json)),
+    static : Bool,
+    path : (List String),
+    rest : (List Visit)
+  ],
+  result: (List Visit),
+  body: (tableTasks "properties" members static path (tableTasks "$defs" members false (nil String) (singleTask "items" members (singleTask "additionalProperties" members (listTasks "allOf" members (listTasks "anyOf" members (listTasks "oneOf" members (singleTask "not" members (singleTask "if" members (singleTask "then" members (singleTask "else" members rest))))))))))),
+  executable: true
+}
+
+definition{
+  name: referenceFault,
+  parameters: [tool : String, root : Json::Json, members : (List (String * Json::Json))],
+  result: (Option AdmitFault),
+  body: (match (Json::lookupIn "$ref" members)
+    | Json::Lookup.absent => (ctor Option.none [AdmitFault])
+    | Json::Lookup.present declared => (match (Json::asText declared)
+      | Option.none => (ctor Option.none [AdmitFault])
+      | Option.some target => (match (Schema::resolve root target)
+        | Option.none => (ctor Option.some [AdmitFault] (ctor AdmitFault.referenceUnresolved tool target))
+        | Option.some found => (ctor Option.none [AdmitFault])))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: nodeFault,
+  parameters: [tool : String, root : Json::Json, members : (List (String * Json::Json))],
+  result: (Option AdmitFault),
+  body: (match (unsupportedIn (unsupportedKeywords) members)
+    | Option.some keyword => (ctor Option.some [AdmitFault] (ctor AdmitFault.keywordUnsupported tool keyword))
+    | Option.none => (match (shapeProblem (shapeTable) members)
+      | Option.some keyword => (ctor Option.some [AdmitFault] (ctor AdmitFault.keywordMalformed tool keyword))
+      | Option.none => (referenceFault tool root members))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: visitNode,
+  parameters: [
+    tool : String,
+    root : Json::Json,
+    members : (List (String * Json::Json)),
+    static : Bool,
+    path : (List String),
+    acc : Acc,
+    rest : (List Visit)
+  ],
+  result: (Result ((List Visit) * Acc) AdmitFault),
+  body: (match (nodeFault tool root members)
+    | Option.some fault => (ctor Result.error [((List Visit) * Acc), AdmitFault] fault)
+    | Option.none => (match (afterHeader tool members static path acc)
+      | HeaderStep.refused fault => (ctor Result.error [((List Visit) * Acc), AdmitFault] fault)
+      | HeaderStep.accepted grown => (ctor Result.ok [((List Visit) * Acc), AdmitFault] ((childTasks members static path rest), grown)))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: visitStep,
+  parameters: [tool : String, root : Json::Json, task : Visit, acc : Acc, rest : (List Visit)],
+  result: (Result ((List Visit) * Acc) AdmitFault),
+  body: (match task
+    | Visit.visit schema static path => (match (Json::asBool schema)
+      | Option.some flag => (ctor Result.ok [((List Visit) * Acc), AdmitFault] (rest, acc))
+      | Option.none => (match (Json::asObject schema)
+        | Option.none => (ctor Result.error [((List Visit) * Acc), AdmitFault] (ctor AdmitFault.keywordMalformed tool "schema"))
+        | Option.some declared => (visitNode tool root (project declared members) static path acc rest)))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: walkLoop,
+  parameters: [fuel : Nat, tool : String, root : Json::Json, tasks : (List Visit), acc : Acc],
+  result: (Result Acc AdmitFault),
+  body: (match fuel
+    | Nat.zero => (ctor Result.error [Acc, AdmitFault] (ctor AdmitFault.keywordMalformed tool "budget"))
+    | Nat.succ below => (match tasks
+      | List.nil => (ctor Result.ok [Acc, AdmitFault] acc)
+      | List.cons task rest => (match (visitStep tool root task acc rest)
+        | Result.error fault => (ctor Result.error [Acc, AdmitFault] fault)
+        | Result.ok moved => (walkLoop below tool root (first moved) (second moved))))),
+  axioms: [Quot.sound, propext],
+  executable: true,
+  recursive_argument: fuel
+}
+
+definition{
+  name: dialectFault,
+  parameters: [tool : String, members : (List (String * Json::Json))],
+  result: (Option AdmitFault),
+  body: (match (Json::lookupIn "$schema" members)
+    | Json::Lookup.absent => (ctor Option.none [AdmitFault])
+    | Json::Lookup.present declared => (match (Json::asText declared)
+      | Option.none => (ctor Option.some [AdmitFault] (ctor AdmitFault.dialectUnsupported tool))
+      | Option.some uri => (if (prim equal uri (Schema::dialect) : Bool) then (ctor Option.none [AdmitFault]) else (ctor Option.some [AdmitFault] (ctor AdmitFault.dialectUnsupported tool))))),
+  executable: true
+}
+
+definition{
+  name: rootTypeFault,
+  parameters: [tool : String, members : (List (String * Json::Json))],
+  result: (Option AdmitFault),
+  body: (match (Json::lookupIn "type" members)
+    | Json::Lookup.absent => (ctor Option.some [AdmitFault] (ctor AdmitFault.rootNotObject tool))
+    | Json::Lookup.present declared => (match (Json::asText declared)
+      | Option.none => (ctor Option.some [AdmitFault] (ctor AdmitFault.rootNotObject tool))
+      | Option.some name => (if (prim equal name "object" : Bool) then (ctor Option.none [AdmitFault]) else (ctor Option.some [AdmitFault] (ctor AdmitFault.rootNotObject tool))))),
+  executable: true
+}
+
+definition{
+  name: inputFault,
+  parameters: [tool : Content::Tool],
+  result: (Option AdmitFault),
+  body: (match (rootTypeFault (project tool name) (project (project tool inputSchema) members))
+    | Option.some fault => (ctor Option.some [AdmitFault] fault)
+    | Option.none => (dialectFault (project tool name) (project (project tool inputSchema) members))),
+  executable: true
+}
+
+definition{
+  name: noAcc,
+  parameters: [],
+  result: Acc,
+  body: (record Acc {rules := (nil Extension::ParamRule), seen := (nil (List Nat))}),
+  executable: true
+}
+
+definition{
+  name: outputAdmitted,
+  parameters: [tool : Content::Tool],
+  result: (Option AdmitFault),
+  body: (match (project tool outputSchema)
+    | Option.none => (ctor Option.none [AdmitFault])
+    | Option.some declared => (match (dialectFault (project tool name) (project declared members))
+      | Option.some fault => (ctor Option.some [AdmitFault] fault)
+      | Option.none => (match (walkLoop (admitBudget) (project tool name) (ctor Json::Json.object (project declared members)) (cons (ctor Visit.visit (ctor Json::Json.object (project declared members)) false (nil String)) (nil Visit)) (noAcc))
+        | Result.error fault => (ctor Option.some [AdmitFault] fault)
+        | Result.ok walked => (ctor Option.none [AdmitFault])))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: afterInput,
+  parameters: [tool : Content::Tool, walked : (Result Acc AdmitFault)],
+  result: (Result (List Extension::ParamRule) AdmitFault),
+  body: (match walked
+    | Result.error fault => (ctor Result.error [(List Extension::ParamRule), AdmitFault] fault)
+    | Result.ok acc => (match (outputAdmitted tool)
+      | Option.some fault => (ctor Result.error [(List Extension::ParamRule), AdmitFault] fault)
+      | Option.none => (ctor Result.ok [(List Extension::ParamRule), AdmitFault] (JsonRead::reverseOnto [Extension::ParamRule] (project acc rules) (nil Extension::ParamRule))))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: admitShape,
+  parameters: [tool : Content::Tool],
+  result: (Result (List Extension::ParamRule) AdmitFault),
+  body: (match (inputFault tool)
+    | Option.some fault => (ctor Result.error [(List Extension::ParamRule), AdmitFault] fault)
+    | Option.none => (afterInput tool (walkLoop (admitBudget) (project tool name) (ctor Json::Json.object (project (project tool inputSchema) members)) (cons (ctor Visit.visit (ctor Json::Json.object (project (project tool inputSchema) members)) true (nil String)) (nil Visit)) (noAcc)))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: admitTool,
+  parameters: [tool : Content::Tool],
+  result: (Result (List Extension::ParamRule) AdmitFault),
+  body: (match (nameFault (project tool name) (bytesOf (project tool name)))
+    | Option.some fault => (ctor Result.error [(List Extension::ParamRule), AdmitFault] fault)
+    | Option.none => (admitShape tool)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: duplicateOf,
+  parameters: [tools : (List Content::Tool), seen : (List String)],
+  result: (Option String),
+  body: (match tools
+    | List.nil => (ctor Option.none [String])
+    | List.cons head rest => (if (seenBefore (project head name) seen) then (ctor Option.some [String] (project head name)) else (duplicateOf rest (cons (project head name) seen)))),
+  executable: true,
+  recursive_argument: tools
+}
+
+definition{
+  name: catalogLoop,
+  parameters: [tools : (List Content::Tool), rules : (List Extension::ParamRule)],
+  result: (Result (List Extension::ParamRule) AdmitFault),
+  body: (match tools
+    | List.nil => (ctor Result.ok [(List Extension::ParamRule), AdmitFault] (JsonRead::reverseOnto [Extension::ParamRule] rules (nil Extension::ParamRule)))
+    | List.cons head rest => (match (admitTool head)
+      | Result.error fault => (ctor Result.error [(List Extension::ParamRule), AdmitFault] fault)
+      | Result.ok found => (catalogLoop rest (JsonRead::reverseOnto [Extension::ParamRule] found rules)))),
+  axioms: [Quot.sound, propext],
+  executable: true,
+  recursive_argument: tools
+}
+
+definition{
+  name: duplicateFault,
+  parameters: [tools : (List Content::Tool)],
+  result: (Option AdmitFault),
+  body: (match (duplicateOf tools (nil String))
+    | Option.some name => (ctor Option.some [AdmitFault] (ctor AdmitFault.nameDuplicate name))
+    | Option.none => (ctor Option.none [AdmitFault])),
+  executable: true
+}
+
+definition{
+  name: admitCatalog,
+  parameters: [tools : (List Content::Tool)],
+  result: (Result (List Extension::ParamRule) AdmitFault),
+  body: (match (duplicateFault tools)
+    | Option.some fault => (ctor Result.error [(List Extension::ParamRule), AdmitFault] fault)
+    | Option.none => (catalogLoop tools (nil Extension::ParamRule))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: rulesOf,
+  parameters: [tools : (List Content::Tool)],
+  result: (List Extension::ParamRule),
+  body: (match (admitCatalog tools)
+    | Result.ok rules => rules
+    | Result.error fault => (nil Extension::ParamRule)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: faultText,
+  parameters: [fault : AdmitFault],
+  result: String,
+  body: (match fault
+    | AdmitFault.nameInvalid tool => (prim join (cons "tool name is not 1 to 64 characters of letters, digits, underscore, hyphen and dot:" (cons tool (nil String))) " " : String)
+    | AdmitFault.nameDuplicate tool => (prim join (cons "tool name is used twice:" (cons tool (nil String))) " " : String)
+    | AdmitFault.dialectUnsupported tool => (prim join (cons "the schema dialect of tool" (cons tool (cons "is not JSON Schema 2020-12" (nil String)))) " " : String)
+    | AdmitFault.rootNotObject tool => (prim join (cons "the input schema of tool" (cons tool (cons "does not have type object" (nil String)))) " " : String)
+    | AdmitFault.keywordUnsupported tool keyword => (prim join (cons "tool" (cons tool (cons "uses the unsupported schema keyword" (cons keyword (nil String))))) " " : String)
+    | AdmitFault.keywordMalformed tool keyword => (prim join (cons "tool" (cons tool (cons "has a malformed schema keyword" (cons keyword (nil String))))) " " : String)
+    | AdmitFault.referenceUnresolved tool target => (prim join (cons "tool" (cons tool (cons "has an unresolved reference" (cons target (nil String))))) " " : String)
+    | AdmitFault.headerNotText tool => (prim join (cons "tool" (cons tool (cons "has an x-mcp-header that is not text" (nil String)))) " " : String)
+    | AdmitFault.headerEmpty tool => (prim join (cons "tool" (cons tool (cons "has an empty x-mcp-header" (nil String)))) " " : String)
+    | AdmitFault.headerNotToken tool => (prim join (cons "tool" (cons tool (cons "has an x-mcp-header that is not an HTTP field name" (nil String)))) " " : String)
+    | AdmitFault.headerUnreachable tool => (prim join (cons "tool" (cons tool (cons "has an x-mcp-header that is not reached through properties alone" (nil String)))) " " : String)
+    | AdmitFault.headerType tool => (prim join (cons "tool" (cons tool (cons "has an x-mcp-header on a parameter that is not a string, integer or boolean" (nil String)))) " " : String)
+    | AdmitFault.headerDuplicate tool header => (prim join (cons "tool" (cons tool (cons "repeats the x-mcp-header" (cons header (nil String))))) " " : String)),
+  axioms: [propext],
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

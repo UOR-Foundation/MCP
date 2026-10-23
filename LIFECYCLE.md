@@ -30,7 +30,7 @@ then params.
 | `crates/lifecycle-oracle/tests/schema.rs`, `tests/common/mod.rs` | LC-15: every response a test produces is validated against the specification's JSON Schema |
 | `crates/lifecycle-oracle/tests/stress.rs` | LC-16: the largest frames the tests build, on a 2 MiB stack |
 | `crates/lifecycle-oracle/suite/mcp-spec-80041ab0a139a8f4fb3adbc99f7ae9113ea59671` | the vendored `schema/2026-07-28/schema.json` and the licence |
-| `crates/lifecycle-oracle/suite/conformance-232a9014457eaf4c59559916e3d616d2f7f28f05` | the five vendored suite files |
+| `crates/lifecycle-oracle/suite/conformance-232a9014457eaf4c59559916e3d616d2f7f28f05` | the eight vendored suite files |
 
 Regenerate the package after any change to the sources (it verifies the project first,
 which takes about ten minutes on two cores):
@@ -66,17 +66,33 @@ u32 field_count
   u32 name_length     name              repeated field_count times, in the order received
   u32 value_length    value
 u32 body_length       body
+u32 tool_calls                          the host's count of tool calls for this client in the current window
 ```
 
-and nothing after the body. A response frame:
+and nothing after the count. A response frame:
 
 ```
 u32 status
 u32 field_count
   u32 name_length     name              repeated field_count times
   u32 value_length    value
+u32 notification_count
+  u32 length          notification      one compact JSON-RPC notification, repeated notification_count times
 u32 body_length       body
 ```
+
+`tool_calls` is the one input the core cannot compute, because it is state: how many
+`tools/call` requests the host has already admitted for this client in the current
+rate-limit window, not counting this one. The adapter owns the window and the client
+identity (the connection, a token subject or an address); the core only compares the count
+with `rate.tool_calls`, the limit the provider declares ([TOOLS.md](TOOLS.md#the-rate-limit)).
+An adapter with no limit sends 0.
+
+The notifications are the progress notifications the core produced while answering a
+`tools/call` whose `_meta` carries a `progressToken`. They are not part of the body: the
+`Content-Type` of the response stays `application/json`, and an adapter that finds
+notifications sends the exchange as a stream, the notifications first and the body last
+(`text/event-stream`, issue #11). The core never encodes SSE.
 
 The core decides every status and every field of the response. The adapter:
 
@@ -91,6 +107,8 @@ The core decides every status and every field of the response. The adapter:
   The stack the root needs does not depend on the frame ([The stack](#the-stack)): the
   export states no `recursion` effect and no function of the package calls itself except
   as a loop;
+* counts the tool calls it admits per client and window and passes the count in
+  `tool_calls`, and sends the response as a stream when `notification_count` is not 0;
 * treats a response with status 500 and the fixed internal-error body as the core's
   answer to a frame it could not read (a truncated frame or trailing bytes).
 
@@ -112,6 +130,9 @@ horizontal tab; any other byte makes the field malformed, which is `headerMismat
 | a header absent, repeated, malformed or different from the body | -32020 | 400 |
 | a protocol version the server does not support | -32022, `data.supported`, `data.requested` | 400 |
 | a client capability the request needs and the client did not declare | -32021, `data.requiredCapabilities` | 400 |
+| a tool the catalog does not list, a `tools/call` without a text name or with non-object arguments, a cursor | -32602 | 400 |
+| a tool result the core will not write: `structuredContent` missing or not conforming to the `outputSchema`, a payload that is not canonical Base64, progress that does not increase | -32603, no `data` | 500 |
+| a `tools/call` when the host's count is at or over the limit | 429, `data.limit` | 429 |
 | a method the server does not offer | -32601 | 404 |
 | a request method other than POST | none; `Allow: POST` | 405 |
 | a frame the core cannot read, or a message it cannot encode | -32603, no `id` member | 500 |
@@ -137,8 +158,8 @@ are axiom-free and seven, the ones about `statusForCode`, use `propext` only.
 | `Mcp-Param-*` | only the headers a `ParamRule` names are recognized; others are ignored. A body value that is present and not null must be matched by the header; null or absent means the header is not expected (and one sent anyway is not compared, but is still refused when malformed) |
 | Integer parameters | the header is a decimal integer with an optional minus sign; the body number must be a whole number within 2^53 - 1; the comparison is numeric, so `10.0` and `1e1` in the body match `10` |
 | Boolean parameters | the header is exactly `true` or `false` |
-| `paramRules` | first-order data supplied by the provider; deriving them from `x-mcp-header` in tool schemas is for #8 |
-| Result bodies encoded | `server/discover`, `tools/list`, `tools/call` (text content blocks only); a body the encoder does not cover is a 500, so #8 to #12 each add theirs |
+| `paramRules` | first-order data in `ProviderInfo`; the fixture derives them from the `x-mcp-header` annotations of its catalog (`Admission.rulesOf`, [TOOLS.md](TOOLS.md)) |
+| Result bodies encoded | `server/discover`, `tools/list`, `tools/call` (every content block of the schema: text, image, audio, resource link, embedded resource; `structuredContent`; `isError`); a body the encoder does not cover is a 500, so #9 to #12 each add theirs |
 | Provider | a record of functions cannot be an exported root's parameter in LexLean 1.2, so `Dispatch.handleWith` takes `ProviderInfo` (data) and one answer function; `Dispatch.handle` is `handleWith` over a `Provider` and keeps every earlier theorem |
 
 ## Evidence
@@ -189,7 +210,7 @@ absent at the commit that bumped the package to 0.2.0-alpha.10 (`468e535`); the 
 own comment names alpha.10 as its anchor, and between those two commits only lines
 889 to 900 of `stateless.ts` changed, inside a streaming probe that is not run here.
 The authority row `A-MCP-CONFORMANCE` records the commit and a manifest checksum over
-the five vendored files.
+the eight vendored files.
 
 Not run, with the owning issue (listed in the vectors file as `not_run`): the six
 `listenToStream` probes of `server-stateless` (lines 887, 947, 1037, 1144, 1209 and
@@ -344,8 +365,8 @@ and `cargo clippy --workspace --all-targets -- -D warnings` pass.
   sees it. Here every response is validated against the specification's JSON Schema
   (LC-15) by another validator, which is falsifying evidence; the suite's validator has
   not been run on the answers since the by-hand check was removed.
-* The tools in the fixture are a test double for the pinned scenarios. The tool layer is
-  #8; `ParamRule`s are given, not derived from `x-mcp-header`.
+* The tools in the fixture are a test double for the pinned scenarios; the tool layer
+  that serves them is described in [TOOLS.md](TOOLS.md).
 * The universal statement "every request the root accepts has every check true" is not
   proved. The theorems are about the status mapping, the check order, the header and
   Base64 examples from the scenarios and the earlier model; the pipeline over bytes is

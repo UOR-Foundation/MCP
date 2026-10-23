@@ -5,6 +5,7 @@
 \importmodule{Capabilities}
 \importmodule{Json}
 \importmodule{JsonRpc}
+\importmodule{Numeric}
 \importmodule{JsonRead}
 \title{MCP typed refusals}
 \begin{semanticmodule}
@@ -65,6 +66,9 @@ inductive{
     {name: resourceNotFound, fields: [String]},
     {name: unknownTask, fields: [String]},
     {name: invalidArguments, fields: [String]},
+    {name: invalidCursor, fields: [String]},
+    {name: badToolOutput, fields: [String]},
+    {name: rateLimited, fields: [Nat]},
     {name: missingCapability, fields: [Capabilities::ClientCapabilities]},
     {name: internal, fields: [String]}
   ]
@@ -93,6 +97,9 @@ definition{
     | ProviderRefusal.resourceNotFound uri => (JsonRpc::invalidParamsCode)
     | ProviderRefusal.unknownTask taskId => (JsonRpc::invalidParamsCode)
     | ProviderRefusal.invalidArguments reason => (JsonRpc::invalidParamsCode)
+    | ProviderRefusal.invalidCursor cursor => (JsonRpc::invalidParamsCode)
+    | ProviderRefusal.badToolOutput reason => (JsonRpc::internalErrorCode)
+    | ProviderRefusal.rateLimited limit => (JsonRpc::rateLimitedCode)
     | ProviderRefusal.missingCapability required => (JsonRpc::missingRequiredClientCapabilityCode)
     | ProviderRefusal.internal reason => (JsonRpc::internalErrorCode)),
   executable: true
@@ -205,6 +212,9 @@ definition{
       | ProviderRefusal.resourceNotFound uri => (ctor Option.none [Json::Json])
       | ProviderRefusal.unknownTask taskId => (ctor Option.none [Json::Json])
       | ProviderRefusal.invalidArguments reason => (ctor Option.none [Json::Json])
+      | ProviderRefusal.invalidCursor cursor => (ctor Option.none [Json::Json])
+      | ProviderRefusal.badToolOutput reason => (ctor Option.none [Json::Json])
+      | ProviderRefusal.rateLimited limit => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("limit", (ctor Json::Json.number (record Json::Decimal {mantissa := (Numeric::natToInt limit (0 : Int)), exponent := (0 : Int)}))) (nil (String * Json::Json)))))
       | ProviderRefusal.missingCapability required => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("requiredCapabilities", (capabilitiesJson required)) (nil (String * Json::Json)))))
       | ProviderRefusal.internal reason => (ctor Option.none [Json::Json]))),
   executable: true
@@ -225,6 +235,9 @@ definition{
       | ProviderRefusal.resourceNotFound uri => "Invalid params: resource not found"
       | ProviderRefusal.unknownTask taskId => "Invalid params: unknown task"
       | ProviderRefusal.invalidArguments reason => "Invalid params: invalid arguments"
+      | ProviderRefusal.invalidCursor cursor => "Invalid params: invalid cursor"
+      | ProviderRefusal.badToolOutput reason => "Internal error"
+      | ProviderRefusal.rateLimited limit => "Rate limit exceeded: too many tool calls"
       | ProviderRefusal.missingCapability required => "Missing required client capability"
       | ProviderRefusal.internal reason => "Internal error")),
   executable: true
@@ -277,6 +290,34 @@ theorem{
   name: unsupported_version_error_data_lists_the_supported_versions,
   parameters: [requested : String, supported : (List String)],
   statement: ((dataOf (ctor Refusal.unsupportedProtocolVersion requested supported)) = (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("supported", (ctor Json::Json.array (textList supported))) (cons ("requested", (ctor Json::Json.text requested)) (nil (String * Json::Json))))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_rate_limit_refusal_has_the_application_code,
+  parameters: [limit : Nat],
+  statement: ((codeOf (ctor Refusal.provider (ctor ProviderRefusal.rateLimited limit))) = (429 : Int)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_rate_limit_refusal_names_the_limit,
+  parameters: [],
+  statement: ((dataOf (ctor Refusal.provider (ctor ProviderRefusal.rateLimited 3))) = (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("limit", (ctor Json::Json.number (record Json::Decimal {mantissa := (3 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_invalid_cursor_has_the_invalid_params_code,
+  parameters: [cursor : String],
+  statement: ((codeOf (ctor Refusal.provider (ctor ProviderRefusal.invalidCursor cursor))) = (-32602 : Int)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_refused_tool_output_has_the_internal_error_code,
+  parameters: [reason : String],
+  statement: ((codeOf (ctor Refusal.provider (ctor ProviderRefusal.badToolOutput reason))) = (-32603 : Int)),
   proof: reflexivity{}
 }
 \end{semanticmodule}

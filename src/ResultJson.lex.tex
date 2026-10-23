@@ -11,6 +11,7 @@
 \importmodule{JsonRead}
 \importmodule{Methods}
 \importmodule{Refusal}
+\importmodule{Sanitize}
 \title{MCP result bodies as JSON}
 \begin{semanticmodule}
 definition{
@@ -162,15 +163,65 @@ definition{
 }
 
 definition{
+  name: dataBlockJson,
+  parameters: [
+    kind : String,
+    data : String,
+    mimeType : String,
+    annotations : (Option Common::Annotations),
+    meta : (Option Json::JsonObject)
+  ],
+  result: Json::Json,
+  body: (ctor Json::Json.object (cons ("type", (ctor Json::Json.text kind)) (cons ("data", (ctor Json::Json.text data)) (cons ("mimeType", (ctor Json::Json.text mimeType)) (prim append (annotationsMember annotations) (metaMember meta) : (List (String * Json::Json))))))),
+  executable: true
+}
+
+definition{
+  name: contentsJson,
+  parameters: [contents : Content::ResourceContents],
+  result: Json::Json,
+  body: (match contents
+    | Content::ResourceContents.text found => (ctor Json::Json.object (cons ("uri", (ctor Json::Json.text (project found uri))) (prim append (Envelope::textMember "mimeType" (project found mimeType)) (cons ("text", (ctor Json::Json.text (project found text))) (metaMember (project found meta))) : (List (String * Json::Json)))))
+    | Content::ResourceContents.blob found => (ctor Json::Json.object (cons ("uri", (ctor Json::Json.text (project found uri))) (prim append (Envelope::textMember "mimeType" (project found mimeType)) (cons ("blob", (ctor Json::Json.text (project found blob))) (metaMember (project found meta))) : (List (String * Json::Json)))))),
+  executable: true
+}
+
+definition{
+  name: embeddedJson,
+  parameters: [found : Content::EmbeddedResource],
+  result: Json::Json,
+  body: (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "resource")) (cons ("resource", (contentsJson (project found resource))) (prim append (annotationsMember (project found annotations)) (metaMember (project found meta)) : (List (String * Json::Json)))))),
+  executable: true
+}
+
+definition{
+  name: sizeMember,
+  parameters: [size : (Option Nat)],
+  result: (List (String * Json::Json)),
+  body: (match size
+    | Option.none => (nil (String * Json::Json))
+    | Option.some bytes => (cons ("size", (natJson bytes)) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: linkJson,
+  parameters: [found : Content::Resource],
+  result: Json::Json,
+  body: (ctor Json::Json.object (prim append (cons ("type", (ctor Json::Json.text "resource_link")) (cons ("name", (ctor Json::Json.text (project found name))) (nil (String * Json::Json)))) (prim append (Envelope::textMember "title" (project found title)) (prim append (Envelope::iconsMember (project found icons)) (prim append (cons ("uri", (ctor Json::Json.text (project found uri))) (nil (String * Json::Json))) (prim append (Envelope::textMember "description" (project found description)) (prim append (Envelope::textMember "mimeType" (project found mimeType)) (prim append (annotationsMember (project found annotations)) (prim append (sizeMember (project found size)) (metaMember (project found meta)) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json)))),
+  executable: true
+}
+
+definition{
   name: blockJson,
   parameters: [block : Content::ContentBlock],
   result: (Option Json::Json),
   body: (match block
     | Content::ContentBlock.text found => (ctor Option.some [Json::Json] (textBlockJson found))
-    | Content::ContentBlock.image found => (ctor Option.none [Json::Json])
-    | Content::ContentBlock.audio found => (ctor Option.none [Json::Json])
-    | Content::ContentBlock.resource_link found => (ctor Option.none [Json::Json])
-    | Content::ContentBlock.resource found => (ctor Option.none [Json::Json])),
+    | Content::ContentBlock.image found => (ctor Option.some [Json::Json] (dataBlockJson "image" (project found data) (project found mimeType) (project found annotations) (project found meta)))
+    | Content::ContentBlock.audio found => (ctor Option.some [Json::Json] (dataBlockJson "audio" (project found data) (project found mimeType) (project found annotations) (project found meta)))
+    | Content::ContentBlock.resource_link found => (ctor Option.some [Json::Json] (linkJson found))
+    | Content::ContentBlock.resource found => (ctor Option.some [Json::Json] (embeddedJson found))),
   executable: true
 }
 
@@ -269,13 +320,29 @@ definition{
 }
 
 definition{
+  name: sanitizedMembers,
+  parameters: [members : (Option (List (String * Json::Json)))],
+  result: (Option (List (String * Json::Json))),
+  body: (match members
+    | Option.none => (ctor Option.none [(List (String * Json::Json))])
+    | Option.some built => (match (Sanitize::sanitizeJson (ctor Json::Json.object built))
+      | Option.none => (ctor Option.none [(List (String * Json::Json))])
+      | Option.some cleaned => (match (Json::asObject cleaned)
+        | Option.none => (ctor Option.none [(List (String * Json::Json))])
+        | Option.some table => (ctor Option.some [(List (String * Json::Json))] (project table members))))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
   name: bodyMembers,
   parameters: [body : Methods::ResultBody],
   result: (Option (List (String * Json::Json))),
   body: (match body
     | Methods::ResultBody.discover found => (ctor Option.some [(List (String * Json::Json))] (discoverMembers found))
     | Methods::ResultBody.listTools found => (ctor Option.some [(List (String * Json::Json))] (listToolsMembers found))
-    | Methods::ResultBody.callTool found => (callToolMembers found)
+    | Methods::ResultBody.callTool found => (sanitizedMembers (callToolMembers found))
+    | Methods::ResultBody.progressed found => (sanitizedMembers (callToolMembers (project found result)))
     | Methods::ResultBody.acknowledged => (ctor Option.some [(List (String * Json::Json))] (nil (String * Json::Json)))
     | Methods::ResultBody.listResources found => (ctor Option.none [(List (String * Json::Json))])
     | Methods::ResultBody.readResource found => (ctor Option.none [(List (String * Json::Json))])
@@ -286,6 +353,7 @@ definition{
     | Methods::ResultBody.getTask found => (ctor Option.none [(List (String * Json::Json))])
     | Methods::ResultBody.inputRequired found => (ctor Option.none [(List (String * Json::Json))])
     | Methods::ResultBody.taskCreated found => (ctor Option.none [(List (String * Json::Json))])),
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
@@ -296,6 +364,7 @@ definition{
   body: (match (bodyMembers (project reply body))
     | Option.none => (ctor Option.none [Json::JsonObject])
     | Option.some members => (ctor Option.some [Json::JsonObject] (record Json::JsonObject {members := (prim append members (project (Envelope::envelope reply) members) : (List (String * Json::Json)))}))),
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 \end{semanticmodule}

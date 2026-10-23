@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-stress-catalog"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Crowd"
+component = "Crowd"
+
+[[form]]
+id = "mcp-stress-catalog"
+channel = "text"
+surface = "MCP stress catalog"
+canonical_source = true
+features = ["sentence-case", "singular"]

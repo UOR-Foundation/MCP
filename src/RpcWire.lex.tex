@@ -2,8 +2,10 @@
 \useglossary{lexlean.std.bool@1.2.0}
 \useglossary{lexlean.std.nat@1.2.0}
 \useglossary{mcp.core@1.0.0}
+\importmodule{Common}
 \importmodule{Json}
 \importmodule{JsonRpc}
+\importmodule{Methods}
 \importmodule{Param}
 \importmodule{Refusal}
 \title{MCP JSON-RPC wire messages}
@@ -271,6 +273,44 @@ definition{
   executable: true
 }
 
+definition{
+  name: tokenJson,
+  parameters: [token : Common::ProgressToken],
+  result: Json::Json,
+  body: (match token
+    | Common::ProgressToken.text content => (ctor Json::Json.text content)
+    | Common::ProgressToken.number whole => (ctor Json::Json.number (record Json::Decimal {mantissa := whole, exponent := (0 : Int)}))),
+  executable: true
+}
+
+definition{
+  name: totalMember,
+  parameters: [total : (Option Json::Decimal)],
+  result: (List (String * Json::Json)),
+  body: (match total
+    | Option.none => (nil (String * Json::Json))
+    | Option.some amount => (cons ("total", (ctor Json::Json.number amount)) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: messageMember,
+  parameters: [message : (Option String)],
+  result: (List (String * Json::Json)),
+  body: (match message
+    | Option.none => (nil (String * Json::Json))
+    | Option.some content => (cons ("message", (ctor Json::Json.text content)) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: progressNotification,
+  parameters: [note : Methods::ProgressNote],
+  result: Json::Json,
+  body: (ctor Json::Json.object (cons ("jsonrpc", (ctor Json::Json.text (JsonRpc::jsonrpcVersion))) (cons ("method", (ctor Json::Json.text "notifications/progress")) (cons ("params", (ctor Json::Json.object (cons ("progressToken", (tokenJson (project note token))) (cons ("progress", (ctor Json::Json.number (project (project note step) progress))) (prim append (totalMember (project (project note step) total)) (messageMember (project (project note step) message)) : (List (String * Json::Json))))))) (nil (String * Json::Json)))))),
+  executable: true
+}
+
 theorem{
   name: an_error_without_an_id_has_no_id_member,
   parameters: [error : JsonRpc::ErrorObject],
@@ -289,6 +329,19 @@ theorem{
   name: an_error_response_is_an_object_of_its_members,
   parameters: [ident : (Option JsonRpc::RequestId), error : JsonRpc::ErrorObject],
   statement: ((errorResponse ident error) = (ctor Json::Json.object (errorMembers ident error))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_progress_notification_has_no_id_member,
+  parameters: [note : Methods::ProgressNote],
+  statement: ((Json::lookupIn "id" (match (progressNotification note)
+    | Json::Json.null => (nil (String * Json::Json))
+    | Json::Json.bool flag => (nil (String * Json::Json))
+    | Json::Json.number amount => (nil (String * Json::Json))
+    | Json::Json.text content => (nil (String * Json::Json))
+    | Json::Json.array items => (nil (String * Json::Json))
+    | Json::Json.object members => members)) = (ctor Json::Lookup.absent)),
   proof: reflexivity{}
 }
 \end{semanticmodule}

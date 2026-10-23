@@ -1,0 +1,194 @@
+\begin{lexlean}{Sanitize}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Base64}
+\importmodule{Json}
+\importmodule{JsonRead}
+\importmodule{JsonText}
+\title{MCP output sanitization}
+\begin{semanticmodule}
+inductive{
+  name: Hole,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: inArray, fields: [(List Json::Json), (List Json::Json)]},
+    {name: inObject, fields: [String, (List (String * Json::Json)), (List (String * Json::Json))]}
+  ]
+}
+
+inductive{
+  name: Phase,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: down, fields: [Json::Json]}, {name: up, fields: [Json::Json]}]
+}
+
+definition{name: sanitizeBudget, parameters: [], result: Nat, body: 67108864, executable: true}
+
+definition{
+  name: replaced,
+  parameters: [built : (List Nat)],
+  result: (List Nat),
+  body: (cons 189 (cons 191 (cons 239 built))),
+  executable: true
+}
+
+definition{
+  name: isKept,
+  parameters: [byte : Nat],
+  result: Bool,
+  body: ((byte =? 9) || ((byte =? 10) || (byte =? 13))),
+  executable: true
+}
+
+structure{
+  name: Out,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: state, type: Nat}, {name: built, type: (List Nat)}]
+}
+
+definition{
+  name: ready,
+  parameters: [byte : Nat, built : (List Nat)],
+  result: Out,
+  body: (if (byte <? 32) then (if (isKept byte) then (record Out {state := 0, built := (cons byte built)}) else (record Out {state := 0, built := (replaced built)})) else (if (byte =? 127) then (record Out {state := 0, built := (replaced built)}) else (if (byte =? 194) then (record Out {state := 1, built := built}) else (if (byte =? 226) then (record Out {state := 2, built := built}) else (record Out {state := 0, built := (cons byte built)}))))),
+  executable: true
+}
+
+definition{
+  name: held,
+  parameters: [state : Nat, byte : Nat, built : (List Nat)],
+  result: Out,
+  body: (if (state =? 0) then (ready byte built) else (if (state =? 1) then (if ((128 <=? byte) && (byte <=? 159)) then (record Out {state := 0, built := (replaced built)}) else (ready byte (cons 194 built))) else (if (state =? 2) then (if (byte =? 128) then (record Out {state := 3, built := built}) else (if (byte =? 129) then (record Out {state := 4, built := built}) else (ready byte (cons 226 built)))) else (if (state =? 3) then (if ((170 <=? byte) && (byte <=? 174)) then (record Out {state := 0, built := (replaced built)}) else (ready byte (cons 128 (cons 226 built)))) else (if ((166 <=? byte) && (byte <=? 169)) then (record Out {state := 0, built := (replaced built)}) else (ready byte (cons 129 (cons 226 built)))))))),
+  executable: true
+}
+
+definition{
+  name: flush,
+  parameters: [state : Nat, built : (List Nat)],
+  result: (List Nat),
+  body: (if (state =? 0) then built else (if (state =? 1) then (cons 194 built) else (if (state =? 2) then (cons 226 built) else (if (state =? 3) then (cons 128 (cons 226 built)) else (cons 129 (cons 226 built)))))),
+  executable: true
+}
+
+definition{
+  name: cleanLoop,
+  parameters: [bytes : (List Nat), state : Nat, built : (List Nat)],
+  result: (List Nat),
+  body: (match bytes
+    | List.nil => (flush state built)
+    | List.cons byte rest => (let step : Out := (held state byte built); (cleanLoop rest (project step state) (project step built)))),
+  executable: true,
+  recursive_argument: bytes
+}
+
+definition{
+  name: cleanBytes,
+  parameters: [bytes : (List Nat), built : (List Nat)],
+  result: (List Nat),
+  body: (cleanLoop bytes 0 built),
+  executable: true
+}
+
+definition{
+  name: cleanText,
+  parameters: [content : String],
+  result: String,
+  body: (match (prim utf8_decode (JsonText::listToBytes (JsonText::emptyBytes) (JsonRead::reverseOnto [Nat] (cleanBytes (JsonText::bytesToList (prim utf8_encode content : Bytes)) (nil Nat)) (nil Nat))) : (Option String))
+    | Option.none => "?"
+    | Option.some cleaned => cleaned),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: rebuild,
+  parameters: [fuel : Nat, phase : Phase, holes : (List Hole)],
+  result: (Option Json::Json),
+  body: (match fuel
+    | Nat.zero => (ctor Option.none [Json::Json])
+    | Nat.succ below => (match phase
+      | Phase.down value => (match value
+        | Json::Json.null => (rebuild below (ctor Phase.up value) holes)
+        | Json::Json.bool flag => (rebuild below (ctor Phase.up value) holes)
+        | Json::Json.number amount => (rebuild below (ctor Phase.up value) holes)
+        | Json::Json.text content => (let cleaned : String := (cleanText content); (rebuild below (ctor Phase.up (ctor Json::Json.text cleaned)) holes))
+        | Json::Json.array items => (match items
+          | List.nil => (rebuild below (ctor Phase.up value) holes)
+          | List.cons head tail => (rebuild below (ctor Phase.down head) (cons (ctor Hole.inArray (nil Json::Json) tail) holes)))
+        | Json::Json.object entries => (match entries
+          | List.nil => (rebuild below (ctor Phase.up value) holes)
+          | List.cons entry tail => (let label : String := (cleanText (first entry)); (rebuild below (ctor Phase.down (second entry)) (cons (ctor Hole.inObject label (nil (String * Json::Json)) tail) holes)))))
+      | Phase.up finished => (match holes
+        | List.nil => (ctor Option.some [Json::Json] finished)
+        | List.cons hole rest => (match hole
+          | Hole.inArray done todo => (let grown : (List Json::Json) := (cons finished done); (match todo
+            | List.nil => (rebuild below (ctor Phase.up (ctor Json::Json.array (JsonRead::reverseOnto [Json::Json] grown (nil Json::Json)))) rest)
+            | List.cons head tail => (rebuild below (ctor Phase.down head) (cons (ctor Hole.inArray grown tail) rest))))
+          | Hole.inObject label done todo => (let grown : (List (String * Json::Json)) := (cons (label, finished) done); (match todo
+            | List.nil => (rebuild below (ctor Phase.up (ctor Json::Json.object (JsonRead::reverseOnto [(String * Json::Json)] grown (nil (String * Json::Json))))) rest)
+            | List.cons entry tail => (let next : String := (cleanText (first entry)); (rebuild below (ctor Phase.down (second entry)) (cons (ctor Hole.inObject next grown tail) rest))))))))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true,
+  recursive_argument: fuel
+}
+
+definition{
+  name: sanitizeJson,
+  parameters: [value : Json::Json],
+  result: (Option Json::Json),
+  body: (rebuild (sanitizeBudget) (ctor Phase.down value) (nil Hole)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: payloadOk,
+  parameters: [data : String],
+  result: Bool,
+  body: (match (Base64::decode (JsonText::bytesToList (prim utf8_encode data : Bytes)))
+    | Option.none => false
+    | Option.some decoded => true),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+theorem{
+  name: a_bell_is_replaced_by_the_replacement_character,
+  parameters: [],
+  statement: ((JsonRead::reverseOnto [Nat] (cleanBytes (cons 97 (cons 7 (cons 98 (nil Nat)))) (nil Nat)) (nil Nat)) = (cons 97 (cons 239 (cons 191 (cons 189 (cons 98 (nil Nat))))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: tab_newline_and_carriage_return_are_kept,
+  parameters: [],
+  statement: ((JsonRead::reverseOnto [Nat] (cleanBytes (cons 9 (cons 10 (cons 13 (nil Nat)))) (nil Nat)) (nil Nat)) = (cons 9 (cons 10 (cons 13 (nil Nat))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_c1_control_is_replaced,
+  parameters: [],
+  statement: ((JsonRead::reverseOnto [Nat] (cleanBytes (cons 194 (cons 133 (nil Nat))) (nil Nat)) (nil Nat)) = (cons 239 (cons 191 (cons 189 (nil Nat))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_right_to_left_override_is_replaced,
+  parameters: [],
+  statement: ((JsonRead::reverseOnto [Nat] (cleanBytes (cons 226 (cons 128 (cons 174 (nil Nat)))) (nil Nat)) (nil Nat)) = (cons 239 (cons 191 (cons 189 (nil Nat))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_no_break_space_is_kept,
+  parameters: [],
+  statement: ((JsonRead::reverseOnto [Nat] (cleanBytes (cons 194 (cons 160 (nil Nat))) (nil Nat)) (nil Nat)) = (cons 194 (cons 160 (nil Nat)))),
+  proof: reflexivity{}
+}
+\end{semanticmodule}
+\end{lexlean}

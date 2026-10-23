@@ -1,0 +1,185 @@
+\begin{lexlean}{JsonEq}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Json}
+\importmodule{Numeric}
+\title{MCP JSON equality}
+\begin{semanticmodule}
+inductive{
+  name: Same,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: yes, fields: []}, {name: no, fields: []}, {name: exhausted, fields: []}]
+}
+
+inductive{
+  name: EqStep,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: differ, fields: []},
+    {name: advanced, fields: [(List (Json::Json * Json::Json))]}
+  ]
+}
+
+definition{name: eqBudget, parameters: [], result: Nat, body: 67108864, executable: true}
+
+definition{
+  name: kindOf,
+  parameters: [value : Json::Json],
+  result: Nat,
+  body: (match value
+    | Json::Json.null => 0
+    | Json::Json.bool flag => 1
+    | Json::Json.number amount => 2
+    | Json::Json.text content => 3
+    | Json::Json.array items => 4
+    | Json::Json.object members => 5),
+  executable: true
+}
+
+definition{
+  name: itemCount,
+  parameters: [items : (List Json::Json), counted : Nat],
+  result: Nat,
+  body: (match items | List.nil => counted | List.cons head tail => (itemCount tail (counted + 1))),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: memberCount,
+  parameters: [members : (List (String * Json::Json)), counted : Nat],
+  result: Nat,
+  body: (match members
+    | List.nil => counted
+    | List.cons head tail => (memberCount tail (counted + 1))),
+  executable: true,
+  recursive_argument: members
+}
+
+definition{
+  name: pairItems,
+  parameters: [
+    left : (List Json::Json),
+    right : (List Json::Json),
+    built : (List (Json::Json * Json::Json))
+  ],
+  result: (Option (List (Json::Json * Json::Json))),
+  body: (match left
+    | List.nil => (match right
+      | List.nil => (ctor Option.some [(List (Json::Json * Json::Json))] built)
+      | List.cons other more => (ctor Option.none [(List (Json::Json * Json::Json))]))
+    | List.cons head tail => (match right
+      | List.nil => (ctor Option.none [(List (Json::Json * Json::Json))])
+      | List.cons other more => (pairItems tail more (cons (head, other) built)))),
+  executable: true,
+  recursive_argument: left
+}
+
+definition{
+  name: pairMembers,
+  parameters: [
+    left : (List (String * Json::Json)),
+    right : (List (String * Json::Json)),
+    built : (List (Json::Json * Json::Json))
+  ],
+  result: (Option (List (Json::Json * Json::Json))),
+  body: (match left
+    | List.nil => (ctor Option.some [(List (Json::Json * Json::Json))] built)
+    | List.cons entry rest => (match (Json::lookupIn (first entry) right)
+      | Json::Lookup.absent => (ctor Option.none [(List (Json::Json * Json::Json))])
+      | Json::Lookup.present found => (pairMembers rest right (cons ((second entry), found) built)))),
+  executable: true,
+  recursive_argument: left
+}
+
+definition{
+  name: advance,
+  parameters: [
+    pairs : (Option (List (Json::Json * Json::Json))),
+    rest : (List (Json::Json * Json::Json))
+  ],
+  result: EqStep,
+  body: (match pairs
+    | Option.none => (ctor EqStep.differ)
+    | Option.some more => (ctor EqStep.advanced (prim append more rest : (List (Json::Json * Json::Json))))),
+  executable: true
+}
+
+definition{
+  name: pairStep,
+  parameters: [left : Json::Json, right : Json::Json, rest : (List (Json::Json * Json::Json))],
+  result: EqStep,
+  body: (if ((kindOf left) =? (kindOf right)) then (match left
+    | Json::Json.null => (ctor EqStep.advanced rest)
+    | Json::Json.bool flag => (match (Json::asBool right)
+      | Option.none => (ctor EqStep.differ)
+      | Option.some other => (if (prim equal flag other : Bool) then (ctor EqStep.advanced rest) else (ctor EqStep.differ)))
+    | Json::Json.number amount => (match (Json::asNumber right)
+      | Option.none => (ctor EqStep.differ)
+      | Option.some other => (if (Numeric::isSame (Numeric::compare amount other)) then (ctor EqStep.advanced rest) else (ctor EqStep.differ)))
+    | Json::Json.text content => (match (Json::asText right)
+      | Option.none => (ctor EqStep.differ)
+      | Option.some other => (if (prim equal content other : Bool) then (ctor EqStep.advanced rest) else (ctor EqStep.differ)))
+    | Json::Json.array items => (match (Json::asArray right)
+      | Option.none => (ctor EqStep.differ)
+      | Option.some others => (advance (pairItems items others (nil (Json::Json * Json::Json))) rest))
+    | Json::Json.object members => (match (Json::asObject right)
+      | Option.none => (ctor EqStep.differ)
+      | Option.some others => (if ((memberCount members 0) =? (memberCount (project others members) 0)) then (advance (pairMembers members (project others members) (nil (Json::Json * Json::Json))) rest) else (ctor EqStep.differ)))) else (ctor EqStep.differ)),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: eqLoop,
+  parameters: [fuel : Nat, pending : (List (Json::Json * Json::Json))],
+  result: Same,
+  body: (match fuel
+    | Nat.zero => (ctor Same.exhausted)
+    | Nat.succ below => (match pending
+      | List.nil => (ctor Same.yes)
+      | List.cons pair rest => (match (pairStep (first pair) (second pair) rest)
+        | EqStep.differ => (ctor Same.no)
+        | EqStep.advanced more => (eqLoop below more)))),
+  axioms: [propext],
+  executable: true,
+  recursive_argument: fuel
+}
+
+definition{
+  name: compare,
+  parameters: [left : Json::Json, right : Json::Json],
+  result: Same,
+  body: (eqLoop (eqBudget) (cons (left, right) (nil (Json::Json * Json::Json)))),
+  axioms: [propext],
+  executable: true
+}
+
+theorem{
+  name: equal_objects_ignore_member_order,
+  parameters: [],
+  statement: ((compare (ctor Json::Json.object (cons ("a", (ctor Json::Json.bool true)) (cons ("b", (ctor Json::Json.null)) (nil (String * Json::Json))))) (ctor Json::Json.object (cons ("b", (ctor Json::Json.null)) (cons ("a", (ctor Json::Json.bool true)) (nil (String * Json::Json)))))) = (ctor Same.yes)),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: arrays_of_different_length_differ,
+  parameters: [],
+  statement: ((compare (ctor Json::Json.array (cons (ctor Json::Json.null) (nil Json::Json))) (ctor Json::Json.array (nil Json::Json))) = (ctor Same.no)),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: values_of_different_kinds_differ,
+  parameters: [],
+  statement: ((compare (ctor Json::Json.null) (ctor Json::Json.bool false)) = (ctor Same.no)),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+\end{semanticmodule}
+\end{lexlean}
