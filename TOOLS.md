@@ -207,3 +207,21 @@ covered by the tests of `tests/tools.rs` and `tests/stress.rs`, which run LexLea
 | TL-09 to TL-12, TL-14, TL-15 | `tests/tools.rs` |
 | TL-16, TL-17 | `ToolLaws.lex.tex` (76 theorems) and `Tools.lex.tex` (2, the rate-limit decision), checked by `lexlean verify`, the limits of which are stated in [Kernel theorems](#kernel-theorems), and the tests that name them |
 | TL-18 | `tests/stress.rs`, `tests/provenance.rs` |
+
+## Planted defects
+
+Each was planted alone in the sources of a tree on which every gate passed, run, and
+reverted with `git checkout`. The first three are stopped by the kernel, the fourth by the
+oracle after the root was exported again.
+
+| Defect | Planted in | Gate | Command | Diagnostic |
+| --- | --- | --- | --- | --- |
+| an unknown tool is answered as a tool result with `isError` | `Tools.answerCall`: the `Option.none` branch returns `textResult "Unknown tool" true` | kernel | `lexlean verify src/ToolLaws.lex.tex` | `LLV7002`, `Tactic rfl failed` in `an_unknown_tool_is_invalid_params` (`ToolLaws.lex.tex:87`, now :94 after the theorem below was added): `callFixture "no_such_tool" none` is not definitionally equal to `Except.error (Refusal.ProviderRefusal.unknownTool "no_such_tool")` |
+| `tools/list` is out of order | `Tools.answerList`: the first tool moved to the end | kernel | same | `LLV7002`, `Tactic rfl failed` in `tools_list_answers_with_the_catalog_in_its_declared_order` (`ToolLaws.lex.tex:87`): `Tools.answerList Fixture.fixtureCache Fixture.fixtureTools { meta := probeMeta, cursor := none }` is not definitionally equal to `Except.ok (Methods.ResultBody.listTools { cache := Fixture.fixtureCache, nextCursor := none, tools := Fixture.fixtureTools })`. The theorem `the_catalog_lists_its_tools_in_the_declared_order` did not see it: it states the order of the catalog, not of the answer, and the planted defect passed `lexlean verify` until the second theorem was added |
+| the rate limit is off by one | `Tools.admits`: `used <=? limit` for `used <? limit` | kernel | same | `LLV7002`, `Tactic decide proved that the proposition admits 3 3 = false ∧ admits 3 4 = false ∧ admits 0 0 = false is false` in `a_call_at_or_above_the_limit_is_refused` (`Tools.lex.tex:300`) |
+| an image or audio block is written without `mimeType` | `ResultJson.dataBlockJson`: the `mimeType` member left out | oracle | `cargo test -p lifecycle-oracle --no-fail-fast` | passes `lexlean verify` (no theorem covers the encoder); 3 tests fail: `the_image_is_the_reference_fixtures_image_tl_04` (`TS-03: /result/content/0/mimeType is absent ... scenario "tools-call-image", line 302`), `the_audio_is_the_reference_fixtures_audio_tl_05` (`TS-07 ... "tools-call-audio", line 1057`) and `mixed_content_keeps_the_order_the_tool_produced_tl_07` (`TS-04: /result/content/1/mimeType is absent`) |
+
+Restored result: every defect was reverted with `git checkout`, and on the final tree
+`lexlean verify` reports 41 modules verified, the three packages equal a fresh export, and
+`cargo test --workspace`, `cargo fmt --all -- --check` and `cargo clippy --workspace
+--all-targets -- -D warnings` pass.

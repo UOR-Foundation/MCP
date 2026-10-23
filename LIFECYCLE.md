@@ -43,11 +43,12 @@ with that request naming root `UorMcp.Fixture.fixtureRun`, package `mcp_lifecycl
 1.0.0, target `rust-std`. Copy `Cargo.toml`, `package.json`, `provenance.json` and
 `src/lib.rs` from `.lexlean/production/<id>/packages/rust-std/mcp_lifecycle` to
 `crates/lifecycle-oracle/generated/mcp_lifecycle`. A re-export of the committed sources
-reproduces the committed package byte for byte: the build of the final sources (the
-codec of #23 included) reported export `9c92f312995db81415b1fb650080a51f69c00cd5a54448fea048ee2a9546249a`
-and `diff -r .lexlean/production/<id>/packages/rust-std/mcp_lifecycle
-crates/lifecycle-oracle/generated/mcp_lifecycle` was empty. The package records the semantic ID of the sources it states
-(`aad8fdc8e49153c7fceed7c181eae54878d0df7cd76db57119523b713c5a339a`). The lock was made
+reproduces the committed package byte for byte (`diff -r
+.lexlean/production/<id>/packages/rust-std/mcp_lifecycle
+crates/lifecycle-oracle/generated/mcp_lifecycle` is empty), and the `lexlean / export`
+job of CI repeats the comparison for every `generated/request.json`. The package records
+the semantic ID of the sources it states in `provenance.json` (`sources`), which equals
+the `semantic` ID that `lexlean check` prints for the tree. The lock was made
 with LexLean `release/v0.4` at `9796067`.
 
 ## The boundary encoding
