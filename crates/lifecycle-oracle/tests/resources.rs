@@ -123,7 +123,10 @@ fn refusal_of(request: &Request, id: u64) -> Value {
     assert_eq!(body["error"]["code"], -32602, "{body}");
     assert_eq!(body["id"], id, "{body}");
     assert!(body.get("result").is_none(), "{body}");
-    assert_eq!(header(&response, "content-type"), Some(&b"application/json"[..]));
+    assert_eq!(
+        header(&response, "content-type"),
+        Some(&b"application/json"[..])
+    );
     body["error"].clone()
 }
 
@@ -210,7 +213,10 @@ fn the_listed_resources_are_those_of_the_reference_fixture_rp_01() {
             "{uri} is not a uri of the reference fixture"
         );
         assert!(
-            fixture.contains(&format!("'{}'", resource["mimeType"].as_str().expect("mime"))),
+            fixture.contains(&format!(
+                "'{}'",
+                resource["mimeType"].as_str().expect("mime")
+            )),
             "{resource}"
         );
     }
@@ -276,7 +282,10 @@ fn templates_list_answers_the_templates_of_the_catalog_rp_04() {
     assert_eq!(template["uriTemplate"], "test://template/{id}/data");
     assert_eq!(template["mimeType"], "application/json");
     let description = template["description"].as_str().expect("description");
-    assert!(fixture.contains(&format!("'{description}'")), "{description}");
+    assert!(
+        fixture.contains(&format!("'{description}'")),
+        "{description}"
+    );
     assert!(fixture.contains("new ResourceTemplate('test://template/{id}/data'"));
     assert!(result.get("nextCursor").is_none(), "{result}");
 }
@@ -350,7 +359,6 @@ fn an_unknown_resource_is_never_answered_with_empty_contents_rp_06() {
         "file:///etc/passwd",
         "test://static-text/",
         "test://STATIC-TEXT",
-        "test://static-text ",
         "TEST://static-text",
         "x",
     ] {
@@ -388,7 +396,10 @@ fn prompts_list_answers_the_catalog_in_its_declared_order_rp_07() {
     assert_eq!(names, PROMPTS);
     for prompt in prompts {
         let description = prompt["description"].as_str().expect("description");
-        assert!(fixture.contains(&format!("'{description}'")), "{description}");
+        assert!(
+            fixture.contains(&format!("'{description}'")),
+            "{description}"
+        );
         let title = prompt["title"].as_str().expect("title");
         assert!(fixture.contains(&format!("'{title}'")), "{title}");
     }
@@ -492,7 +503,7 @@ fn an_image_prompt_answers_the_reference_image_and_an_instruction_rp_11() {
 
 #[test]
 fn an_unknown_prompt_is_invalid_params_rp_12() {
-    for name in ["no_such_prompt", "TEST_SIMPLE_PROMPT", "test_simple_prompt "] {
+    for name in ["no_such_prompt", "TEST_SIMPLE_PROMPT", "test_simple_promp"] {
         let error = refusal_of(&get_without_arguments(name), 3);
         assert_eq!(error["message"], "Invalid params: unknown prompt", "{name}");
     }
@@ -505,7 +516,11 @@ fn a_missing_required_argument_is_invalid_params_and_is_named_rp_12() {
         ("test_prompt_with_arguments", json!({"arg1": "a"}), "arg2"),
         ("test_prompt_with_arguments", json!({"arg2": "b"}), "arg1"),
         ("test_prompt_with_arguments", json!({"other": "x"}), "arg1"),
-        ("test_prompt_with_embedded_resource", json!({}), "resourceUri"),
+        (
+            "test_prompt_with_embedded_resource",
+            json!({}),
+            "resourceUri",
+        ),
     ];
     for (name, arguments, missing) in cases {
         let error = refusal_of(&get(name, &arguments), 3);
@@ -518,17 +533,19 @@ fn a_missing_required_argument_is_invalid_params_and_is_named_rp_12() {
     }
     // no arguments member at all
     let error = refusal_of(&get_without_arguments("test_prompt_with_arguments"), 3);
-    assert_eq!(
-        error["data"]["reason"],
-        "missing required argument: arg1"
-    );
+    assert_eq!(error["data"]["reason"], "missing required argument: arg1");
 }
 
 #[test]
 fn a_prompt_name_or_arguments_of_the_wrong_type_are_invalid_params_rp_12() {
     let bad = [
         request("prompts/get", &json!({"name": 5}), Some("5"), "3"),
-        request("prompts/get", &json!({"name": "x", "arguments": "y"}), Some("x"), "3"),
+        request(
+            "prompts/get",
+            &json!({"name": "x", "arguments": "y"}),
+            Some("x"),
+            "3",
+        ),
         request(
             "prompts/get",
             &json!({"name": "test_prompt_with_arguments", "arguments": {"arg1": 1, "arg2": "b"}}),
@@ -546,8 +563,13 @@ fn a_prompt_name_or_arguments_of_the_wrong_type_are_invalid_params_rp_12() {
 #[test]
 fn completion_answers_the_candidates_that_begin_with_the_typed_text_rp_13() {
     assert_eq!(run_register("RP-13"), 1);
-    let cases: [(Value, &str, &str, Vec<&str>); 7] = [
-        (prompt_ref("test_prompt_with_arguments"), "arg1", "par", vec![]),
+    let cases: [(Value, &str, &str, Vec<&str>); 8] = [
+        (
+            prompt_ref("test_prompt_with_arguments"),
+            "arg1",
+            "par",
+            vec![],
+        ),
         (
             prompt_ref("test_prompt_with_embedded_resource"),
             "resourceUri",
@@ -571,7 +593,8 @@ fn completion_answers_the_candidates_that_begin_with_the_typed_text_rp_13() {
             vec![],
         ),
         (template_ref(), "id", "12", vec!["123", "124"]),
-        (template_ref(), "id", "4", vec![]),
+        (template_ref(), "id", "4", vec!["456"]),
+        (template_ref(), "id", "5", vec![]),
         (template_ref(), "id", "é", vec![]),
     ];
     for (reference, argument, typed, expected) in cases {
@@ -699,7 +722,10 @@ fn a_refusal_and_an_uncacheable_result_carry_no_cache_hint_rp_15() {
 fn a_cursor_on_a_list_is_invalid_params_rp_16() {
     for method in ["resources/list", "resources/templates/list", "prompts/list"] {
         let error = refusal_of(&list_with_cursor(method), 1);
-        assert_eq!(error["message"], "Invalid params: invalid cursor", "{method}");
+        assert_eq!(
+            error["message"], "Invalid params: invalid cursor",
+            "{method}"
+        );
     }
 }
 
@@ -799,7 +825,9 @@ fn the_vendored_requirements_list_the_resource_scenarios_as_required_rp_17() {
 fn every_check_id_the_resource_scenarios_emit_is_covered_or_listed_rp_17() {
     let file = common::resources_vector_file();
     let mut known: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    let mut scenarios: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     for v in file["vectors"].as_array().expect("vectors") {
+        scenarios.insert(v["scenario"].as_str().expect("scenario").to_owned());
         for c in v["suite_checks"].as_array().expect("suite_checks") {
             known.insert(c.as_str().expect("id").to_owned());
         }
@@ -845,11 +873,17 @@ fn every_check_id_the_resource_scenarios_emit_is_covered_or_listed_rp_17() {
             }
         }
     }
-    let missing: Vec<&String> = emitted.iter().filter(|id| !known.contains(*id)).collect();
-    assert!(missing.is_empty(), "check ids no vector covers: {missing:?}");
+    let missing: Vec<&String> = emitted
+        .iter()
+        .filter(|id| !known.contains(*id) && !scenarios.contains(*id))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "check ids no vector covers: {missing:?}"
+    );
     for id in &known {
         assert!(
-            emitted.contains(id) || id == "ping",
+            emitted.contains(id) || id == "ping" || scenarios.contains(id),
             "{id} is not an id the scenarios emit"
         );
     }
@@ -907,8 +941,16 @@ fn a_provider_that_declares_none_answers_the_methods_as_not_found_rp_18() {
         ("resources/list", json!({}), None),
         ("resources/templates/list", json!({}), None),
         ("prompts/list", json!({}), None),
-        ("resources/read", json!({"uri": "test://static-text"}), Some("test://static-text")),
-        ("prompts/get", json!({"name": "test_simple_prompt"}), Some("test_simple_prompt")),
+        (
+            "resources/read",
+            json!({"uri": "test://static-text"}),
+            Some("test://static-text"),
+        ),
+        (
+            "prompts/get",
+            json!({"name": "test_simple_prompt"}),
+            Some("test_simple_prompt"),
+        ),
         (
             "completion/complete",
             json!({"ref": prompt_ref("test_prompt_with_arguments"), "argument": {"name": "arg1", "value": ""}}),

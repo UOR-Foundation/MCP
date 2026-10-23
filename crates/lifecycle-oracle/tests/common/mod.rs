@@ -466,7 +466,9 @@ fn check(
     if let Some(part) = check.get("contains").and_then(Value::as_str) {
         return match found.as_str() {
             Some(text) if text.contains(part) => Ok(()),
-            _ => Err(format!("{vector}: {at} is {found}, expected text with {part:?}")),
+            _ => Err(format!(
+                "{vector}: {at} is {found}, expected text with {part:?}"
+            )),
         };
     }
     if check.get("non_negative_integer").is_some() {
@@ -482,7 +484,9 @@ fn check(
         return if allowed.contains(found) {
             Ok(())
         } else {
-            Err(format!("{vector}: {at} is {found}, expected one of {allowed:?}"))
+            Err(format!(
+                "{vector}: {at} is {found}, expected one of {allowed:?}"
+            ))
         };
     }
     if check.get("nonempty_array").is_some() {
