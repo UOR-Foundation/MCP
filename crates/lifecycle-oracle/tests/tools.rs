@@ -838,6 +838,7 @@ fn the_named_theorems_of_the_tools_layer_are_declared_tl_17() {
     let laws = source("ToolLaws");
     for name in [
         "the_catalog_lists_its_tools_in_the_declared_order",
+        "tools_list_answers_with_the_catalog_in_its_declared_order",
         "an_unknown_tool_is_invalid_params",
         "an_unknown_tool_has_the_invalid_params_code",
         "an_invalid_argument_is_a_tool_result_with_is_error",

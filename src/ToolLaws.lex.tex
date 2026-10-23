@@ -85,6 +85,13 @@ theorem{
 }
 
 theorem{
+  name: tools_list_answers_with_the_catalog_in_its_declared_order,
+  parameters: [],
+  statement: ((Tools::answerList (Fixture::fixtureCache) (Fixture::fixtureTools) (record Methods::PaginatedParams {meta := (probeMeta), cursor := (ctor Option.none [String])})) = (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.listTools (record Methods::ListToolsResult {cache := (Fixture::fixtureCache), nextCursor := (ctor Option.none [String]), tools := (Fixture::fixtureTools)})))),
+  proof: reflexivity{}
+}
+
+theorem{
   name: an_unknown_tool_is_invalid_params,
   parameters: [],
   statement: ((callFixture "no_such_tool" (ctor Option.none [Json::JsonObject])) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.unknownTool "no_such_tool"))),

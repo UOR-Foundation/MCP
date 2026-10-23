@@ -66,7 +66,9 @@ The tools of a provider are data and a function: `handleWith(ProviderInfo, answe
 unchanged, and the fixture's `answer` is `Tools.answerList` and `Tools.answerCall` over its
 catalog and its behaviour function. The catalog is `List Tool`, so a provider lists its
 tools by listing them; the order of `tools/list` is the order of the list, and a theorem
-states it for the fixture (`the_catalog_lists_its_tools_in_the_declared_order`). The
+states it for the fixture (`the_catalog_lists_its_tools_in_the_declared_order`), and a second
+states that `tools/list` answers with that catalog unchanged
+(`tools_list_answers_with_the_catalog_in_its_declared_order`). The
 catalog is one page: a `cursor` is `invalidCursor` (-32602).
 
 ## Schemas
@@ -203,5 +205,5 @@ covered by the tests of `tests/tools.rs` and `tests/stress.rs`, which run LexLea
 | TL-01 to TL-08, TL-13 | `tests/tools.rs` over the vectors of `vectors/tools.json` (the requests of `tools-list`, `tools-call-simple-text`, `tools-call-image`, `tools-call-audio`, `tools-call-embedded-resource`, `tools-call-mixed-content`, `tools-call-error` and `tools-call-with-progress`), and the probes beyond them; every response and every notification is validated against the specification's JSON Schema |
 | TL-02 | the vector of `json-schema-2020-12`, and the focal schema's conditionals run by `tools/call` |
 | TL-09 to TL-12, TL-14, TL-15 | `tests/tools.rs` |
-| TL-16, TL-17 | `ToolLaws.lex.tex` (75 theorems) and `Tools.lex.tex` (2, the rate-limit decision), checked by `lexlean verify`, the limits of which are stated in [Kernel theorems](#kernel-theorems), and the tests that name them |
+| TL-16, TL-17 | `ToolLaws.lex.tex` (76 theorems) and `Tools.lex.tex` (2, the rate-limit decision), checked by `lexlean verify`, the limits of which are stated in [Kernel theorems](#kernel-theorems), and the tests that name them |
 | TL-18 | `tests/stress.rs`, `tests/provenance.rs` |
