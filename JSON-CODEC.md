@@ -28,8 +28,9 @@ lexlean production build --request crates/json-oracle/generated/request.json
 with that request naming root `UorMcp.JsonCodec.codecRun`, package
 `mcp_json_codec` 1.0.0, target `rust-std`. Copy `Cargo.toml`, `package.json`,
 `provenance.json` and `src/lib.rs` from `.lexlean/production/<id>/packages/rust-std/mcp_json_codec`
-to `crates/json-oracle/generated/mcp_json_codec`. The lock was made with LexLean
-`release/v0.4` at `9796067`.
+to `crates/json-oracle/generated/mcp_json_codec`. The lock was made with the compiler
+pinned in `.github/lexlean.rev` (LexLean PR #292 at `0b0c95d96`, on PR #284, on
+`release/v0.4`; see [CI.md](CI.md)).
 
 ## Decisions
 
