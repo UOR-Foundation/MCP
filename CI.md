@@ -124,7 +124,7 @@ The same stale pin is what `cargo xtask export` rewrites: after it, the same com
 One comment, ` // hand edit`, appended to line 10 of
 `crates/json-oracle/generated/mcp_json_codec/src/lib.rs` in the tree of commit `e821637`
 (a blank line there, so the line becomes the comment). It changes no behavior. Pushed as the
-head of a throwaway pull request (#29, based on this branch, closed unmerged, branch deleted).
+head of a throwaway pull request (#29, based on this branch, closed unmerged; its branch `claude/plant-hand-edited-package` is still on the remote, delete it).
 
 | | |
 | --- | --- |
