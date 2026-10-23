@@ -18,17 +18,19 @@ JC-13 and JC-14 from issues #23 and #18.
 | `crates/json-oracle/generated/mcp_json_codec` | LexLean's export of `codecRun`, unedited |
 | `crates/json-oracle/corpus/JSONTestSuite-1ef36fa01286573e846ac449e8683f8833c5b26a` | the vendored corpus |
 
-Regenerate the package after any change to the sources (it verifies the project
-first):
+Regenerate the pins and the package in the same commit as any change to the sources, the
+lock or the pinned compiler (it verifies the project first):
 
 ```
-lexlean production build --request crates/json-oracle/generated/request.json
+cargo xtask export
 ```
 
-with that request naming root `UorMcp.JsonCodec.codecRun`, package
-`mcp_json_codec` 1.0.0, target `rust-std`. Copy `Cargo.toml`, `package.json`,
-`provenance.json` and `src/lib.rs` from `.lexlean/production/<id>/packages/rust-std/mcp_json_codec`
-to `crates/json-oracle/generated/mcp_json_codec`. The lock was made with the compiler
+The request `crates/json-oracle/generated/request.json` names root `UorMcp.JsonCodec.codecRun`,
+package `mcp_json_codec` 1.0.0, target `rust-std`, and pins in `expect` the source ID, the
+semantic ID and the SHA-256 of `lexlean.lock` it was exported from (SPEC section 24.7).
+`cargo xtask export` writes those pins and the target digest, runs
+`lexlean production build --request` and replaces the package in
+`crates/json-oracle/generated/mcp_json_codec` with the export. The lock was made with the compiler
 pinned in `.github/lexlean.rev` (LexLean PR #292 at `0b0c95d96`, on PR #284, on
 `release/v0.4`; see [CI.md](CI.md)).
 

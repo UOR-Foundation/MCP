@@ -32,17 +32,24 @@ then params.
 | `crates/lifecycle-oracle/suite/mcp-spec-80041ab0a139a8f4fb3adbc99f7ae9113ea59671` | the vendored `schema/2026-07-28/schema.json` and the licence |
 | `crates/lifecycle-oracle/suite/conformance-232a9014457eaf4c59559916e3d616d2f7f28f05` | the eight vendored suite files |
 
-Regenerate the package after any change to the sources (it verifies the project first,
-which takes about ten minutes on two cores):
+Regenerate the pins and the package in the same commit as any change to the sources, the
+lock or the pinned compiler (it verifies the project first, which takes about ten minutes
+on two cores):
 
 ```
-lexlean production build --request crates/lifecycle-oracle/generated/request.json
+cargo xtask export
 ```
 
-with that request naming root `UorMcp.Fixture.fixtureRun`, package `mcp_lifecycle`
-1.0.0, target `rust-std`. Copy `Cargo.toml`, `package.json`, `provenance.json` and
-`src/lib.rs` from `.lexlean/production/<id>/packages/rust-std/mcp_lifecycle` to
-`crates/lifecycle-oracle/generated/mcp_lifecycle`. A re-export of the committed sources
+Each `crates/*/generated/request.json` pins, in `expect`, the source ID, the semantic ID and
+the SHA-256 of `lexlean.lock` that its packages were exported from (SPEC section 24.7), and
+names each target by its descriptor digest. `cargo xtask export` reads those values from
+`lexlean check`, `lexlean.lock` and `lexlean production targets`, writes them into every
+request, runs `lexlean production build --request` on each (this one names the roots
+`UorMcp.Crowd.crowdRun`, package `mcp_crowd`, and `UorMcp.Fixture.fixtureRun`, package
+`mcp_lifecycle`, both 1.0.0, target `rust-std`) and replaces the packages committed beside
+it with the export. A source edit committed without it is
+refused by `lexlean production build` as `LLC0204`; a hand-edited package is refused by the
+byte comparison (see [CI.md](CI.md)). A re-export of the committed sources
 reproduces the committed package byte for byte (`diff -r
 .lexlean/production/<id>/packages/rust-std/mcp_lifecycle
 crates/lifecycle-oracle/generated/mcp_lifecycle` is empty), and the `lexlean / export`
