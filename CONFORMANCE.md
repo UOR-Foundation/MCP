@@ -54,6 +54,8 @@ model does not sanction.
 | `JC-12` | `build` | The oracle executes the package generated from the LexLean codec root, whose recorded digest and provenance match the committed files, over the corpus whose pin and checksum match the recorded authority. |
 | `JC-13` | `build` | Reading a JSON string, as a value or as a member name, takes time at most proportional to its length up to a logarithmic factor: at 256 KiB, 1 MiB and 2 MiB, through the codec root and through the lifecycle root, the read finishes within a bound linear in the length and its time grows no more than twice as fast as the length does. |
 | `JC-14` | `build` | The Unicode byte validator accepts every well-formed complete three-byte and four-byte sequence and refuses every ill-formed one as RFC 3629 and Table 3-7 state, naming the first byte the table does not admit, by kernel-checked theorems over all byte values with exact axiom policies. |
+| `JC-15` | `build` | The encoder's work loop agrees with its structural specification for every JSON value and every fuel above the specification's cost: the text it emits, or the refusal it names, is the one the specification gives, by kernel-checked theorems proved by induction over the value, with exact axiom policies. The statement is about the encoder only; the universal round trip through the reader is not claimed. |
+| `JC-16` | `build` | Writing and reading again returns the same value for values that hold string escapes, non-ASCII characters, an empty member name, members in a stated order and a repeated member name, by kernel-checked theorems with exact axiom policies. |
 
 ## lifecycle
 

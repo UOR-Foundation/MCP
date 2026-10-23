@@ -85,3 +85,15 @@ Feature: JSON text codec
     Given the lead-byte classes of Table 3-7 for three-byte and four-byte sequences
     When the theorems of the Utf8 module are checked by the kernel and the validator judges every such sequence
     Then the validator accepts exactly the well-formed ones, refuses each ill-formed one at the byte the table first refuses, and agrees with the standard library on every sequence
+
+  @JC-15 @build
+  Scenario: The encoder's work loop agrees with its structural specification for every JSON value and every fuel above the specification's cost: the text it emits, or the refusal it names, is the one the specification gives, by kernel-checked theorems proved by induction over the value, with exact axiom policies. The statement is about the encoder only; the universal round trip through the reader is not claimed.
+    Given the encoder module of the codec and the module that states its specification
+    When the theorems of the JsonWriteLaws module are checked by the kernel
+    Then the loop's result for any value equals the specification's, with the axiom policy each theorem declares and no placeholder proof
+
+  @JC-16 @build
+  Scenario: Writing and reading again returns the same value for values that hold string escapes, non-ASCII characters, an empty member name, members in a stated order and a repeated member name, by kernel-checked theorems with exact axiom policies.
+    Given values that hold the escapes, a multi-byte character, an empty member name, three members in a stated order and a repeated member name
+    When each is written and read again by the kernel's evaluation of the codec
+    Then the value read is the value written, with the axiom policy each theorem declares and no placeholder proof

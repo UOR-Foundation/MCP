@@ -15,7 +15,7 @@
 # state: a capability that is not built does not get a row, and every row in this
 # file is built.
 #
-# The JSON text codec (issue #18) is the first capability registered: JC-01..JC-12, extended by JC-13 and JC-14.
+# The JSON text codec (issue #18) is the first capability registered: JC-01..JC-12, extended by JC-13 to JC-16.
 
 spec = "template/1"
 
@@ -102,6 +102,18 @@ id = "JC-14"
 level = "build"
 suite = "json-codec"
 statement = "The Unicode byte validator accepts every well-formed complete three-byte and four-byte sequence and refuses every ill-formed one as RFC 3629 and Table 3-7 state, naming the first byte the table does not admit, by kernel-checked theorems over all byte values with exact axiom policies."
+
+[[id]]
+id = "JC-15"
+level = "build"
+suite = "json-codec"
+statement = "The encoder's work loop agrees with its structural specification for every JSON value and every fuel above the specification's cost: the text it emits, or the refusal it names, is the one the specification gives, by kernel-checked theorems proved by induction over the value, with exact axiom policies. The statement is about the encoder only; the universal round trip through the reader is not claimed."
+
+[[id]]
+id = "JC-16"
+level = "build"
+suite = "json-codec"
+statement = "Writing and reading again returns the same value for values that hold string escapes, non-ASCII characters, an empty member name, members in a stated order and a repeated member name, by kernel-checked theorems with exact axiom policies."
 
 [[id]]
 id = "LC-01"
