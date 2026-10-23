@@ -33,12 +33,12 @@ fn an_unsupported_version_is_refused_with_the_supported_list_and_the_echo_lc_04(
 
 #[test]
 fn every_result_carries_result_type_and_the_server_identity_lc_05() {
-    assert_eq!(run_register("LC-05"), 11);
+    assert_eq!(run_register("LC-05"), 12);
 }
 
 #[test]
 fn removed_unknown_and_undeclared_methods_are_not_found_with_404_lc_06() {
-    assert_eq!(run_register("LC-06"), 7);
+    assert_eq!(run_register("LC-06"), 6);
 }
 
 #[test]
@@ -48,7 +48,7 @@ fn an_undeclared_client_capability_is_refused_with_400_and_the_requirement_lc_07
 
 #[test]
 fn every_refusal_echoes_the_request_id_lc_08() {
-    assert_eq!(run_register("LC-08"), 21);
+    assert_eq!(run_register("LC-08"), 20);
 }
 
 #[test]

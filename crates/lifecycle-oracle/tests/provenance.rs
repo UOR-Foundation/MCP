@@ -7,8 +7,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use common::{
-    all_vectors, hex, manifest_sha256, root, suite_root, suite_text, tools_vector_file,
-    transport_vector_file, vector_file, PIN,
+    all_vectors, hex, manifest_sha256, resources_vector_file, root, suite_root, suite_text,
+    tools_vector_file, transport_vector_file, vector_file, PIN,
 };
 use repo_model::Model;
 use serde_json::Value;
@@ -177,8 +177,19 @@ fn the_oracle_reaches_the_generated_package_lc_13() {
 /// The lines of `text` (1-based) that send a request: a call of `sendRpc`,
 /// `listenToStream`, `sendStatelessRequest(serverUrl`, or one of the scenario's case
 /// runners, other than the line that defines it.
-fn call_sites(text: &str) -> BTreeSet<u64> {
+///
+/// The caching scenario sends every request through one helper, `queryEndpoint`, so its
+/// request sites are the calls of that helper and not the one line inside it.
+fn call_sites(text: &str, file: &str) -> BTreeSet<u64> {
     let mut out = BTreeSet::new();
+    if file.ends_with("caching.ts") {
+        for (index, line) in text.lines().enumerate() {
+            if line.contains("queryEndpoint(") && !line.contains("const queryEndpoint") {
+                out.insert(index as u64 + 1);
+            }
+        }
+        return out;
+    }
     for (index, line) in text.lines().enumerate() {
         let sends = (line.contains("sendRpc(") && !line.contains("const sendRpc"))
             || (line.contains("listenToStream(") && !line.contains("const listenToStream"))
@@ -205,7 +216,12 @@ fn line_of(text: &str, line: u64) -> &str {
 fn every_request_a_scenario_sends_is_a_vector_or_a_listed_probe_that_is_not_run_lc_14() {
     let vectors = all_vectors();
     let mut not_run: Vec<Value> = Vec::new();
-    for file in [vector_file(), tools_vector_file(), transport_vector_file()] {
+    for file in [
+        vector_file(),
+        tools_vector_file(),
+        resources_vector_file(),
+        transport_vector_file(),
+    ] {
         not_run.extend(file["not_run"].as_array().expect("not_run").iter().cloned());
     }
     for scenario_file in [
@@ -213,6 +229,10 @@ fn every_request_a_scenario_sends_is_a_vector_or_a_listed_probe_that_is_not_run_
         "src/scenarios/server/http-standard-headers.ts",
         "src/scenarios/server/tools.ts",
         "src/scenarios/server/json-schema-2020-12.ts",
+        "src/scenarios/server/resources.ts",
+        "src/scenarios/server/prompts.ts",
+        "src/scenarios/server/caching.ts",
+        "src/scenarios/server/utils.ts",
     ] {
         let text = suite_text(scenario_file);
         let mut accounted: BTreeSet<u64> = BTreeSet::new();
@@ -249,7 +269,7 @@ fn every_request_a_scenario_sends_is_a_vector_or_a_listed_probe_that_is_not_run_
             accounted.insert(line);
         }
         assert_eq!(
-            call_sites(&text),
+            call_sites(&text, scenario_file),
             accounted,
             "{scenario_file}: the request sites and the accounted lines differ"
         );

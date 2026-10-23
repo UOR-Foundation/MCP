@@ -9,6 +9,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Merge-queue groups for main get the same gates, so a queued pull request
+  # is checked against the main it will land on.
+  merge_group:
+    branches: [main]
 
 permissions:
   contents: read

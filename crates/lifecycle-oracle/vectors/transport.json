@@ -441,11 +441,15 @@
       "absent": true
      },
      {
-      "at": "/result/capabilities/prompts",
+      "at": "/result/capabilities/prompts/listChanged",
       "absent": true
      },
      {
-      "at": "/result/capabilities/resources",
+      "at": "/result/capabilities/resources/listChanged",
+      "absent": true
+     },
+     {
+      "at": "/result/capabilities/resources/subscribe",
       "absent": true
      }
     ]

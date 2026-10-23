@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-resource-laws"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "ResourceLaws"
+component = "ResourceLaws"
+
+[[form]]
+id = "mcp-resource-laws"
+channel = "text"
+surface = "MCP resource laws"
+canonical_source = true
+features = ["sentence-case", "singular"]

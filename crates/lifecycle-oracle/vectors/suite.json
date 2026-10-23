@@ -333,8 +333,7 @@
     "sep-2575-server-declares-prompts-in-discover"
    ],
    "register": [
-    "LC-06",
-    "LC-08"
+    "LC-05"
    ],
    "request": {
     "method": "POST",
@@ -360,14 +359,10 @@
     "body": "{\"jsonrpc\":\"2.0\",\"id\":203,\"method\":\"prompts/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
    },
    "expect": {
-    "status": 404,
+    "status": 200,
     "checks": [
      {
-      "at": "/error/code",
-      "eq": -32601
-     },
-     {
-      "at": "/result",
+      "at": "/error",
       "absent": true
      },
      {
@@ -379,11 +374,20 @@
       "eq": 203
      },
      {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "present": true
+     },
+     {
       "at": "/result/prompts",
-      "absent": true
+      "nonempty_array": true
      }
     ]
-   }
+   },
+   "note": "The fixture offers prompts (RP-07) and declares them in server/discover (RP-18), which is what the check requires of a server that handles prompts; the vector first recorded the answer of a fixture that offered tools only (-32601)."
   },
   {
    "id": "ST-07",

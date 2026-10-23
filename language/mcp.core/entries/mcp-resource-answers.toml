@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-resource-answers"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Resources"
+component = "Resources"
+
+[[form]]
+id = "mcp-resource-answers"
+channel = "text"
+surface = "MCP resource answers"
+canonical_source = true
+features = ["sentence-case", "singular"]

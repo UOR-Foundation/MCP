@@ -256,6 +256,27 @@ theorem{
 }
 
 theorem{
+  name: a_missing_resource_is_a_bad_request,
+  parameters: [uri : String],
+  statement: ((statusOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.resourceNotFound uri))) = 400),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_unknown_prompt_is_a_bad_request,
+  parameters: [name : String],
+  statement: ((statusOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.unknownPrompt name))) = 400),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_invalid_prompt_argument_is_a_bad_request,
+  parameters: [reason : String],
+  statement: ((statusOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.invalidArguments reason))) = 400),
+  proof: reflexivity{}
+}
+
+theorem{
   name: a_forbidden_origin_is_forbidden,
   parameters: [],
   statement: ((transportStatus (ctor Transport::TransportRefusal.forbiddenOrigin)) = 403),
