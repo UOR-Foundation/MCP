@@ -3,7 +3,7 @@
 The codec reads and writes JSON text (RFC 8259) as bytes. It is LexLean source in
 language 1.2 over the existing `Json` type in `src/Json.lex.tex`, which is
 unchanged; so are Dispatch and Validation. Issue #18; register rows JC-01 to JC-12, and
-JC-13 and JC-14 from issues #23 and #18.
+JC-13 from issue #23, JC-14 to JC-16 from issue #18.
 
 ## Where it lives
 
@@ -15,21 +15,25 @@ JC-13 and JC-14 from issues #23 and #18.
 | `src/JsonWrite.lex.tex` | the encoder: a work list, no recursion on `Json` |
 | `src/JsonCodec.lex.tex` | the production root `codecRun` |
 | `src/JsonGate.lex.tex`, `src/JsonExamples.lex.tex`, `src/JsonRoundTrip.lex.tex` | kernel-checked theorems |
+| `src/JsonWriteLaws.lex.tex` | the encoder's work loop proved equal to a structural specification for every `Json` value, and the bytes it writes (JC-15, JC-16) |
 | `crates/json-oracle/generated/mcp_json_codec` | LexLean's export of `codecRun`, unedited |
 | `crates/json-oracle/corpus/JSONTestSuite-1ef36fa01286573e846ac449e8683f8833c5b26a` | the vendored corpus |
 
-Regenerate the package after any change to the sources (it verifies the project
-first):
+Regenerate the pins and the package in the same commit as any change to the sources, the
+lock or the pinned compiler (it verifies the project first):
 
 ```
-lexlean production build --request crates/json-oracle/generated/request.json
+cargo xtask export
 ```
 
-with that request naming root `UorMcp.JsonCodec.codecRun`, package
-`mcp_json_codec` 1.0.0, target `rust-std`. Copy `Cargo.toml`, `package.json`,
-`provenance.json` and `src/lib.rs` from `.lexlean/production/<id>/packages/rust-std/mcp_json_codec`
-to `crates/json-oracle/generated/mcp_json_codec`. The lock was made with LexLean
-`release/v0.4` at `9796067`.
+The request `crates/json-oracle/generated/request.json` names root `UorMcp.JsonCodec.codecRun`,
+package `mcp_json_codec` 1.0.0, target `rust-std`, and pins in `expect` the source ID, the
+semantic ID and the SHA-256 of `lexlean.lock` it was exported from (SPEC section 24.7).
+`cargo xtask export` writes those pins and the target digest, runs
+`lexlean production build --request` and replaces the package in
+`crates/json-oracle/generated/mcp_json_codec` with the export. The lock was made with the compiler
+pinned in `.github/lexlean.rev` (LexLean PR #292 at `0b0c95d96`, on PR #284, on
+`release/v0.4`; see [CI.md](CI.md)).
 
 ## Decisions
 
@@ -157,6 +161,48 @@ cannot have a hypothesis as a parameter, `LLP2001`; `apply` is one `exact`;
 `linear_arithmetic` unfolds definitions and not theorems, SPEC 17.10 and 17.12). With one it
 would be the single statement `scan [b1, b2, b3] = 0 <-> flags` for a variable lead byte.
 
+## The encoder against its specification (JC-15, JC-16)
+
+`JsonWriteLaws` proves, for every `Json` value and not for instances, that the encoder's work loop
+(`JsonWrite.writeLoop`, a machine over a list of tasks with a fuel) does what a structural
+specification says. The specification reads the value once, front to back:
+
+* `Forest` is a sequence of values with an optional member name on each, written without nesting
+  of `Json` in `List`: `stop`, then `null`, `bool`, `number`, `text`, `array` and `object`, the last
+  two carrying a `Forest` of children and a `Forest` for what follows. `toForest` turns a `Json`
+  into the forest that holds just it; `jsonsOf` and `membersOf` read a forest back as a list of
+  values and as a list of members.
+* `outlineOf depth phase forest` is the `Outline` of what the loop does to the forest in one of five
+  phases (`single`, `items`, `afterItem`, `entries`, `afterEntry`, the tasks the loop keeps): the
+  `bytes` it appends, the `cost` in loop steps, and the first `failure` (`tooDeep` or
+  `numberOutOfRange`) or none.
+
+The theorems, all with exact axiom policies:
+
+| Theorem | Says |
+| --- | --- |
+| `forest_encoding_is_faithful` | `jsonsOf (toForest v) = [v]` and `membersOf (toForest v) = [("", v)]` for every `v`; proved by `nested_induction` over `Json` (nine branches: the six constructors, both lists, the pair) |
+| `writer_loop_agrees_with_outline` | for every forest, depth, fuel `budget`, task list `rest` and output `col`, in each of the five phases, the loop with fuel `budget + cost` on the phase's task followed by `rest` is the failure of the outline if there is one and else the loop with fuel `budget` on `rest` and the outline's bytes added to `col`; proved by `induction` over `Forest` generalizing `depth budget rest col` |
+| `writer_agrees_with_outline` | `writeListWith (cost + budget + 1) (headOf forest) = outcomeOf (outlineOf 0 single forest)` for every forest and `budget` |
+| `writer_agrees_on_every_value` | for every `v` and `budget`: `headOf (toForest v) = v` and the loop with fuel `cost + budget + 1` writes `v` as `outcomeOf (outlineOf 0 single (toForest v))` |
+
+so for every value the encoder, given more than `cost` steps of fuel, returns the specification's bytes
+or its refusal and never `encodeBudget`. The lemmas under them (`loop_step`, `value_step_*`,
+`continue_*`, `orElse_*`, `failure_*`, `reverse_cat`, `plus_assoc`, ...) are theorems of their own with
+their own policies. The reason for the second type: `nested_induction` has no `generalizing`, and
+the invariant of a work list is about every `rest` and `col`, so the induction that carries it is
+over a type that is not nested, `Forest`, and `forest_encoding_is_faithful` is what links it back to `Json`.
+
+`JsonWriteLaws` is hand-maintained source, like every other module: it was written with the help of a
+throwaway script and a plain-Lean prototype, neither of which is kept, and a lemma added to it is
+edited into the file and checked by `lexlean verify`, whose exact axiom audit states each policy.
+
+JC-16 is the byte-level half that the kernel can evaluate: `escape_every_control_byte`,
+`escape_quote_and_backslash` and `escape_leaves_other_bytes` state the escaping loop on literal byte
+lists (each control byte from 0 to 31, the quotation mark and the reverse solidus, bytes that need none),
+and `encoder_keeps_item_order` states the exact bytes of a nested array. The write of a
+`String` is not among them: the kernel cannot unfold `utf8_encode` (see "Not met").
+
 ## Evidence
 
 | ID | Evidence |
@@ -198,6 +244,8 @@ Each was planted alone in the sources of a clean tree, run, and reverted.
 | the third byte of a three-byte sequence may be up to 255 (no earlier theorem covers it) | `Utf8` the `Phase.two` arm's next bounds `128 191` made `128 255` | kernel | `lexlean verify` (same project) | `Type mismatch` in exactly the seven `*_sequence` theorems (four three-byte, three four-byte), whose statement the unfolded phase two no longer matches; no earlier theorem fails |
 | the same, in the generated package | `generated/.../src/lib.rs`, the transition to phase one `(128u64, (191u64` made `255u64` by hand | oracle | `cargo test -p json-oracle --test utf8` | `class of [e0, a0, c0]`: left `"valid"`, right `"invalid"` (JC-01 and both JC-14 sweeps); the provenance test fails too |
 | a corpus file is altered | `test_parsing/y_structure_lonely_null.json` | pin and checksum | same | `the vendored files are not the files the authority records` |
+| the quotation mark is no longer escaped (#18) | `JsonWrite` `escapeBytes`, the first test `byte =? 34` made `byte =? 300` | kernel | `lexlean verify` (run in a project holding `Json`, `JsonText`, `Utf8`, `JsonRead`, `JsonWrite`, `JsonWriteLaws` and `JsonRoundTrip` alone) | one error: `Tactic rfl failed` in `escape_quote_and_backslash`, `JsonRead.reverseOnto Nat (JsonWrite.escapeLoop [113, 34, 98, 92, 115, 47, 92, 34, 92] []) []` is not definitionally equal to `LexLeanRuntime.append [113, 92, 34, 98, 92, 92, 115] [47, 92, 92, 92, 34, 92, 92]`; the universal theorems still hold, because they relate the loop to `quoted`, which is what is wrong, and not to the table; the byte theorems are the ones that stop it |
+| object members are written in reverse order (#18) | `JsonWrite` `valueStep`, the object case opens `Task.members` on `JsonRead.reverseOnto entries []` | kernel | `lexlean verify` (same project) | one error: `Tactic rfl failed` in `value_step_object`, `JsonWrite.valueStep depth (Json.Json.object entries) rest col` is not definitionally equal to `objectStepGated (depth.blt JsonRead.maxDepth) depth entries rest col`: the lemma that ties the loop to the specification, on which `writer_loop_agrees_with_outline` is built, is false, so the universal theorem does not verify (no instance theorem covers an object, because the kernel cannot write its keys) |
 | a test is renamed so no test ends in `jc_11` | `tests/corpus.rs` | meta-gate | `cargo test -p repo-conformance` | `CM-02: JC-11 is registered but no test name ends in jc_11` |
 
 The first two of the original rows were stopped by `lexlean verify` before an export was possible; the next
@@ -211,13 +259,42 @@ the oracle sweeps would also have stopped it, and that is all they show. The qua
 
 ## Not met
 
-* The universal statement "for every `Json` value that encodes, parsing the encoding returns
-  it" is not proved. `Json` is nested through `List` and LexLean 1.2 has no induction
-  principle over such a type, so the encoder and parser are machines over lists and a
-  proof by induction on the value has nothing to induct on. What is checked: the property
-  as kernel-checked instances (eight values, and all `Bool`), and as a canonical fixed point
-  over every accepted corpus text. The precondition of the instances is that the encoder
-  accepts the value (number and depth bounds), which the tests exercise on both sides.
+* **The universal round trip is not proved:** "for every `Json` value that encodes, parsing the
+  encoding returns it". The writer half is (JC-15, above). The reader half is not, and nothing
+  was weakened to say otherwise. The statement stays as the issue gives it; what stops a proof is
+  four things language 1.2 does not have:
+  1. *A conditional lemma cannot be discharged.* The parser is a state machine, and its invariant
+     is a lemma about `readLoop` on `bytes ++ rest` for every `rest`, under a condition on the
+     first byte of `rest` (for instance that it does not continue a number) and on the fuel. A
+     theorem may state a premise with `->`, but a proof form that applies a theorem to a premise
+     and proves that premise at the use does not exist: `apply` takes exactly the theorem's
+     parameters. This is LexLean#291, which the 0.5.0 line is meant to close.
+  2. *No law about `String` and `Bytes`.* `utf8_encode` and `utf8_decode` are not unfolded by
+     `rfl` inside a verified module (the same statements are accepted by `rfl` in a plain Lean file
+     that imports the generated modules, so the cause is the module system's view of the core
+     definitions), so
+     `reparse (text "a")`, `reparse (object [("", null)])` and every other value with a string or a
+     member name is rejected by `reflexivity` (`Tactic rfl failed`; five round-trip and six `writeList` instance theorems tried),
+     and there is no registered law `utf8_decode (utf8_encode s) = s` for a variable `s`. Every
+     object has keys, so no object is reachable, as an instance or for all values.
+  3. *`nested_induction` cannot generalize.* It has no `generalizing` list and no introduction of
+     the context, so a lemma about a work list for every `rest` cannot be proved by it. The writer
+     proof goes around this with a type that is not nested (`Forest`) and ordinary `induction`;
+     the reader's invariant is over bytes, not over `Json`, and has no such detour.
+  4. *No projection of a conjunction.* A theorem proved as a conjunction of five facts is used, by
+     `simplify`, as five rewrite rules; there is no proof form that returns one of them as the goal.
+     (Used here in `writer_agrees_with_outline`.) `cases` on `Option` is also refused
+     (`proof scrutinee is not Nat, List, or a document inductive`), so `Halt` stands in for it.
+
+  What is checked: the property as kernel-checked instances of the round trip (eight values, and
+  all `Bool`), as the exact bytes the encoder writes (JC-16) and as the universal writer theorem
+  (JC-15), and as a canonical fixed point over every accepted corpus text. The precondition of the
+  instances is that the encoder accepts the value (number and depth bounds), which the tests
+  exercise on both sides.
+* The universal theorem is stated for the loop with `writeListWith` and a fuel above the outline's
+  cost. `writeList` fixes the fuel at 2^26; "the cost of every value is below 2^26" is a
+  conditional lemma (1 above), and the outline's `cost` is the exact number of steps, so the
+  theorem is the statement for every fuel that suffices, not for the production budget.
 * A successful parse of a string is not kernel-evaluated: the decoder uses the opaque
   `utf8_decode`, which the kernel cannot reduce. String success is covered by the oracle.
 * The gate theorem fixes the refusal kind, not the offset; the offset is checked by tests.

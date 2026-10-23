@@ -85,3 +85,15 @@ Feature: JSON text codec
     Given the lead-byte classes of Table 3-7 for three-byte and four-byte sequences
     When the theorems of the Utf8 module are checked by the kernel and the validator judges every such sequence
     Then the validator accepts exactly the well-formed ones, refuses each ill-formed one at the byte the table first refuses, and agrees with the standard library on every sequence
+
+  @JC-15 @build
+  Scenario: The encoder's work loop agrees with its structural specification for every JSON value and every fuel above the specification's cost: the text it emits, or the refusal it names, is the one the specification gives, by kernel-checked theorems proved by induction over the value, with exact axiom policies. The statement is about the encoder only; the universal round trip through the reader is not claimed.
+    Given the encoder module of the codec and the module that states its specification
+    When the theorems of the JsonWriteLaws module are checked by the kernel
+    Then the loop's result for any value equals the specification's, with the axiom policy each theorem declares and no placeholder proof
+
+  @JC-16 @build
+  Scenario: The encoder escapes bytes as RFC 8259 section 7 and the decisions table state, byte for byte, and keeps the order of array items: every control byte from 0 to 31, the quotation mark and the reverse solidus are escaped, bytes that need no escape are written unchanged, and the items of an array are written in order, by kernel-checked theorems with exact axiom policies. The write of a string value is not kernel-evaluated, so the read of a written string is not claimed.
+    Given the control bytes from 0 to 31, the quotation mark, the reverse solidus, bytes that need no escape, and an array of nested items in a stated order
+    When the escaping loop of the encoder and the encoder itself are evaluated by the kernel
+    Then each byte is written as the table states and the items come out in order, with the axiom policy each theorem declares and no placeholder proof

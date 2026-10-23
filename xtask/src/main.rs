@@ -12,6 +12,7 @@ use repo_model::{codegen, Model};
 
 mod audit;
 mod bootstrap;
+mod exports;
 
 fn main() -> ExitCode {
     let task = std::env::args()
@@ -26,6 +27,7 @@ fn main() -> ExitCode {
         "audit-deferral" => audit::audit_deferral(&root),
         "audit-bootstrap" => bootstrap::audit(&root),
         "audit-dependency-updates" => bootstrap::audit_dependency_updates(&root),
+        "export" => exports::export(&root),
         "validate" => validate(&root),
         _ => {
             eprintln!(
@@ -36,6 +38,7 @@ fn main() -> ExitCode {
                  audit-deferral    R4: no deferral marker, no stub, no capability behind a flag\n\
                  audit-bootstrap   immutable SDK and least-privilege workflow trust root\n\
                  audit-dependency-updates   SDK ownership and ordinary dependency maintenance\n\
+                 export            #21: write the request pins and re-export the generated packages (needs lexlean)\n\
                  validate          run every gate above\n\
                  \n\
                  --write           check-model only: rewrite the generated file"
