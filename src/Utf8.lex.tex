@@ -1,0 +1,321 @@
+\begin{lexlean}{Utf8}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\title{Unicode byte validation}
+\begin{semanticmodule}
+inductive{
+  name: Utf8Verdict,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: valid, fields: []},
+    {name: invalidByte, fields: [Nat]},
+    {name: truncated, fields: [Nat]}
+  ]
+}
+
+inductive{
+  name: Phase,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: ready, fields: []},
+    {name: one, fields: []},
+    {name: two, fields: []},
+    {name: three, fields: []}
+  ]
+}
+
+definition{
+  name: inRange,
+  parameters: [value : Nat, low : Nat, high : Nat],
+  result: Bool,
+  body: ((low <=? value) && (value <=? high)),
+  executable: true
+}
+
+definition{
+  name: invalidCode,
+  parameters: [remaining : Nat],
+  result: Nat,
+  body: ((prim multiply remaining 3 : Nat) + 1),
+  executable: true
+}
+
+definition{
+  name: utf8Scan,
+  parameters: [phase : Phase, low : Nat, high : Nat, bytes : (List Nat)],
+  result: Nat,
+  body: (match bytes
+    | List.nil => (match phase
+      | Phase.ready => 0
+      | Phase.one => 2
+      | Phase.two => 2
+      | Phase.three => 2)
+    | List.cons byte rest => (match phase
+      | Phase.ready => (if (byte <? 128) then (utf8Scan (ctor Phase.ready) 0 0 rest) else (if (byte <? 194) then (let code : Nat := (invalidCode (prim length (cons byte rest) : Nat)); code) else (if (byte <? 224) then (utf8Scan (ctor Phase.one) 128 191 rest) else (if (byte =? 224) then (utf8Scan (ctor Phase.two) 160 191 rest) else (if (byte =? 237) then (utf8Scan (ctor Phase.two) 128 159 rest) else (if (byte <? 240) then (utf8Scan (ctor Phase.two) 128 191 rest) else (if (byte =? 240) then (utf8Scan (ctor Phase.three) 144 191 rest) else (if (byte =? 244) then (utf8Scan (ctor Phase.three) 128 143 rest) else (if (byte <? 244) then (utf8Scan (ctor Phase.three) 128 191 rest) else (let code : Nat := (invalidCode (prim length (cons byte rest) : Nat)); code))))))))))
+      | Phase.one => (if (inRange byte low high) then (utf8Scan (ctor Phase.ready) 0 0 rest) else (let code : Nat := (invalidCode (prim length (cons byte rest) : Nat)); code))
+      | Phase.two => (if (inRange byte low high) then (utf8Scan (ctor Phase.one) 128 191 rest) else (let code : Nat := (invalidCode (prim length (cons byte rest) : Nat)); code))
+      | Phase.three => (if (inRange byte low high) then (utf8Scan (ctor Phase.two) 128 191 rest) else (let code : Nat := (invalidCode (prim length (cons byte rest) : Nat)); code)))),
+  executable: true,
+  recursive_argument: bytes
+}
+
+definition{
+  name: verdictOf,
+  parameters: [total : Nat, code : Nat],
+  result: Utf8Verdict,
+  body: (if (code =? 0) then (ctor Utf8Verdict.valid) else (if (code =? 2) then (ctor Utf8Verdict.truncated total) else (ctor Utf8Verdict.invalidByte (prim subtract total (prim quotient code 3 0 : Nat) : Nat)))),
+  executable: true
+}
+
+definition{
+  name: utf8Check,
+  parameters: [bytes : (List Nat)],
+  result: Utf8Verdict,
+  body: (verdictOf (prim length bytes : Nat) (utf8Scan (ctor Phase.ready) 0 0 bytes)),
+  executable: true
+}
+
+theorem{
+  name: in_range_exact,
+  parameters: [value : Nat, low : Nat, high : Nat],
+  statement: (((inRange value low high) = true) <-> ((low <= value) /\ (value <= high))),
+  proof: linear_arithmetic{definitions: [inRange]},
+  axioms: [propext]
+}
+
+theorem{
+  name: ascii_accepted,
+  parameters: [byte : Nat, rest : (List Nat)],
+  statement: ((byte < 128) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons byte rest)) = (utf8Scan (ctor Phase.ready) 0 0 rest))),
+  proof: linear_arithmetic{definitions: [inRange, invalidCode, utf8Scan]},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: bad_lead_refused,
+  parameters: [byte : Nat, rest : (List Nat)],
+  statement: (((((128 <=? byte) && (byte <? 194)) || (245 <=? byte)) = true) -> (0 < (utf8Scan (ctor Phase.ready) 0 0 (cons byte rest)))),
+  proof: linear_arithmetic{definitions: [inRange, invalidCode, utf8Scan]},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: two_byte_accepted,
+  parameters: [lead : Nat, next : Nat, rest : (List Nat)],
+  statement: (((194 <= lead) /\ ((lead <= 223) /\ ((128 <= next) /\ (next <= 191)))) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons lead (cons next rest))) = (utf8Scan (ctor Phase.ready) 0 0 rest))),
+  proof: linear_arithmetic{definitions: [inRange, invalidCode, utf8Scan]},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: two_byte_second_refused,
+  parameters: [lead : Nat, next : Nat, rest : (List Nat)],
+  statement: (((194 <= lead) /\ ((lead <= 223) /\ (((next <? 128) || (191 <? next)) = true))) -> (0 < (utf8Scan (ctor Phase.ready) 0 0 (cons lead (cons next rest))))),
+  proof: linear_arithmetic{definitions: [inRange, invalidCode, utf8Scan]},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: lead_alone_truncated,
+  parameters: [lead : Nat],
+  statement: (((194 <= lead) /\ (lead <= 244)) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons lead (nil Nat))) = 2)),
+  proof: linear_arithmetic{definitions: [inRange, invalidCode, utf8Scan]},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: table_3_7_second_byte,
+  parameters: [b1 : Nat, b2 : Nat],
+  statement: (((224 <= b1) /\ (b1 <= 244)) -> (((utf8Scan (ctor Phase.ready) 0 0 (cons b1 (cons b2 (nil Nat)))) = 2) <-> (((((((((b1 =? 224) && ((160 <=? b2) && (b2 <=? 191))) || (((225 <=? b1) && (b1 <=? 236)) && ((128 <=? b2) && (b2 <=? 191)))) || ((b1 =? 237) && ((128 <=? b2) && (b2 <=? 159)))) || (((238 <=? b1) && (b1 <=? 239)) && ((128 <=? b2) && (b2 <=? 191)))) || ((b1 =? 240) && ((144 <=? b2) && (b2 <=? 191)))) || (((241 <=? b1) && (b1 <=? 243)) && ((128 <=? b2) && (b2 <=? 191)))) || ((b1 =? 244) && ((128 <=? b2) && (b2 <=? 143)))) = true))),
+  proof: linear_arithmetic{definitions: [inRange, invalidCode, utf8Scan]},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: lead_e0_step,
+  parameters: [b1 : Nat, tail : (List Nat)],
+  statement: ((b1 = 224) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 tail)) = (utf8Scan (ctor Phase.two) 160 191 tail))),
+  proof: linear_arithmetic{definitions: [inRange, invalidCode, utf8Scan]},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: lead_mid3_step,
+  parameters: [b1 : Nat, tail : (List Nat)],
+  statement: (((225 <= b1) /\ (b1 <= 236)) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 tail)) = (utf8Scan (ctor Phase.two) 128 191 tail))),
+  proof: linear_arithmetic{definitions: [inRange, invalidCode, utf8Scan]},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: lead_ed_step,
+  parameters: [b1 : Nat, tail : (List Nat)],
+  statement: ((b1 = 237) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 tail)) = (utf8Scan (ctor Phase.two) 128 159 tail))),
+  proof: linear_arithmetic{definitions: [inRange, invalidCode, utf8Scan]},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: lead_hi3_step,
+  parameters: [b1 : Nat, tail : (List Nat)],
+  statement: (((238 <= b1) /\ (b1 <= 239)) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 tail)) = (utf8Scan (ctor Phase.two) 128 191 tail))),
+  proof: linear_arithmetic{definitions: [inRange, invalidCode, utf8Scan]},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: lead_f0_step,
+  parameters: [b1 : Nat, tail : (List Nat)],
+  statement: ((b1 = 240) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 tail)) = (utf8Scan (ctor Phase.three) 144 191 tail))),
+  proof: linear_arithmetic{definitions: [inRange, invalidCode, utf8Scan]},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: lead_mid4_step,
+  parameters: [b1 : Nat, tail : (List Nat)],
+  statement: (((241 <= b1) /\ (b1 <= 243)) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 tail)) = (utf8Scan (ctor Phase.three) 128 191 tail))),
+  proof: linear_arithmetic{definitions: [inRange, invalidCode, utf8Scan]},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: lead_f4_step,
+  parameters: [b1 : Nat, tail : (List Nat)],
+  statement: ((b1 = 244) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 tail)) = (utf8Scan (ctor Phase.three) 128 143 tail))),
+  proof: linear_arithmetic{definitions: [inRange, invalidCode, utf8Scan]},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: three_byte_e0_sequence,
+  parameters: [b1 : Nat, b2 : Nat, b3 : Nat, rest : (List Nat)],
+  statement: ((b1 = 224) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 (cons b2 (cons b3 rest)))) = (if (inRange b2 160 191) then (if (inRange b3 128 191) then (utf8Scan (ctor Phase.ready) 0 0 rest) else (invalidCode (prim length (cons b3 rest) : Nat))) else (invalidCode (prim length (cons b2 (cons b3 rest)) : Nat))))),
+  proof: apply{arguments: [b1, (cons b2 (cons b3 rest))], theorem: lead_e0_step},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: three_byte_mid3_sequence,
+  parameters: [b1 : Nat, b2 : Nat, b3 : Nat, rest : (List Nat)],
+  statement: (((225 <= b1) /\ (b1 <= 236)) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 (cons b2 (cons b3 rest)))) = (if (inRange b2 128 191) then (if (inRange b3 128 191) then (utf8Scan (ctor Phase.ready) 0 0 rest) else (invalidCode (prim length (cons b3 rest) : Nat))) else (invalidCode (prim length (cons b2 (cons b3 rest)) : Nat))))),
+  proof: apply{arguments: [b1, (cons b2 (cons b3 rest))], theorem: lead_mid3_step},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: three_byte_ed_sequence,
+  parameters: [b1 : Nat, b2 : Nat, b3 : Nat, rest : (List Nat)],
+  statement: ((b1 = 237) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 (cons b2 (cons b3 rest)))) = (if (inRange b2 128 159) then (if (inRange b3 128 191) then (utf8Scan (ctor Phase.ready) 0 0 rest) else (invalidCode (prim length (cons b3 rest) : Nat))) else (invalidCode (prim length (cons b2 (cons b3 rest)) : Nat))))),
+  proof: apply{arguments: [b1, (cons b2 (cons b3 rest))], theorem: lead_ed_step},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: three_byte_hi3_sequence,
+  parameters: [b1 : Nat, b2 : Nat, b3 : Nat, rest : (List Nat)],
+  statement: (((238 <= b1) /\ (b1 <= 239)) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 (cons b2 (cons b3 rest)))) = (if (inRange b2 128 191) then (if (inRange b3 128 191) then (utf8Scan (ctor Phase.ready) 0 0 rest) else (invalidCode (prim length (cons b3 rest) : Nat))) else (invalidCode (prim length (cons b2 (cons b3 rest)) : Nat))))),
+  proof: apply{arguments: [b1, (cons b2 (cons b3 rest))], theorem: lead_hi3_step},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: four_byte_f0_sequence,
+  parameters: [b1 : Nat, b2 : Nat, b3 : Nat, b4 : Nat, rest : (List Nat)],
+  statement: ((b1 = 240) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 (cons b2 (cons b3 (cons b4 rest))))) = (if (inRange b2 144 191) then (if (inRange b3 128 191) then (if (inRange b4 128 191) then (utf8Scan (ctor Phase.ready) 0 0 rest) else (invalidCode (prim length (cons b4 rest) : Nat))) else (invalidCode (prim length (cons b3 (cons b4 rest)) : Nat))) else (invalidCode (prim length (cons b2 (cons b3 (cons b4 rest))) : Nat))))),
+  proof: apply{arguments: [b1, (cons b2 (cons b3 (cons b4 rest)))], theorem: lead_f0_step},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: four_byte_mid4_sequence,
+  parameters: [b1 : Nat, b2 : Nat, b3 : Nat, b4 : Nat, rest : (List Nat)],
+  statement: (((241 <= b1) /\ (b1 <= 243)) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 (cons b2 (cons b3 (cons b4 rest))))) = (if (inRange b2 128 191) then (if (inRange b3 128 191) then (if (inRange b4 128 191) then (utf8Scan (ctor Phase.ready) 0 0 rest) else (invalidCode (prim length (cons b4 rest) : Nat))) else (invalidCode (prim length (cons b3 (cons b4 rest)) : Nat))) else (invalidCode (prim length (cons b2 (cons b3 (cons b4 rest))) : Nat))))),
+  proof: apply{arguments: [b1, (cons b2 (cons b3 (cons b4 rest)))], theorem: lead_mid4_step},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: four_byte_f4_sequence,
+  parameters: [b1 : Nat, b2 : Nat, b3 : Nat, b4 : Nat, rest : (List Nat)],
+  statement: ((b1 = 244) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 (cons b2 (cons b3 (cons b4 rest))))) = (if (inRange b2 128 143) then (if (inRange b3 128 191) then (if (inRange b4 128 191) then (utf8Scan (ctor Phase.ready) 0 0 rest) else (invalidCode (prim length (cons b4 rest) : Nat))) else (invalidCode (prim length (cons b3 (cons b4 rest)) : Nat))) else (invalidCode (prim length (cons b2 (cons b3 (cons b4 rest))) : Nat))))),
+  proof: apply{arguments: [b1, (cons b2 (cons b3 (cons b4 rest)))], theorem: lead_f4_step},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: three_byte_e0_complete,
+  parameters: [b1 : Nat, b2 : Nat, b3 : Nat],
+  statement: ((b1 = 224) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 (cons b2 (cons b3 (nil Nat))))) = (if (inRange b2 160 191) then (if (inRange b3 128 191) then 0 else (invalidCode 1)) else (invalidCode 2)))),
+  proof: apply{arguments: [b1, b2, b3, (nil Nat)], theorem: three_byte_e0_sequence},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: three_byte_mid3_complete,
+  parameters: [b1 : Nat, b2 : Nat, b3 : Nat],
+  statement: (((225 <= b1) /\ (b1 <= 236)) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 (cons b2 (cons b3 (nil Nat))))) = (if (inRange b2 128 191) then (if (inRange b3 128 191) then 0 else (invalidCode 1)) else (invalidCode 2)))),
+  proof: apply{arguments: [b1, b2, b3, (nil Nat)], theorem: three_byte_mid3_sequence},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: three_byte_ed_complete,
+  parameters: [b1 : Nat, b2 : Nat, b3 : Nat],
+  statement: ((b1 = 237) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 (cons b2 (cons b3 (nil Nat))))) = (if (inRange b2 128 159) then (if (inRange b3 128 191) then 0 else (invalidCode 1)) else (invalidCode 2)))),
+  proof: apply{arguments: [b1, b2, b3, (nil Nat)], theorem: three_byte_ed_sequence},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: three_byte_hi3_complete,
+  parameters: [b1 : Nat, b2 : Nat, b3 : Nat],
+  statement: (((238 <= b1) /\ (b1 <= 239)) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 (cons b2 (cons b3 (nil Nat))))) = (if (inRange b2 128 191) then (if (inRange b3 128 191) then 0 else (invalidCode 1)) else (invalidCode 2)))),
+  proof: apply{arguments: [b1, b2, b3, (nil Nat)], theorem: three_byte_hi3_sequence},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: four_byte_f0_complete,
+  parameters: [b1 : Nat, b2 : Nat, b3 : Nat, b4 : Nat],
+  statement: ((b1 = 240) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 (cons b2 (cons b3 (cons b4 (nil Nat)))))) = (if (inRange b2 144 191) then (if (inRange b3 128 191) then (if (inRange b4 128 191) then 0 else (invalidCode 1)) else (invalidCode 2)) else (invalidCode 3)))),
+  proof: apply{arguments: [b1, b2, b3, b4, (nil Nat)], theorem: four_byte_f0_sequence},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: four_byte_mid4_complete,
+  parameters: [b1 : Nat, b2 : Nat, b3 : Nat, b4 : Nat],
+  statement: (((241 <= b1) /\ (b1 <= 243)) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 (cons b2 (cons b3 (cons b4 (nil Nat)))))) = (if (inRange b2 128 191) then (if (inRange b3 128 191) then (if (inRange b4 128 191) then 0 else (invalidCode 1)) else (invalidCode 2)) else (invalidCode 3)))),
+  proof: apply{arguments: [b1, b2, b3, b4, (nil Nat)], theorem: four_byte_mid4_sequence},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: four_byte_f4_complete,
+  parameters: [b1 : Nat, b2 : Nat, b3 : Nat, b4 : Nat],
+  statement: ((b1 = 244) -> ((utf8Scan (ctor Phase.ready) 0 0 (cons b1 (cons b2 (cons b3 (cons b4 (nil Nat)))))) = (if (inRange b2 128 143) then (if (inRange b3 128 191) then (if (inRange b4 128 191) then 0 else (invalidCode 1)) else (invalidCode 2)) else (invalidCode 3)))),
+  proof: apply{arguments: [b1, b2, b3, b4, (nil Nat)], theorem: four_byte_f4_sequence},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: three_byte_complete_zero_iff,
+  parameters: [lo : Nat, hi : Nat, b2 : Nat, b3 : Nat, l3 : Nat, l2 : Nat],
+  statement: (((if (inRange b2 lo hi) then (if (inRange b3 128 191) then 0 else (invalidCode l3)) else (invalidCode l2)) = 0) <-> (((inRange b2 lo hi) && (inRange b3 128 191)) = true)),
+  proof: linear_arithmetic{definitions: [inRange, invalidCode]},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: four_byte_complete_zero_iff,
+  parameters: [lo : Nat, hi : Nat, b2 : Nat, b3 : Nat, b4 : Nat, l4 : Nat, l3 : Nat, l2 : Nat],
+  statement: (((if (inRange b2 lo hi) then (if (inRange b3 128 191) then (if (inRange b4 128 191) then 0 else (invalidCode l4)) else (invalidCode l3)) else (invalidCode l2)) = 0) <-> ((((inRange b2 lo hi) && (inRange b3 128 191)) && (inRange b4 128 191)) = true)),
+  proof: linear_arithmetic{definitions: [inRange, invalidCode]},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+\end{semanticmodule}
+\end{lexlean}

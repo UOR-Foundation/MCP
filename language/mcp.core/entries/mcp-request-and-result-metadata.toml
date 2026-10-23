@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-request-and-result-metadata"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Meta"
+component = "RequestMeta"
+
+[[form]]
+id = "mcp-request-and-result-metadata"
+channel = "text"
+surface = "MCP request and result metadata"
+canonical_source = true
+features = ["sentence-case", "singular"]

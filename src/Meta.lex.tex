@@ -1,0 +1,128 @@
+\begin{lexlean}{Meta}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Capabilities}
+\importmodule{Common}
+\importmodule{Json}
+\importmodule{JsonRpc}
+\title{MCP request and result metadata}
+\begin{semanticmodule}
+definition{
+  name: latestProtocolVersion,
+  parameters: [],
+  result: String,
+  body: "2026-07-28",
+  executable: true
+}
+
+definition{
+  name: protocolVersionKey,
+  parameters: [],
+  result: String,
+  body: "io.modelcontextprotocol/protocolVersion",
+  executable: true
+}
+
+definition{
+  name: clientCapabilitiesKey,
+  parameters: [],
+  result: String,
+  body: "io.modelcontextprotocol/clientCapabilities",
+  executable: true
+}
+
+definition{
+  name: clientInfoKey,
+  parameters: [],
+  result: String,
+  body: "io.modelcontextprotocol/clientInfo",
+  executable: true
+}
+
+definition{
+  name: logLevelKey,
+  parameters: [],
+  result: String,
+  body: "io.modelcontextprotocol/logLevel",
+  executable: true
+}
+
+definition{
+  name: progressTokenKey,
+  parameters: [],
+  result: String,
+  body: "progressToken",
+  executable: true
+}
+
+definition{
+  name: serverInfoKey,
+  parameters: [],
+  result: String,
+  body: "io.modelcontextprotocol/serverInfo",
+  executable: true
+}
+
+definition{
+  name: subscriptionIdKey,
+  parameters: [],
+  result: String,
+  body: "io.modelcontextprotocol/subscriptionId",
+  executable: true
+}
+
+structure{
+  name: RequestMeta,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: protocolVersion, type: String},
+    {name: clientCapabilities, type: Capabilities::ClientCapabilities},
+    {name: clientInfo, type: (Option Json::JsonObject)},
+    {name: logLevel, type: (Option Common::LoggingLevel)},
+    {name: progressToken, type: (Option Common::ProgressToken)},
+    {name: raw, type: Json::JsonObject}
+  ]
+}
+
+inductive{
+  name: ResultType,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: complete, fields: []},
+    {name: input_required, fields: []},
+    {name: task, fields: []}
+  ]
+}
+
+definition{
+  name: resultTypeWire,
+  parameters: [kind : ResultType],
+  result: String,
+  body: (match kind
+    | ResultType.complete => "complete"
+    | ResultType.input_required => "input_required"
+    | ResultType.task => "task"),
+  executable: true
+}
+
+structure{
+  name: ResultMeta,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: serverInfo, type: (Option Common::Implementation)},
+    {name: others, type: (Option Json::JsonObject)}
+  ]
+}
+
+theorem{
+  name: result_type_wire_values,
+  parameters: [],
+  statement: ((((resultTypeWire (ctor ResultType.complete)) = "complete") /\ ((resultTypeWire (ctor ResultType.input_required)) = "input_required")) /\ ((resultTypeWire (ctor ResultType.task)) = "task")),
+  proof: decide{}
+}
+\end{semanticmodule}
+\end{lexlean}

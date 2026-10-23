@@ -1,0 +1,144 @@
+\begin{lexlean}{Fixture}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Capabilities}
+\importmodule{Common}
+\importmodule{Content}
+\importmodule{Extension}
+\importmodule{Json}
+\importmodule{Meta}
+\importmodule{Methods}
+\importmodule{Refusal}
+\importmodule{Serve}
+\title{MCP conformance fixture}
+\begin{semanticmodule}
+definition{
+  name: fixtureServerInfo,
+  parameters: [],
+  result: Common::Implementation,
+  body: (record Common::Implementation {name := "mcp-core-fixture", title := (ctor Option.none [String]), version := "0.1.0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])}),
+  executable: true
+}
+
+definition{
+  name: fixtureCapabilities,
+  parameters: [],
+  result: Capabilities::ServerCapabilities,
+  body: (record Capabilities::ServerCapabilities {experimental := (ctor Option.none [Json::JsonObject]), logging := (ctor Option.none [Json::JsonObject]), completions := (ctor Option.none [Json::JsonObject]), prompts := (ctor Option.none [Capabilities::ListChangedCapability]), resources := (ctor Option.none [Capabilities::ResourcesCapability]), tools := (ctor Option.some [Capabilities::ListChangedCapability] (record Capabilities::ListChangedCapability {listChanged := (ctor Option.none [Bool])})), extensions := (ctor Option.none [Json::JsonObject])}),
+  executable: true
+}
+
+definition{
+  name: fixtureCache,
+  parameters: [],
+  result: Common::CacheHint,
+  body: (record Common::CacheHint {ttlMs := 0, cacheScope := (ctor Common::CacheScope.private)}),
+  executable: true
+}
+
+definition{
+  name: fixtureRules,
+  parameters: [],
+  result: (List Extension::ParamRule),
+  body: (cons (record Extension::ParamRule {tool := "execute_sql", header := "Region", path := (cons "region" (nil String)), kind := (ctor Common::ParamKind.text)}) (cons (record Extension::ParamRule {tool := "execute_sql", header := "Limit", path := (cons "limit" (nil String)), kind := (ctor Common::ParamKind.integer)}) (cons (record Extension::ParamRule {tool := "execute_sql", header := "Dry-Run", path := (cons "dry_run" (nil String)), kind := (ctor Common::ParamKind.boolean)}) (nil Extension::ParamRule)))),
+  executable: true
+}
+
+definition{
+  name: fixtureInfo,
+  parameters: [],
+  result: Extension::ProviderInfo,
+  body: (record Extension::ProviderInfo {serverInfo := (fixtureServerInfo), instructions := (ctor Option.none [String]), capabilities := (fixtureCapabilities), discoverCache := (fixtureCache), paramRules := (fixtureRules)}),
+  executable: true
+}
+
+definition{
+  name: objectSchema,
+  parameters: [properties : (List (String * Json::Json)), required : (List String)],
+  result: Json::JsonObject,
+  body: (record Json::JsonObject {members := (cons ("type", (ctor Json::Json.text "object")) (cons ("properties", (ctor Json::Json.object properties)) (cons ("required", (ctor Json::Json.array (Refusal::textList required))) (nil (String * Json::Json)))))}),
+  executable: true
+}
+
+definition{
+  name: stringProperty,
+  parameters: [],
+  result: Json::Json,
+  body: (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: mirroredProperty,
+  parameters: [kind : String, header : String],
+  result: Json::Json,
+  body: (ctor Json::Json.object (cons ("type", (ctor Json::Json.text kind)) (cons ("x-mcp-header", (ctor Json::Json.text header)) (nil (String * Json::Json))))),
+  executable: true
+}
+
+definition{
+  name: plainTool,
+  parameters: [name : String, description : String, schema : Json::JsonObject],
+  result: Content::Tool,
+  body: (record Content::Tool {name := name, title := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)]), description := (ctor Option.some [String] description), inputSchema := schema, outputSchema := (ctor Option.none [Json::JsonObject]), annotations := (ctor Option.none [Content::ToolAnnotations]), meta := (ctor Option.none [Json::JsonObject])}),
+  executable: true
+}
+
+definition{
+  name: fixtureTools,
+  parameters: [],
+  result: (List Content::Tool),
+  body: (cons (plainTool "echo" "Returns a fixed acknowledgement" (objectSchema (nil (String * Json::Json)) (nil String))) (cons (plainTool "execute_sql" "Runs a statement in a region" (objectSchema (cons ("region", (mirroredProperty "string" "Region")) (cons ("query", (stringProperty)) (cons ("limit", (mirroredProperty "integer" "Limit")) (cons ("dry_run", (mirroredProperty "boolean" "Dry-Run")) (nil (String * Json::Json)))))) (cons "region" (cons "query" (nil String))))) (cons (plainTool "test_missing_capability" "Requires the client to declare sampling" (objectSchema (nil (String * Json::Json)) (nil String))) (nil Content::Tool)))),
+  executable: true
+}
+
+definition{
+  name: acknowledged,
+  parameters: [],
+  result: Methods::CallToolResult,
+  body: (record Methods::CallToolResult {content := (cons (ctor Content::ContentBlock.text (record Content::TextContent {text := "ok", annotations := (ctor Option.none [Common::Annotations]), meta := (ctor Option.none [Json::JsonObject])})) (nil Content::ContentBlock)), structuredContent := (ctor Option.none [Json::Json]), isError := (ctor Option.none [Bool])}),
+  executable: true
+}
+
+definition{
+  name: callFixture,
+  parameters: [params : Methods::CallToolParams],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (if (prim equal (project params name) "echo" : Bool) then (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.callTool (acknowledged))) else (if (prim equal (project params name) "execute_sql" : Bool) then (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.callTool (acknowledged))) else (if (prim equal (project params name) "test_missing_capability" : Bool) then (match (project (project (project params meta) clientCapabilities) sampling)
+    | Option.none => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.missingCapability (Capabilities::samplingRequirement)))
+    | Option.some declared => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.callTool (acknowledged)))) else (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.unknownTool (project params name)))))),
+  executable: true
+}
+
+definition{
+  name: fixtureAnswer,
+  parameters: [request : Methods::ClientRequest],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match request
+    | Methods::ClientRequest.toolsList params => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.listTools (record Methods::ListToolsResult {cache := (fixtureCache), nextCursor := (ctor Option.none [String]), tools := (fixtureTools)})))
+    | Methods::ClientRequest.toolsCall params => (callFixture params)
+    | Methods::ClientRequest.serverDiscover params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
+    | Methods::ClientRequest.resourcesList params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
+    | Methods::ClientRequest.resourcesRead params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
+    | Methods::ClientRequest.resourcesTemplatesList params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
+    | Methods::ClientRequest.promptsList params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
+    | Methods::ClientRequest.promptsGet params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
+    | Methods::ClientRequest.completionComplete params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
+    | Methods::ClientRequest.tasksGet params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
+    | Methods::ClientRequest.tasksUpdate params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
+    | Methods::ClientRequest.tasksCancel params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))),
+  executable: true
+}
+
+definition{
+  name: fixtureRun,
+  parameters: [input : Bytes],
+  result: (List Nat),
+  body: (Serve::serve (fixtureInfo) (ref fixtureAnswer) input),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true,
+  production: {effects: [allocation, overflow], targets: [rust-std]}
+}
+\end{semanticmodule}
+\end{lexlean}

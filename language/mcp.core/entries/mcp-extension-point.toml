@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-extension-point"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Extension"
+component = "Provider"
+
+[[form]]
+id = "mcp-extension-point"
+channel = "text"
+surface = "MCP extension point"
+canonical_source = true
+features = ["sentence-case", "singular"]

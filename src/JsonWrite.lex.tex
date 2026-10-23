@@ -1,0 +1,229 @@
+\begin{lexlean}{JsonWrite}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Json}
+\importmodule{JsonRead}
+\importmodule{JsonText}
+\title{JSON text writer}
+\begin{semanticmodule}
+inductive{
+  name: Task,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: emit, fields: [(List Nat)]},
+    {name: value, fields: [Nat, Json::Json]},
+    {name: items, fields: [Nat, (List Json::Json)]},
+    {name: afterItem, fields: [Nat, (List Json::Json)]},
+    {name: members, fields: [Nat, (List (String * Json::Json))]},
+    {name: afterMember, fields: [Nat, (List (String * Json::Json))]}
+  ]
+}
+
+definition{name: writeBudget, parameters: [], result: Nat, body: 67108864, executable: true}
+
+definition{
+  name: maxMagnitude,
+  parameters: [],
+  result: Int,
+  body: (999999999999999999 : Int),
+  executable: true
+}
+
+definition{
+  name: digitChar,
+  parameters: [digit : Int],
+  result: Nat,
+  body: (if (prim less_than digit (1 : Int) : Bool) then 48 else (if (prim less_than digit (2 : Int) : Bool) then 49 else (if (prim less_than digit (3 : Int) : Bool) then 50 else (if (prim less_than digit (4 : Int) : Bool) then 51 else (if (prim less_than digit (5 : Int) : Bool) then 52 else (if (prim less_than digit (6 : Int) : Bool) then 53 else (if (prim less_than digit (7 : Int) : Bool) then 54 else (if (prim less_than digit (8 : Int) : Bool) then 55 else (if (prim less_than digit (9 : Int) : Bool) then 56 else 57))))))))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: digitsOnto,
+  parameters: [fuel : Nat, magnitude : Int, collected : (List Nat)],
+  result: (List Nat),
+  body: (match fuel
+    | Nat.zero => collected
+    | Nat.succ below => (let rest : Int := (prim quotient magnitude (10 : Int) (0 : Int) : Int); (let low : Int := (prim remainder magnitude (10 : Int) (0 : Int) : Int); (if (prim less_than rest (1 : Int) : Bool) then (cons (digitChar low) collected) else (digitsOnto below rest (cons (digitChar low) collected)))))),
+  axioms: [propext],
+  executable: true,
+  recursive_argument: fuel
+}
+
+definition{
+  name: signedDigits,
+  parameters: [whole : Int],
+  result: (List Nat),
+  body: (if (prim less_than whole (0 : Int) : Bool) then (cons 45 (digitsOnto 20 (prim negate whole : Int) (nil Nat))) else (digitsOnto 20 whole (nil Nat))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: inBounds,
+  parameters: [amount : Json::Decimal],
+  result: Bool,
+  body: (not ((prim less_than (maxMagnitude) (project amount mantissa) : Bool) || ((prim less_than (project amount mantissa) (prim negate (maxMagnitude) : Int) : Bool) || ((prim less_than (9999 : Int) (project amount exponent) : Bool) || (prim less_than (project amount exponent) (-9999 : Int) : Bool))))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: numberBytes,
+  parameters: [amount : Json::Decimal],
+  result: (List Nat),
+  body: (if ((prim less_than (project amount exponent) (0 : Int) : Bool) || (prim less_than (0 : Int) (project amount exponent) : Bool)) then (prim append (signedDigits (project amount mantissa)) (cons 101 (signedDigits (project amount exponent))) : (List Nat)) else (signedDigits (project amount mantissa))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: hexDigit,
+  parameters: [nibble : Nat],
+  result: Nat,
+  body: (if (nibble <? 10) then (48 + nibble) else (87 + nibble)),
+  executable: true
+}
+
+definition{
+  name: escapeBytes,
+  parameters: [byte : Nat],
+  result: (List Nat),
+  body: (if (byte =? 34) then (cons 92 (cons 34 (nil Nat))) else (if (byte =? 92) then (cons 92 (cons 92 (nil Nat))) else (if (byte =? 8) then (cons 92 (cons 98 (nil Nat))) else (if (byte =? 9) then (cons 92 (cons 116 (nil Nat))) else (if (byte =? 10) then (cons 92 (cons 110 (nil Nat))) else (if (byte =? 12) then (cons 92 (cons 102 (nil Nat))) else (if (byte =? 13) then (cons 92 (cons 114 (nil Nat))) else (if (byte <? 32) then (cons 92 (cons 117 (cons 48 (cons 48 (cons (hexDigit (JsonRead::divide byte 16)) (cons (hexDigit (JsonRead::modulo byte 16)) (nil Nat))))))) else (cons byte (nil Nat)))))))))),
+  executable: true
+}
+
+definition{
+  name: escapeLoop,
+  parameters: [bytes : (List Nat), collected : (List Nat)],
+  result: (List Nat),
+  body: (match bytes
+    | List.nil => collected
+    | List.cons byte rest => (escapeLoop rest (JsonRead::reverseOnto [Nat] (escapeBytes byte) collected))),
+  executable: true,
+  recursive_argument: bytes
+}
+
+definition{
+  name: quoted,
+  parameters: [content : String],
+  result: (List Nat),
+  body: (cons 34 (prim append (JsonRead::reverseOnto [Nat] (escapeLoop (JsonText::bytesToList (prim utf8_encode content : Bytes)) (nil Nat)) (nil Nat)) (cons 34 (nil Nat)) : (List Nat))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: literalText,
+  parameters: [which : Nat],
+  result: (List Nat),
+  body: (JsonRead::literalBytes which),
+  executable: true
+}
+
+definition{
+  name: openTasks,
+  parameters: [opener : Nat, task : Task, rest : (List Task)],
+  result: (List Task),
+  body: (cons (ctor Task.emit (cons opener (nil Nat))) (cons task rest)),
+  executable: true
+}
+
+inductive{
+  name: WriteStep,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: failed, fields: [JsonText::JsonRefusal]},
+    {name: advanced, fields: [(List Task), (List Nat)]}
+  ]
+}
+
+definition{
+  name: valueStep,
+  parameters: [depth : Nat, item : Json::Json, rest : (List Task), collected : (List Nat)],
+  result: WriteStep,
+  body: (match item
+    | Json::Json.null => (ctor WriteStep.advanced rest (JsonRead::reverseOnto [Nat] (literalText 2) collected))
+    | Json::Json.bool flag => (ctor WriteStep.advanced rest (JsonRead::reverseOnto [Nat] (if flag then (literalText 0) else (literalText 1)) collected))
+    | Json::Json.number amount => (if (inBounds amount) then (ctor WriteStep.advanced rest (JsonRead::reverseOnto [Nat] (numberBytes amount) collected)) else (ctor WriteStep.failed (ctor JsonText::JsonRefusal.encodeNumberOutOfRange)))
+    | Json::Json.text content => (ctor WriteStep.advanced rest (JsonRead::reverseOnto [Nat] (quoted content) collected))
+    | Json::Json.array elements => (if (depth <? (JsonRead::maxDepth)) then (ctor WriteStep.advanced (openTasks 91 (ctor Task.items (depth + 1) elements) rest) collected) else (ctor WriteStep.failed (ctor JsonText::JsonRefusal.encodeTooDeep)))
+    | Json::Json.object entries => (if (depth <? (JsonRead::maxDepth)) then (ctor WriteStep.advanced (openTasks 123 (ctor Task.members (depth + 1) entries) rest) collected) else (ctor WriteStep.failed (ctor JsonText::JsonRefusal.encodeTooDeep)))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: taskStep,
+  parameters: [task : Task, rest : (List Task), collected : (List Nat)],
+  result: WriteStep,
+  body: (match task
+    | Task.emit pieces => (ctor WriteStep.advanced rest (JsonRead::reverseOnto [Nat] pieces collected))
+    | Task.value depth item => (valueStep depth item rest collected)
+    | Task.items depth elements => (match elements
+      | List.nil => (ctor WriteStep.advanced (cons (ctor Task.emit (cons 93 (nil Nat))) rest) collected)
+      | List.cons head others => (ctor WriteStep.advanced (cons (ctor Task.value depth head) (cons (ctor Task.afterItem depth others) rest)) collected))
+    | Task.afterItem depth others => (match others
+      | List.nil => (ctor WriteStep.advanced (cons (ctor Task.emit (cons 93 (nil Nat))) rest) collected)
+      | List.cons next more => (ctor WriteStep.advanced (cons (ctor Task.emit (cons 44 (nil Nat))) (cons (ctor Task.items depth others) rest)) collected))
+    | Task.members depth entries => (match entries
+      | List.nil => (ctor WriteStep.advanced (cons (ctor Task.emit (cons 125 (nil Nat))) rest) collected)
+      | List.cons entry others => (ctor WriteStep.advanced (cons (ctor Task.emit (prim append (quoted (first entry)) (cons 58 (nil Nat)) : (List Nat))) (cons (ctor Task.value depth (second entry)) (cons (ctor Task.afterMember depth others) rest))) collected))
+    | Task.afterMember depth others => (match others
+      | List.nil => (ctor WriteStep.advanced (cons (ctor Task.emit (cons 125 (nil Nat))) rest) collected)
+      | List.cons next more => (ctor WriteStep.advanced (cons (ctor Task.emit (cons 44 (nil Nat))) (cons (ctor Task.members depth others) rest)) collected))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: writeLoop,
+  parameters: [fuel : Nat, tasks : (List Task), collected : (List Nat)],
+  result: (Result (List Nat) JsonText::JsonRefusal),
+  body: (match fuel
+    | Nat.zero => (ctor Result.error [(List Nat), JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.encodeBudget))
+    | Nat.succ below => (match tasks
+      | List.nil => (ctor Result.ok [(List Nat), JsonText::JsonRefusal] collected)
+      | List.cons task rest => (match (taskStep task rest collected)
+        | WriteStep.failed reason => (ctor Result.error [(List Nat), JsonText::JsonRefusal] reason)
+        | WriteStep.advanced pending produced => (writeLoop below pending produced)))),
+  axioms: [Quot.sound, propext],
+  executable: true,
+  recursive_argument: fuel
+}
+
+definition{
+  name: writeListWith,
+  parameters: [budget : Nat, item : Json::Json],
+  result: (Result (List Nat) JsonText::JsonRefusal),
+  body: (match (writeLoop budget (cons (ctor Task.value 0 item) (nil Task)) (nil Nat))
+    | Result.ok produced => (ctor Result.ok [(List Nat), JsonText::JsonRefusal] (JsonRead::reverseOnto [Nat] produced (nil Nat)))
+    | Result.error reason => (ctor Result.error [(List Nat), JsonText::JsonRefusal] reason)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: writeList,
+  parameters: [item : Json::Json],
+  result: (Result (List Nat) JsonText::JsonRefusal),
+  body: (writeListWith (writeBudget) item),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: writeJson,
+  parameters: [item : Json::Json],
+  result: (Result Bytes JsonText::JsonRefusal),
+  body: (match (writeList item)
+    | Result.ok produced => (ctor Result.ok [Bytes, JsonText::JsonRefusal] (JsonText::listToBytes (JsonText::emptyBytes) produced))
+    | Result.error reason => (ctor Result.error [Bytes, JsonText::JsonRefusal] reason)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

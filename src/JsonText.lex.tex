@@ -1,0 +1,123 @@
+\begin{lexlean}{JsonText}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\title{JSON text bridge}
+\begin{semanticmodule}
+inductive{
+  name: JsonRefusal,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: invalidUtf8, fields: [Nat]},
+    {name: truncatedUtf8, fields: [Nat]},
+    {name: unexpectedByte, fields: [Nat]},
+    {name: unexpectedEnd, fields: []},
+    {name: controlInString, fields: [Nat]},
+    {name: badEscape, fields: [Nat]},
+    {name: loneSurrogate, fields: [Nat]},
+    {name: badNumber, fields: [Nat]},
+    {name: numberOutOfRange, fields: [Nat]},
+    {name: tooDeep, fields: [Nat]},
+    {name: trailingContent, fields: [Nat]},
+    {name: encodeNumberOutOfRange, fields: []},
+    {name: encodeTooDeep, fields: []},
+    {name: encodeBudget, fields: []},
+    {name: internalText, fields: []}
+  ]
+}
+
+definition{
+  name: byteTable,
+  parameters: [],
+  result: Bytes,
+  body: 0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff,
+  executable: true
+}
+
+definition{name: emptyBytes, parameters: [], result: Bytes, body: 0x, executable: true}
+
+definition{
+  name: byteOf,
+  parameters: [value : Nat],
+  result: Bytes,
+  body: (match (prim slice (byteTable) value 1 : (Option Bytes))
+    | Option.some single => single
+    | Option.none => (emptyBytes)),
+  executable: true
+}
+
+definition{
+  name: pushBlock,
+  parameters: [block : Bytes, stack : (List Bytes)],
+  result: (List Bytes),
+  body: (match stack
+    | List.nil => (cons block (nil Bytes))
+    | List.cons below rest => (if ((prim length below : Nat) =? (prim length block : Nat)) then (pushBlock (prim append below block : Bytes) rest) else (cons block (cons below rest)))),
+  executable: true,
+  recursive_argument: stack
+}
+
+definition{
+  name: gatherBlocks,
+  parameters: [stack : (List Bytes), items : (List Nat)],
+  result: (List Bytes),
+  body: (match items
+    | List.nil => stack
+    | List.cons head tail => (gatherBlocks (pushBlock (byteOf head) stack) tail)),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: joinBlocks,
+  parameters: [built : Bytes, stack : (List Bytes)],
+  result: Bytes,
+  body: (match stack
+    | List.nil => built
+    | List.cons head rest => (joinBlocks (prim append head built : Bytes) rest)),
+  executable: true,
+  recursive_argument: stack
+}
+
+definition{
+  name: listToBytes,
+  parameters: [built : Bytes, items : (List Nat)],
+  result: Bytes,
+  body: (prim append built (joinBlocks (emptyBytes) (gatherBlocks (nil Bytes) items)) : Bytes),
+  executable: true
+}
+
+definition{
+  name: byteAt,
+  parameters: [source : Bytes, position : Nat],
+  result: Nat,
+  body: (match (prim index source position : (Option UInt8))
+    | Option.some octet => (prim to_nat octet : Nat)
+    | Option.none => 0),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: bytesFrom,
+  parameters: [source : Bytes, position : Nat, collected : (List Nat)],
+  result: (List Nat),
+  body: (match position
+    | Nat.zero => collected
+    | Nat.succ below => (bytesFrom source below (cons (byteAt source below) collected))),
+  axioms: [Quot.sound, propext],
+  executable: true,
+  recursive_argument: position
+}
+
+definition{
+  name: bytesToList,
+  parameters: [source : Bytes],
+  result: (List Nat),
+  body: (bytesFrom source (prim length source : Nat) (nil Nat)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

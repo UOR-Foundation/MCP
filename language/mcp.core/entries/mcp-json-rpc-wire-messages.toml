@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-json-rpc-wire-messages"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "RpcWire"
+component = "RpcWire"
+
+[[form]]
+id = "mcp-json-rpc-wire-messages"
+channel = "text"
+surface = "MCP JSON-RPC wire messages"
+canonical_source = true
+features = ["sentence-case", "singular"]

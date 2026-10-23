@@ -1,0 +1,123 @@
+\begin{lexlean}{JsonRoundTrip}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Json}
+\importmodule{JsonRead}
+\importmodule{JsonText}
+\importmodule{JsonWrite}
+\title{JSON round trip}
+\begin{semanticmodule}
+definition{
+  name: reparse,
+  parameters: [original : Json::Json],
+  result: (Result Json::Json JsonText::JsonRefusal),
+  body: (match (JsonWrite::writeList original)
+    | Result.error reason => (ctor Result.error [Json::Json, JsonText::JsonRefusal] reason)
+    | Result.ok produced => (JsonRead::readList produced)),
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: round_trip_null,
+  parameters: [],
+  statement: ((reparse (ctor Json::Json.null)) = (ctor Result.ok [Json::Json, JsonText::JsonRefusal] (ctor Json::Json.null))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: round_trip_true,
+  parameters: [],
+  statement: ((reparse (ctor Json::Json.bool true)) = (ctor Result.ok [Json::Json, JsonText::JsonRefusal] (ctor Json::Json.bool true))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: round_trip_false,
+  parameters: [],
+  statement: ((reparse (ctor Json::Json.bool false)) = (ctor Result.ok [Json::Json, JsonText::JsonRefusal] (ctor Json::Json.bool false))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: round_trip_empty_array,
+  parameters: [],
+  statement: ((reparse (ctor Json::Json.array (nil Json::Json))) = (ctor Result.ok [Json::Json, JsonText::JsonRefusal] (ctor Json::Json.array (nil Json::Json)))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: round_trip_empty_object,
+  parameters: [],
+  statement: ((reparse (ctor Json::Json.object (nil (String * Json::Json)))) = (ctor Result.ok [Json::Json, JsonText::JsonRefusal] (ctor Json::Json.object (nil (String * Json::Json))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: round_trip_integers,
+  parameters: [],
+  statement: ((reparse (ctor Json::Json.array (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (0 : Int), exponent := (0 : Int)})) (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (-12 : Int), exponent := (0 : Int)})) (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (7 : Int), exponent := (0 : Int)})) (nil Json::Json)))))) = (ctor Result.ok [Json::Json, JsonText::JsonRefusal] (ctor Json::Json.array (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (0 : Int), exponent := (0 : Int)})) (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (-12 : Int), exponent := (0 : Int)})) (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (7 : Int), exponent := (0 : Int)})) (nil Json::Json))))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: round_trip_decimals,
+  parameters: [],
+  statement: ((reparse (ctor Json::Json.array (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (15 : Int), exponent := (-1 : Int)})) (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (-25 : Int), exponent := (-2 : Int)})) (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (2 : Int)})) (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (0 : Int), exponent := (-1 : Int)})) (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (123456789012345678 : Int), exponent := (0 : Int)})) (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (9999 : Int)})) (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (-9999 : Int)})) (nil Json::Json)))))))))) = (ctor Result.ok [Json::Json, JsonText::JsonRefusal] (ctor Json::Json.array (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (15 : Int), exponent := (-1 : Int)})) (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (-25 : Int), exponent := (-2 : Int)})) (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (2 : Int)})) (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (0 : Int), exponent := (-1 : Int)})) (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (123456789012345678 : Int), exponent := (0 : Int)})) (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (9999 : Int)})) (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (-9999 : Int)})) (nil Json::Json))))))))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: round_trip_nested_arrays,
+  parameters: [],
+  statement: ((reparse (ctor Json::Json.array (cons (ctor Json::Json.array (cons (ctor Json::Json.array (cons (ctor Json::Json.null) (nil Json::Json))) (cons (ctor Json::Json.array (nil Json::Json)) (nil Json::Json)))) (cons (ctor Json::Json.array (cons (ctor Json::Json.null) (cons (ctor Json::Json.bool true) (nil Json::Json)))) (nil Json::Json))))) = (ctor Result.ok [Json::Json, JsonText::JsonRefusal] (ctor Json::Json.array (cons (ctor Json::Json.array (cons (ctor Json::Json.array (cons (ctor Json::Json.null) (nil Json::Json))) (cons (ctor Json::Json.array (nil Json::Json)) (nil Json::Json)))) (cons (ctor Json::Json.array (cons (ctor Json::Json.null) (cons (ctor Json::Json.bool true) (nil Json::Json)))) (nil Json::Json)))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: round_trip_any_bool,
+  parameters: [flag : Bool],
+  statement: ((reparse (ctor Json::Json.bool flag)) = (ctor Result.ok [Json::Json, JsonText::JsonRefusal] (ctor Json::Json.bool flag))),
+  proof: cases{
+    branches: [
+      {proof: reflexivity{}, binders: [], constructor: "false"},
+      {proof: reflexivity{}, binders: [], constructor: "true"}
+    ],
+    scrutinee: flag
+  },
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: encoder_refuses_wide_mantissa,
+  parameters: [],
+  statement: ((JsonWrite::writeList (ctor Json::Json.number (record Json::Decimal {mantissa := (1000000000000000000 : Int), exponent := (0 : Int)}))) = (ctor Result.error [(List Nat), JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.encodeNumberOutOfRange))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: encoder_refuses_high_exponent,
+  parameters: [],
+  statement: ((JsonWrite::writeList (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (10000 : Int)}))) = (ctor Result.error [(List Nat), JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.encodeNumberOutOfRange))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: encoder_refuses_low_exponent,
+  parameters: [],
+  statement: ((JsonWrite::writeList (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (-10000 : Int)}))) = (ctor Result.error [(List Nat), JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.encodeNumberOutOfRange))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+\end{semanticmodule}
+\end{lexlean}

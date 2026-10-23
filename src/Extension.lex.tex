@@ -1,0 +1,183 @@
+\begin{lexlean}{Extension}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Capabilities}
+\importmodule{Common}
+\importmodule{Input}
+\importmodule{Json}
+\importmodule{Methods}
+\importmodule{Refusal}
+\importmodule{Tasks}
+\title{MCP extension point}
+\begin{semanticmodule}
+inductive{
+  name: CallOutcome,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: complete, fields: [Methods::CallToolResult]},
+    {name: pending, fields: [Input::InputRequiredResult]},
+    {name: task, fields: [Tasks::CreateTaskResult]}
+  ]
+}
+
+inductive{
+  name: ReadOutcome,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: complete, fields: [Methods::ReadResourceResult]},
+    {name: pending, fields: [Input::InputRequiredResult]}
+  ]
+}
+
+inductive{
+  name: PromptOutcome,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: complete, fields: [Methods::GetPromptResult]},
+    {name: pending, fields: [Input::InputRequiredResult]}
+  ]
+}
+
+structure{
+  name: ParamRule,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: tool, type: String},
+    {name: header, type: String},
+    {name: path, type: (List String)},
+    {name: kind, type: Common::ParamKind}
+  ]
+}
+
+structure{
+  name: ProviderInfo,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: serverInfo, type: Common::Implementation},
+    {name: instructions, type: (Option String)},
+    {name: capabilities, type: Capabilities::ServerCapabilities},
+    {name: discoverCache, type: Common::CacheHint},
+    {name: paramRules, type: (List ParamRule)}
+  ]
+}
+
+structure{
+  name: Provider,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: serverInfo, type: Common::Implementation},
+    {name: instructions, type: (Option String)},
+    {name: capabilities, type: Capabilities::ServerCapabilities},
+    {name: discoverCache, type: Common::CacheHint},
+    {name: paramRules, type: (List ParamRule)},
+    {
+      name: listTools,
+      type: (Fn (Methods::PaginatedParams) (Result Methods::ListToolsResult Refusal::ProviderRefusal))
+    },
+    {
+      name: callTool,
+      type: (Fn (Methods::CallToolParams) (Result CallOutcome Refusal::ProviderRefusal))
+    },
+    {
+      name: listResources,
+      type: (Fn (Methods::PaginatedParams) (Result Methods::ListResourcesResult Refusal::ProviderRefusal))
+    },
+    {
+      name: listResourceTemplates,
+      type: (Fn (Methods::PaginatedParams) (Result Methods::ListResourceTemplatesResult Refusal::ProviderRefusal))
+    },
+    {
+      name: readResource,
+      type: (Fn (Methods::ReadResourceParams) (Result ReadOutcome Refusal::ProviderRefusal))
+    },
+    {
+      name: listPrompts,
+      type: (Fn (Methods::PaginatedParams) (Result Methods::ListPromptsResult Refusal::ProviderRefusal))
+    },
+    {
+      name: getPrompt,
+      type: (Fn (Methods::GetPromptParams) (Result PromptOutcome Refusal::ProviderRefusal))
+    },
+    {
+      name: complete,
+      type: (Fn (Methods::CompleteParams) (Result Methods::CompleteResult Refusal::ProviderRefusal))
+    },
+    {
+      name: getTask,
+      type: (Fn (Methods::GetTaskParams) (Result Tasks::DetailedTask Refusal::ProviderRefusal))
+    },
+    {name: updateTask, type: (Fn (Methods::UpdateTaskParams) (Option Refusal::ProviderRefusal))},
+    {name: cancelTask, type: (Fn (Methods::CancelTaskParams) (Option Refusal::ProviderRefusal))}
+  ]
+}
+
+definition{
+  name: inertProvider,
+  parameters: [info : Common::Implementation],
+  result: Provider,
+  body: (record Provider {serverInfo := info, instructions := (ctor Option.none [String]), capabilities := (record Capabilities::ServerCapabilities {experimental := (ctor Option.none [Json::JsonObject]), logging := (ctor Option.none [Json::JsonObject]), completions := (ctor Option.none [Json::JsonObject]), prompts := (ctor Option.none [Capabilities::ListChangedCapability]), resources := (ctor Option.none [Capabilities::ResourcesCapability]), tools := (ctor Option.none [Capabilities::ListChangedCapability]), extensions := (ctor Option.none [Json::JsonObject])}), discoverCache := (record Common::CacheHint {ttlMs := 0, cacheScope := (ctor Common::CacheScope.public)}), paramRules := (nil ParamRule), listTools := (fun (params : Methods::PaginatedParams) => (ctor Result.error [Methods::ListToolsResult, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), callTool := (fun (params : Methods::CallToolParams) => (ctor Result.error [CallOutcome, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), listResources := (fun (params : Methods::PaginatedParams) => (ctor Result.error [Methods::ListResourcesResult, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), listResourceTemplates := (fun (params : Methods::PaginatedParams) => (ctor Result.error [Methods::ListResourceTemplatesResult, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), readResource := (fun (params : Methods::ReadResourceParams) => (ctor Result.error [ReadOutcome, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), listPrompts := (fun (params : Methods::PaginatedParams) => (ctor Result.error [Methods::ListPromptsResult, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), getPrompt := (fun (params : Methods::GetPromptParams) => (ctor Result.error [PromptOutcome, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), complete := (fun (params : Methods::CompleteParams) => (ctor Result.error [Methods::CompleteResult, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), getTask := (fun (params : Methods::GetTaskParams) => (ctor Result.error [Tasks::DetailedTask, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), updateTask := (fun (params : Methods::UpdateTaskParams) => (ctor Option.some [Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer"))), cancelTask := (fun (params : Methods::CancelTaskParams) => (ctor Option.some [Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "no tool layer")))})
+}
+
+definition{
+  name: infoOf,
+  parameters: [provider : Provider],
+  result: ProviderInfo,
+  body: (record ProviderInfo {serverInfo := (project provider serverInfo), instructions := (project provider instructions), capabilities := (project provider capabilities), discoverCache := (project provider discoverCache), paramRules := (project provider paramRules)})
+}
+
+definition{
+  name: answerOf,
+  parameters: [provider : Provider, request : Methods::ClientRequest],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match request
+    | Methods::ClientRequest.serverDiscover params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "server/discover is answered by the core"))
+    | Methods::ClientRequest.toolsList params => (match (apply (project provider listTools) params)
+      | Result.ok found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.listTools found))
+      | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr))
+    | Methods::ClientRequest.toolsCall params => (match (apply (project provider callTool) params)
+      | Result.ok outcome => (match outcome
+        | CallOutcome.complete found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.callTool found))
+        | CallOutcome.pending needed => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.inputRequired needed))
+        | CallOutcome.task created => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.taskCreated created)))
+      | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr))
+    | Methods::ClientRequest.resourcesList params => (match (apply (project provider listResources) params)
+      | Result.ok found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.listResources found))
+      | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr))
+    | Methods::ClientRequest.resourcesRead params => (match (apply (project provider readResource) params)
+      | Result.ok outcome => (match outcome
+        | ReadOutcome.complete found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.readResource found))
+        | ReadOutcome.pending needed => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.inputRequired needed)))
+      | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr))
+    | Methods::ClientRequest.resourcesTemplatesList params => (match (apply (project provider listResourceTemplates) params)
+      | Result.ok found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.listResourceTemplates found))
+      | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr))
+    | Methods::ClientRequest.promptsList params => (match (apply (project provider listPrompts) params)
+      | Result.ok found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.listPrompts found))
+      | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr))
+    | Methods::ClientRequest.promptsGet params => (match (apply (project provider getPrompt) params)
+      | Result.ok outcome => (match outcome
+        | PromptOutcome.complete found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.getPrompt found))
+        | PromptOutcome.pending needed => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.inputRequired needed)))
+      | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr))
+    | Methods::ClientRequest.completionComplete params => (match (apply (project provider complete) params)
+      | Result.ok found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.complete found))
+      | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr))
+    | Methods::ClientRequest.tasksGet params => (match (apply (project provider getTask) params)
+      | Result.ok found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.getTask found))
+      | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr))
+    | Methods::ClientRequest.tasksUpdate params => (match (apply (project provider updateTask) params)
+      | Option.none => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.acknowledged))
+      | Option.some pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr))
+    | Methods::ClientRequest.tasksCancel params => (match (apply (project provider cancelTask) params)
+      | Option.none => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.acknowledged))
+      | Option.some pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr)))
+}
+\end{semanticmodule}
+\end{lexlean}

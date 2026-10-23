@@ -1,0 +1,150 @@
+\begin{lexlean}{Tasks}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Input}
+\importmodule{Json}
+\importmodule{JsonRpc}
+\title{MCP tasks extension}
+\begin{semanticmodule}
+inductive{
+  name: TaskStatus,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: working, fields: []},
+    {name: input_required, fields: []},
+    {name: completed, fields: []},
+    {name: failed, fields: []},
+    {name: cancelled, fields: []}
+  ]
+}
+
+structure{
+  name: TaskFields,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: taskId, type: String},
+    {name: statusMessage, type: (Option String)},
+    {name: createdAt, type: String},
+    {name: lastUpdatedAt, type: String},
+    {name: ttlMs, type: (Option Nat)},
+    {name: pollIntervalMs, type: (Option Nat)}
+  ]
+}
+
+inductive{
+  name: DetailedTask,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: working, fields: [TaskFields]},
+    {name: input_required, fields: [TaskFields, (List (String * Input::InputRequest))]},
+    {name: completed, fields: [TaskFields, Json::JsonObject]},
+    {name: failed, fields: [TaskFields, JsonRpc::ErrorObject]},
+    {name: cancelled, fields: [TaskFields]}
+  ]
+}
+
+structure{
+  name: CreateTaskResult,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: status, type: TaskStatus}, {name: fields, type: TaskFields}]
+}
+
+definition{
+  name: statusOf,
+  parameters: [task : DetailedTask],
+  result: TaskStatus,
+  body: (match task
+    | DetailedTask.working fields => (ctor TaskStatus.working)
+    | DetailedTask.input_required fields requests => (ctor TaskStatus.input_required)
+    | DetailedTask.completed fields result => (ctor TaskStatus.completed)
+    | DetailedTask.failed fields error => (ctor TaskStatus.failed)
+    | DetailedTask.cancelled fields => (ctor TaskStatus.cancelled)),
+  executable: true
+}
+
+definition{
+  name: fieldsOf,
+  parameters: [task : DetailedTask],
+  result: TaskFields,
+  body: (match task
+    | DetailedTask.working fields => fields
+    | DetailedTask.input_required fields requests => fields
+    | DetailedTask.completed fields result => fields
+    | DetailedTask.failed fields error => fields
+    | DetailedTask.cancelled fields => fields),
+  executable: true
+}
+
+definition{
+  name: isTerminal,
+  parameters: [status : TaskStatus],
+  result: Bool,
+  body: (match status
+    | TaskStatus.working => false
+    | TaskStatus.input_required => false
+    | TaskStatus.completed => true
+    | TaskStatus.failed => true
+    | TaskStatus.cancelled => true),
+  executable: true
+}
+
+definition{
+  name: taskStatusWire,
+  parameters: [status : TaskStatus],
+  result: String,
+  body: (match status
+    | TaskStatus.working => "working"
+    | TaskStatus.input_required => "input_required"
+    | TaskStatus.completed => "completed"
+    | TaskStatus.failed => "failed"
+    | TaskStatus.cancelled => "cancelled"),
+  executable: true
+}
+
+definition{
+  name: carriesResult,
+  parameters: [task : DetailedTask],
+  result: Bool,
+  body: (match task
+    | DetailedTask.working fields => false
+    | DetailedTask.input_required fields requests => false
+    | DetailedTask.completed fields result => true
+    | DetailedTask.failed fields error => false
+    | DetailedTask.cancelled fields => false),
+  executable: true
+}
+
+theorem{
+  name: only_a_completed_task_carries_a_result,
+  parameters: [task : DetailedTask],
+  statement: ((carriesResult task) = (match (statusOf task)
+    | TaskStatus.completed => true
+    | TaskStatus.working => false
+    | TaskStatus.input_required => false
+    | TaskStatus.failed => false
+    | TaskStatus.cancelled => false)),
+  proof: cases{
+    branches: [
+      {proof: reflexivity{}, binders: [fields], constructor: working},
+      {proof: reflexivity{}, binders: [fields, requests], constructor: input_required},
+      {proof: reflexivity{}, binders: [fields, result], constructor: completed},
+      {proof: reflexivity{}, binders: [fields, error], constructor: failed},
+      {proof: reflexivity{}, binders: [fields], constructor: cancelled}
+    ],
+    scrutinee: task
+  }
+}
+
+theorem{
+  name: terminal_statuses_are_completed_failed_cancelled,
+  parameters: [],
+  statement: ((((isTerminal (ctor TaskStatus.completed)) = true) /\ ((isTerminal (ctor TaskStatus.failed)) = true)) /\ ((((isTerminal (ctor TaskStatus.cancelled)) = true) /\ ((isTerminal (ctor TaskStatus.working)) = false)) /\ ((isTerminal (ctor TaskStatus.input_required)) = false))),
+  proof: decide{}
+}
+\end{semanticmodule}
+\end{lexlean}

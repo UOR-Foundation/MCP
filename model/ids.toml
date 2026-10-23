@@ -15,9 +15,264 @@
 # state: a capability that is not built does not get a row, and every row in this
 # file is built.
 #
-# The register is empty. This repository has no claims yet; adding one starts
-# with a row here, in the order `AGENTS.md` sets out.
+# The JSON text codec (issue #18) is the first capability registered: JC-01..JC-12, extended by JC-13 and JC-14.
 
 spec = "template/1"
 
-id = []
+[[id]]
+id = "JC-01"
+level = "build"
+suite = "json-codec"
+statement = "Unicode byte validation admits exactly the byte strings RFC 3629 Table 3-7 admits, and refuses an overlong form, a surrogate code point, a value above the last code point and a truncated sequence, naming the offset of the first byte the table does not admit, or the end of the input when a sequence is cut short."
+
+[[id]]
+id = "JC-02"
+level = "build"
+suite = "json-codec"
+statement = "The parser refuses every byte string that is not well-formed UTF-8, with the typed refusals invalidUtf8 or truncatedUtf8 and an offset, before it reads any JSON structure."
+
+[[id]]
+id = "JC-03"
+level = "build"
+suite = "json-codec"
+statement = "The parser accepts every text of the RFC 8259 grammar that the pinned JSONTestSuite lists as must-accept (the y_ cases)."
+
+[[id]]
+id = "JC-04"
+level = "build"
+suite = "json-codec"
+statement = "The parser refuses every text that the pinned JSONTestSuite lists as must-reject (the n_ cases) with a typed refusal, and each case's refusal kind equals the recorded table."
+
+[[id]]
+id = "JC-05"
+level = "build"
+suite = "json-codec"
+statement = "The parser's outcome on every implementation-defined case of the pinned JSONTestSuite (the i_ cases) equals the recorded table."
+
+[[id]]
+id = "JC-06"
+level = "build"
+suite = "json-codec"
+statement = "String escapes decode as RFC 8259 section 7 states, an escaped surrogate pair is one code point, a lone surrogate escape is refused as loneSurrogate, and an unescaped control character is refused."
+
+[[id]]
+id = "JC-07"
+level = "build"
+suite = "json-codec"
+statement = "The RFC 8259 section 6 number grammar maps to a Decimal exactly, and a number with more than 18 significant digits or an effective exponent outside -9999..9999 is refused as numberOutOfRange."
+
+[[id]]
+id = "JC-08"
+level = "build"
+suite = "json-codec"
+statement = "Nesting of arrays and objects to depth 512 is accepted and depth 513 is refused as tooDeep, without exhausting the stack."
+
+[[id]]
+id = "JC-09"
+level = "build"
+suite = "json-codec"
+statement = "Duplicate member names are kept in source order, so the parsed object has every member and Json.lookup answers with the first."
+
+[[id]]
+id = "JC-10"
+level = "build"
+suite = "json-codec"
+statement = "The encoder writes compact RFC 8259 text, escapes quotation mark, reverse solidus and control characters, and refuses a number or nesting outside the declared bounds with encodeNumberOutOfRange or encodeTooDeep."
+
+[[id]]
+id = "JC-11"
+level = "build"
+suite = "json-codec"
+statement = "For every text of the pinned JSONTestSuite the parser accepts, encoding the parsed value and parsing the result gives the same canonical bytes; the universal statement over all values is not claimed here."
+
+[[id]]
+id = "JC-12"
+level = "build"
+suite = "json-codec"
+statement = "The oracle executes the package generated from the LexLean codec root, whose recorded digest and provenance match the committed files, over the corpus whose pin and checksum match the recorded authority."
+
+[[id]]
+id = "JC-13"
+level = "build"
+suite = "json-codec"
+statement = "Reading a JSON string, as a value or as a member name, takes time at most proportional to its length up to a logarithmic factor: at 256 KiB, 1 MiB and 2 MiB, through the codec root and through the lifecycle root, the read finishes within a bound linear in the length and its time grows no more than twice as fast as the length does."
+
+[[id]]
+id = "JC-14"
+level = "build"
+suite = "json-codec"
+statement = "The Unicode byte validator accepts every well-formed complete three-byte and four-byte sequence and refuses every ill-formed one as RFC 3629 and Table 3-7 state, naming the first byte the table does not admit, by kernel-checked theorems over all byte values with exact axiom policies."
+
+[[id]]
+id = "LC-01"
+level = "build"
+suite = "lifecycle"
+statement = "A request whose params lack _meta, or whose _meta lacks the protocol version or the client capabilities, is refused as invalidParams (-32602) with HTTP status 400 and the request's own id."
+
+[[id]]
+id = "LC-02"
+level = "build"
+suite = "lifecycle"
+statement = "server/discover answers with the supported protocol versions, the declared capabilities and the server identity, and tools/list answers when the tools capability is declared."
+
+[[id]]
+id = "LC-03"
+level = "build"
+suite = "lifecycle"
+statement = "A request whose _meta omits clientInfo is served, because the client identity is optional."
+
+[[id]]
+id = "LC-04"
+level = "build"
+suite = "lifecycle"
+statement = "A request for a protocol version the server does not support is refused as unsupportedProtocolVersion (-32022) with HTTP status 400, listing the supported versions in data.supported and echoing the requested version in data.requested."
+
+[[id]]
+id = "LC-05"
+level = "build"
+suite = "lifecycle"
+statement = "Every successful result carries resultType and the server identity under _meta io.modelcontextprotocol/serverInfo, and is sent with HTTP status 200."
+
+[[id]]
+id = "LC-06"
+level = "build"
+suite = "lifecycle"
+statement = "A method the server does not offer, whether removed from the protocol, unknown, or gated on a capability the server did not declare, is refused as methodNotFound (-32601) with HTTP status 404."
+
+[[id]]
+id = "LC-07"
+level = "build"
+suite = "lifecycle"
+statement = "A request that needs a client capability the client did not declare is refused as missingRequiredClientCapability (-32021) with HTTP status 400, naming the requirement as a ClientCapabilities object in data.requiredCapabilities."
+
+[[id]]
+id = "LC-08"
+level = "build"
+suite = "lifecycle"
+statement = "Every refusal is a JSON-RPC error response that echoes the request id, or has no id member when the text is not JSON (-32700) or is not a single request with a readable id (-32600: batch, notification, response, bad id, bad version, missing or non-text method, non-object params); the member is never null, and a kernel-checked theorem states that an error built without an id has none."
+
+[[id]]
+id = "LC-09"
+level = "build"
+suite = "lifecycle"
+statement = "The core decides the HTTP status of every outcome: 200 for a result, 400 for -32700, -32600, -32602, -32020, -32021 and -32022, 404 for -32601, 405 with Allow POST for any request method other than POST, and 500 for a frame it cannot read; a kernel-checked theorem states that the status follows the code."
+
+[[id]]
+id = "LC-10"
+level = "build"
+suite = "lifecycle"
+statement = "The checks run in a fixed order, _meta then headers then protocol version then route and capability then params, and an earlier fault is reported whatever later faults the same request carries."
+
+[[id]]
+id = "LC-11"
+level = "build"
+suite = "lifecycle"
+statement = "The response depends only on the request method, the header fields the core reads and the body; the request target and every other header field leave it unchanged."
+
+[[id]]
+id = "LC-12"
+level = "build"
+suite = "lifecycle"
+statement = "The vectors are taken from the pinned conformance suite, whose requirements file for 2026-07-28 has the recorded checksum, and the vendored files match the recorded manifest checksum; the vectors are falsifying evidence and not the verdict of the suite run."
+
+[[id]]
+id = "LC-13"
+level = "build"
+suite = "lifecycle"
+statement = "The oracle executes the package generated from the LexLean lifecycle root, whose recorded digest and provenance match the committed files."
+
+[[id]]
+id = "LC-14"
+level = "build"
+suite = "lifecycle"
+statement = "Every request that the pinned scenarios send is a vector or is listed as a probe that is not run with its owning issue, and every check identifier the scenarios emit is covered, listed as not run, or listed as unreached by the fixture."
+
+[[id]]
+id = "LC-15"
+level = "build"
+suite = "lifecycle"
+statement = "The response bodies the root writes in the vector and boundary tests validate against the MCP 2026-07-28 JSON Schema at the pinned specification commit, whose vendored file has the recorded checksum: as a JSON-RPC response, as the typed result response of the request's method, and as the typed error of its code. A validator is falsifying evidence and not the oracle for the protocol, which MCP#6 binds."
+
+[[id]]
+id = "LC-16"
+level = "build"
+suite = "lifecycle"
+statement = "The exported root needs no stack that grows with its input: its recorded effects do not include recursion, no function of the generated package is on a call cycle, and frames with two hundred thousand header fields, four hundred thousand arguments, a quarter-mebibyte string, the deepest admitted JSON nesting and a long Base64 parameter header complete on a 2 MiB stack."
+
+[[id]]
+id = "HH-01"
+level = "build"
+suite = "http-headers"
+statement = "An MCP-Protocol-Version header that is absent, repeated, malformed or different from the protocolVersion in _meta is refused as headerMismatch (-32020) with HTTP status 400."
+
+[[id]]
+id = "HH-02"
+level = "build"
+suite = "http-headers"
+statement = "An Mcp-Method header that differs from the body method is refused as headerMismatch (-32020) with HTTP status 400."
+
+[[id]]
+id = "HH-03"
+level = "build"
+suite = "http-headers"
+statement = "A request without an Mcp-Method header, or with a repeated, empty or malformed one, is refused as headerMismatch (-32020) with HTTP status 400."
+
+[[id]]
+id = "HH-04"
+level = "build"
+suite = "http-headers"
+statement = "An Mcp-Name header that differs from params.name, params.uri for resources/read, is refused as headerMismatch (-32020) with HTTP status 400; a Base64-wrapped Mcp-Name is decoded before the comparison."
+
+[[id]]
+id = "HH-05"
+level = "build"
+suite = "http-headers"
+statement = "Optional whitespace around a header value is not part of the value, so a padded Mcp-Name equal to params.name is accepted."
+
+[[id]]
+id = "HH-06"
+level = "build"
+suite = "http-headers"
+statement = "Mcp-Name is required on tools/call, resources/read and prompts/get, and a request without it is refused as headerMismatch before the method is routed; it is not required on other methods."
+
+[[id]]
+id = "HH-07"
+level = "build"
+suite = "http-headers"
+statement = "Header names are compared without regard to case."
+
+[[id]]
+id = "HH-08"
+level = "build"
+suite = "http-headers"
+statement = "Header values are compared exactly, so a method value that differs from the body method only in case is refused as headerMismatch (-32020) with HTTP status 400."
+
+[[id]]
+id = "HH-09"
+level = "build"
+suite = "http-headers"
+statement = "A parameter header wrapped as =?base64?...?= is decoded before it is compared with the body value, and an unwrapped value is compared as it is."
+
+[[id]]
+id = "HH-10"
+level = "build"
+suite = "http-headers"
+statement = "A Base64 parameter header with missing padding, characters outside the alphabet, padding inside the text or non-canonical trailing bits is refused as headerMismatch (-32020) with HTTP status 400."
+
+[[id]]
+id = "HH-11"
+level = "build"
+suite = "http-headers"
+statement = "A value that only resembles the sentinel, with a missing closing mark, a missing opening mark or the wrong case, is a literal and is compared as written."
+
+[[id]]
+id = "HH-12"
+level = "build"
+suite = "http-headers"
+statement = "A parameter header that is omitted while the body carries a value, that differs from it, or that is repeated or malformed is refused as headerMismatch (-32020) with HTTP status 400; when the body value is null or absent the header is not expected; an unrecognized parameter header is ignored."
+
+[[id]]
+id = "HH-13"
+level = "build"
+suite = "http-headers"
+statement = "An integer parameter header is compared numerically with the body number within the safe integer range, and a boolean parameter header is exactly true or false."

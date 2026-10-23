@@ -1,0 +1,3 @@
+# The corpus is compared byte for byte against a recorded checksum; no line-ending
+# or encoding conversion may touch it.
+* -text

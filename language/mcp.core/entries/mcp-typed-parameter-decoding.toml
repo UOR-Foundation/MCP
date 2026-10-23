@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-typed-parameter-decoding"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Decode"
+component = "Decode"
+
+[[form]]
+id = "mcp-typed-parameter-decoding"
+channel = "text"
+surface = "MCP typed parameter decoding"
+canonical_source = true
+features = ["sentence-case", "singular"]

@@ -1,0 +1,307 @@
+\begin{lexlean}{Decode}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Json}
+\importmodule{JsonRead}
+\importmodule{Meta}
+\importmodule{Methods}
+\importmodule{Refusal}
+\title{MCP typed parameter decoding}
+\begin{semanticmodule}
+definition{
+  name: reqText,
+  parameters: [key : String, object : Json::JsonObject],
+  result: (Result String Refusal::ParamsProblem),
+  body: (match (Json::lookup key object)
+    | Json::Lookup.absent => (ctor Result.error [String, Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.missingField key))
+    | Json::Lookup.present value => (match (Json::asText value)
+      | Option.none => (ctor Result.error [String, Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedField key))
+      | Option.some text => (ctor Result.ok [String, Refusal::ParamsProblem] text))),
+  executable: true
+}
+
+definition{
+  name: optText,
+  parameters: [key : String, object : Json::JsonObject],
+  result: (Result (Option String) Refusal::ParamsProblem),
+  body: (match (Json::lookup key object)
+    | Json::Lookup.absent => (ctor Result.ok [(Option String), Refusal::ParamsProblem] (ctor Option.none [String]))
+    | Json::Lookup.present value => (match (Json::asText value)
+      | Option.none => (ctor Result.error [(Option String), Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedField key))
+      | Option.some text => (ctor Result.ok [(Option String), Refusal::ParamsProblem] (ctor Option.some [String] text)))),
+  executable: true
+}
+
+definition{
+  name: reqObject,
+  parameters: [key : String, object : Json::JsonObject],
+  result: (Result Json::JsonObject Refusal::ParamsProblem),
+  body: (match (Json::lookup key object)
+    | Json::Lookup.absent => (ctor Result.error [Json::JsonObject, Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.missingField key))
+    | Json::Lookup.present value => (match (Json::asObject value)
+      | Option.none => (ctor Result.error [Json::JsonObject, Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedField key))
+      | Option.some found => (ctor Result.ok [Json::JsonObject, Refusal::ParamsProblem] found))),
+  executable: true
+}
+
+definition{
+  name: optObject,
+  parameters: [key : String, object : Json::JsonObject],
+  result: (Result (Option Json::JsonObject) Refusal::ParamsProblem),
+  body: (match (Json::lookup key object)
+    | Json::Lookup.absent => (ctor Result.ok [(Option Json::JsonObject), Refusal::ParamsProblem] (ctor Option.none [Json::JsonObject]))
+    | Json::Lookup.present value => (match (Json::asObject value)
+      | Option.none => (ctor Result.error [(Option Json::JsonObject), Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedField key))
+      | Option.some found => (ctor Result.ok [(Option Json::JsonObject), Refusal::ParamsProblem] (ctor Option.some [Json::JsonObject] found)))),
+  executable: true
+}
+
+definition{
+  name: textMembersOnto,
+  parameters: [
+    key : String,
+    members : (List (String * Json::Json)),
+    built : (List (String * String))
+  ],
+  result: (Result (List (String * String)) Refusal::ParamsProblem),
+  body: (match members
+    | List.nil => (ctor Result.ok [(List (String * String)), Refusal::ParamsProblem] built)
+    | List.cons entry rest => (match (Json::asText (second entry))
+      | Option.none => (ctor Result.error [(List (String * String)), Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedField key))
+      | Option.some text => (textMembersOnto key rest (cons ((first entry), text) built)))),
+  executable: true,
+  recursive_argument: members
+}
+
+definition{
+  name: textMembers,
+  parameters: [key : String, members : (List (String * Json::Json))],
+  result: (Result (List (String * String)) Refusal::ParamsProblem),
+  body: (match (textMembersOnto key members (nil (String * String)))
+    | Result.ok built => (ctor Result.ok [(List (String * String)), Refusal::ParamsProblem] (JsonRead::reverseOnto [(String * String)] built (nil (String * String))))
+    | Result.error problem => (ctor Result.error [(List (String * String)), Refusal::ParamsProblem] problem)),
+  executable: true
+}
+
+definition{
+  name: optStringMap,
+  parameters: [key : String, object : Json::JsonObject],
+  result: (Result (Option (List (String * String))) Refusal::ParamsProblem),
+  body: (match (Json::lookup key object)
+    | Json::Lookup.absent => (ctor Result.ok [(Option (List (String * String))), Refusal::ParamsProblem] (ctor Option.none [(List (String * String))]))
+    | Json::Lookup.present value => (match (Json::asObject value)
+      | Option.none => (ctor Result.error [(Option (List (String * String))), Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedField key))
+      | Option.some found => (match (textMembers key (project found members))
+        | Result.ok pairs => (ctor Result.ok [(Option (List (String * String))), Refusal::ParamsProblem] (ctor Option.some [(List (String * String))] pairs))
+        | Result.error problem => (ctor Result.error [(Option (List (String * String))), Refusal::ParamsProblem] problem)))),
+  executable: true
+}
+
+definition{
+  name: completionReference,
+  parameters: [object : Json::JsonObject],
+  result: (Result Methods::CompletionReference Refusal::ParamsProblem),
+  body: (match (reqText "type" object)
+    | Result.ok kind => (if (prim equal kind "ref/prompt" : Bool) then (match (reqText "name" object)
+      | Result.ok name => (match (optText "title" object)
+        | Result.ok title => (ctor Result.ok [Methods::CompletionReference, Refusal::ParamsProblem] (ctor Methods::CompletionReference.prompt (record Methods::PromptReference {name := name, title := title})))
+        | Result.error problem => (ctor Result.error [Methods::CompletionReference, Refusal::ParamsProblem] problem))
+      | Result.error problem => (ctor Result.error [Methods::CompletionReference, Refusal::ParamsProblem] problem)) else (if (prim equal kind "ref/resource" : Bool) then (match (reqText "uri" object)
+      | Result.ok uri => (ctor Result.ok [Methods::CompletionReference, Refusal::ParamsProblem] (ctor Methods::CompletionReference.resourceTemplate uri))
+      | Result.error problem => (ctor Result.error [Methods::CompletionReference, Refusal::ParamsProblem] problem)) else (ctor Result.error [Methods::CompletionReference, Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedField "type"))))
+    | Result.error problem => (ctor Result.error [Methods::CompletionReference, Refusal::ParamsProblem] problem)),
+  executable: true
+}
+
+definition{
+  name: completionArgument,
+  parameters: [object : Json::JsonObject],
+  result: (Result Methods::CompletionArgument Refusal::ParamsProblem),
+  body: (match (reqText "name" object)
+    | Result.ok name => (match (reqText "value" object)
+      | Result.ok value => (ctor Result.ok [Methods::CompletionArgument, Refusal::ParamsProblem] (record Methods::CompletionArgument {name := name, value := value}))
+      | Result.error problem => (ctor Result.error [Methods::CompletionArgument, Refusal::ParamsProblem] problem))
+    | Result.error problem => (ctor Result.error [Methods::CompletionArgument, Refusal::ParamsProblem] problem)),
+  executable: true
+}
+
+definition{
+  name: completionContext,
+  parameters: [object : Json::JsonObject],
+  result: (Result (Option Methods::CompletionContext) Refusal::ParamsProblem),
+  body: (match (Json::lookup "context" object)
+    | Json::Lookup.absent => (ctor Result.ok [(Option Methods::CompletionContext), Refusal::ParamsProblem] (ctor Option.none [Methods::CompletionContext]))
+    | Json::Lookup.present value => (match (Json::asObject value)
+      | Option.none => (ctor Result.error [(Option Methods::CompletionContext), Refusal::ParamsProblem] (ctor Refusal::ParamsProblem.malformedField "context"))
+      | Option.some found => (match (optStringMap "arguments" found)
+        | Result.ok arguments => (ctor Result.ok [(Option Methods::CompletionContext), Refusal::ParamsProblem] (ctor Option.some [Methods::CompletionContext] (record Methods::CompletionContext {arguments := arguments})))
+        | Result.error problem => (ctor Result.error [(Option Methods::CompletionContext), Refusal::ParamsProblem] problem)))),
+  executable: true
+}
+
+definition{
+  name: decodeDiscover,
+  parameters: [meta : Meta::RequestMeta, object : Json::JsonObject],
+  result: (Result Methods::ClientRequest Refusal::ParamsProblem),
+  body: (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.serverDiscover (record Methods::DiscoverParams {meta := meta}))),
+  executable: true
+}
+
+definition{
+  name: decodeToolsList,
+  parameters: [meta : Meta::RequestMeta, object : Json::JsonObject],
+  result: (Result Methods::ClientRequest Refusal::ParamsProblem),
+  body: (match (optText "cursor" object)
+    | Result.ok cursor => (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.toolsList (record Methods::PaginatedParams {meta := meta, cursor := cursor})))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
+}
+
+definition{
+  name: decodeResourcesList,
+  parameters: [meta : Meta::RequestMeta, object : Json::JsonObject],
+  result: (Result Methods::ClientRequest Refusal::ParamsProblem),
+  body: (match (optText "cursor" object)
+    | Result.ok cursor => (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.resourcesList (record Methods::PaginatedParams {meta := meta, cursor := cursor})))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
+}
+
+definition{
+  name: decodeResourceTemplatesList,
+  parameters: [meta : Meta::RequestMeta, object : Json::JsonObject],
+  result: (Result Methods::ClientRequest Refusal::ParamsProblem),
+  body: (match (optText "cursor" object)
+    | Result.ok cursor => (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.resourcesTemplatesList (record Methods::PaginatedParams {meta := meta, cursor := cursor})))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
+}
+
+definition{
+  name: decodePromptsList,
+  parameters: [meta : Meta::RequestMeta, object : Json::JsonObject],
+  result: (Result Methods::ClientRequest Refusal::ParamsProblem),
+  body: (match (optText "cursor" object)
+    | Result.ok cursor => (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.promptsList (record Methods::PaginatedParams {meta := meta, cursor := cursor})))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
+}
+
+definition{
+  name: decodeCallTool,
+  parameters: [meta : Meta::RequestMeta, object : Json::JsonObject],
+  result: (Result Methods::ClientRequest Refusal::ParamsProblem),
+  body: (match (reqText "name" object)
+    | Result.ok name => (match (optObject "arguments" object)
+      | Result.ok arguments => (match (optObject "inputResponses" object)
+        | Result.ok inputResponses => (match (optText "requestState" object)
+          | Result.ok requestState => (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.toolsCall (record Methods::CallToolParams {meta := meta, name := name, arguments := arguments, inputResponses := inputResponses, requestState := requestState})))
+          | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+        | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+      | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
+}
+
+definition{
+  name: decodeReadResource,
+  parameters: [meta : Meta::RequestMeta, object : Json::JsonObject],
+  result: (Result Methods::ClientRequest Refusal::ParamsProblem),
+  body: (match (reqText "uri" object)
+    | Result.ok uri => (match (optObject "inputResponses" object)
+      | Result.ok inputResponses => (match (optText "requestState" object)
+        | Result.ok requestState => (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.resourcesRead (record Methods::ReadResourceParams {meta := meta, uri := uri, inputResponses := inputResponses, requestState := requestState})))
+        | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+      | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
+}
+
+definition{
+  name: decodeGetPrompt,
+  parameters: [meta : Meta::RequestMeta, object : Json::JsonObject],
+  result: (Result Methods::ClientRequest Refusal::ParamsProblem),
+  body: (match (reqText "name" object)
+    | Result.ok name => (match (optStringMap "arguments" object)
+      | Result.ok arguments => (match (optObject "inputResponses" object)
+        | Result.ok inputResponses => (match (optText "requestState" object)
+          | Result.ok requestState => (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.promptsGet (record Methods::GetPromptParams {meta := meta, name := name, arguments := arguments, inputResponses := inputResponses, requestState := requestState})))
+          | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+        | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+      | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
+}
+
+definition{
+  name: decodeComplete,
+  parameters: [meta : Meta::RequestMeta, object : Json::JsonObject],
+  result: (Result Methods::ClientRequest Refusal::ParamsProblem),
+  body: (match (reqObject "ref" object)
+    | Result.ok reference_object => (match (completionReference reference_object)
+      | Result.ok reference => (match (reqObject "argument" object)
+        | Result.ok argument_object => (match (completionArgument argument_object)
+          | Result.ok argument => (match (completionContext object)
+            | Result.ok context => (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.completionComplete (record Methods::CompleteParams {meta := meta, reference := reference, argument := argument, context := context})))
+            | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+          | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+        | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+      | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
+}
+
+definition{
+  name: decodeGetTask,
+  parameters: [meta : Meta::RequestMeta, object : Json::JsonObject],
+  result: (Result Methods::ClientRequest Refusal::ParamsProblem),
+  body: (match (reqText "taskId" object)
+    | Result.ok taskId => (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.tasksGet (record Methods::GetTaskParams {meta := meta, taskId := taskId})))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
+}
+
+definition{
+  name: decodeUpdateTask,
+  parameters: [meta : Meta::RequestMeta, object : Json::JsonObject],
+  result: (Result Methods::ClientRequest Refusal::ParamsProblem),
+  body: (match (reqText "taskId" object)
+    | Result.ok taskId => (match (reqObject "inputResponses" object)
+      | Result.ok inputResponses => (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.tasksUpdate (record Methods::UpdateTaskParams {meta := meta, taskId := taskId, inputResponses := inputResponses})))
+      | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
+}
+
+definition{
+  name: decodeCancelTask,
+  parameters: [meta : Meta::RequestMeta, object : Json::JsonObject],
+  result: (Result Methods::ClientRequest Refusal::ParamsProblem),
+  body: (match (reqText "taskId" object)
+    | Result.ok taskId => (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] (ctor Methods::ClientRequest.tasksCancel (record Methods::CancelTaskParams {meta := meta, taskId := taskId})))
+    | Result.error problem => (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)),
+  executable: true
+}
+
+definition{
+  name: decodeParams,
+  parameters: [method : Methods::Method, meta : Meta::RequestMeta, object : Json::JsonObject],
+  result: (Result Methods::ClientRequest Refusal::ParamsProblem),
+  body: (match method
+    | Methods::Method.serverDiscover => (decodeDiscover meta object)
+    | Methods::Method.toolsList => (decodeToolsList meta object)
+    | Methods::Method.toolsCall => (decodeCallTool meta object)
+    | Methods::Method.resourcesList => (decodeResourcesList meta object)
+    | Methods::Method.resourcesRead => (decodeReadResource meta object)
+    | Methods::Method.resourcesTemplatesList => (decodeResourceTemplatesList meta object)
+    | Methods::Method.promptsList => (decodePromptsList meta object)
+    | Methods::Method.promptsGet => (decodeGetPrompt meta object)
+    | Methods::Method.completionComplete => (decodeComplete meta object)
+    | Methods::Method.tasksGet => (decodeGetTask meta object)
+    | Methods::Method.tasksUpdate => (decodeUpdateTask meta object)
+    | Methods::Method.tasksCancel => (decodeCancelTask meta object)),
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

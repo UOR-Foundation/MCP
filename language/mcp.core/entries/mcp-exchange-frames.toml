@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-exchange-frames"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Frame"
+component = "Frame"
+
+[[form]]
+id = "mcp-exchange-frames"
+channel = "text"
+surface = "MCP exchange frames"
+canonical_source = true
+features = ["sentence-case", "singular"]

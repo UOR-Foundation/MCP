@@ -1,0 +1,283 @@
+\begin{lexlean}{Refusal}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Capabilities}
+\importmodule{Json}
+\importmodule{JsonRpc}
+\importmodule{JsonRead}
+\title{MCP typed refusals}
+\begin{semanticmodule}
+inductive{
+  name: ParamsProblem,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: missingParams, fields: []},
+    {name: missingMeta, fields: []},
+    {name: missingProtocolVersion, fields: []},
+    {name: missingClientCapabilities, fields: []},
+    {name: malformedMeta, fields: []},
+    {name: malformedProtocolVersion, fields: []},
+    {name: malformedClientCapabilities, fields: []},
+    {name: missingField, fields: [String]},
+    {name: malformedField, fields: [String]}
+  ]
+}
+
+inductive{
+  name: HeaderKind,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: protocolVersion, fields: []},
+    {name: method, fields: []},
+    {name: name, fields: []}
+  ]
+}
+
+inductive{
+  name: HeaderProblem,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: missingProtocolVersionHeader, fields: []},
+    {name: missingMethodHeader, fields: []},
+    {name: missingNameHeader, fields: []},
+    {name: protocolVersionDiffers, fields: []},
+    {name: methodDiffers, fields: []},
+    {name: nameDiffers, fields: []},
+    {name: malformedValue, fields: [HeaderKind]},
+    {name: repeatedField, fields: [HeaderKind]},
+    {name: missingParamHeader, fields: [String]},
+    {name: paramDiffers, fields: [String]},
+    {name: malformedParamHeader, fields: [String]}
+  ]
+}
+
+inductive{
+  name: ProviderRefusal,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: unknownTool, fields: [String]},
+    {name: unknownPrompt, fields: [String]},
+    {name: resourceNotFound, fields: [String]},
+    {name: unknownTask, fields: [String]},
+    {name: invalidArguments, fields: [String]},
+    {name: missingCapability, fields: [Capabilities::ClientCapabilities]},
+    {name: internal, fields: [String]}
+  ]
+}
+
+inductive{
+  name: Refusal,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: invalidParams, fields: [ParamsProblem]},
+    {name: unsupportedProtocolVersion, fields: [String, (List String)]},
+    {name: headerMismatch, fields: [HeaderProblem]},
+    {name: methodNotFound, fields: [String]},
+    {name: provider, fields: [ProviderRefusal]}
+  ]
+}
+
+definition{
+  name: providerCode,
+  parameters: [refusal : ProviderRefusal],
+  result: Int,
+  body: (match refusal
+    | ProviderRefusal.unknownTool name => (JsonRpc::invalidParamsCode)
+    | ProviderRefusal.unknownPrompt name => (JsonRpc::invalidParamsCode)
+    | ProviderRefusal.resourceNotFound uri => (JsonRpc::invalidParamsCode)
+    | ProviderRefusal.unknownTask taskId => (JsonRpc::invalidParamsCode)
+    | ProviderRefusal.invalidArguments reason => (JsonRpc::invalidParamsCode)
+    | ProviderRefusal.missingCapability required => (JsonRpc::missingRequiredClientCapabilityCode)
+    | ProviderRefusal.internal reason => (JsonRpc::internalErrorCode)),
+  executable: true
+}
+
+definition{
+  name: codeOf,
+  parameters: [refusal : Refusal],
+  result: Int,
+  body: (match refusal
+    | Refusal.invalidParams problem => (JsonRpc::invalidParamsCode)
+    | Refusal.unsupportedProtocolVersion requested supported => (JsonRpc::unsupportedProtocolVersionCode)
+    | Refusal.headerMismatch problem => (JsonRpc::headerMismatchCode)
+    | Refusal.methodNotFound method => (JsonRpc::methodNotFoundCode)
+    | Refusal.provider inner => (providerCode inner)),
+  executable: true
+}
+
+definition{
+  name: messageOfProblem,
+  parameters: [problem : ParamsProblem],
+  result: String,
+  body: (match problem
+    | ParamsProblem.missingParams => "Invalid params: params is required"
+    | ParamsProblem.missingMeta => "Invalid params: _meta is required"
+    | ParamsProblem.missingProtocolVersion => "Invalid params: _meta lacks io.modelcontextprotocol/protocolVersion"
+    | ParamsProblem.missingClientCapabilities => "Invalid params: _meta lacks io.modelcontextprotocol/clientCapabilities"
+    | ParamsProblem.malformedMeta => "Invalid params: _meta is not an object"
+    | ParamsProblem.malformedProtocolVersion => "Invalid params: io.modelcontextprotocol/protocolVersion is not a string"
+    | ParamsProblem.malformedClientCapabilities => "Invalid params: io.modelcontextprotocol/clientCapabilities is not a valid capabilities object"
+    | ParamsProblem.missingField key => "Invalid params: a required field is missing"
+    | ParamsProblem.malformedField key => "Invalid params: a field has the wrong type"),
+  executable: true
+}
+
+definition{
+  name: messageOfHeader,
+  parameters: [problem : HeaderProblem],
+  result: String,
+  body: (match problem
+    | HeaderProblem.missingProtocolVersionHeader => "Header mismatch: MCP-Protocol-Version header is missing"
+    | HeaderProblem.missingMethodHeader => "Header mismatch: Mcp-Method header is missing"
+    | HeaderProblem.missingNameHeader => "Header mismatch: Mcp-Name header is missing"
+    | HeaderProblem.protocolVersionDiffers => "Header mismatch: MCP-Protocol-Version differs from the request body"
+    | HeaderProblem.methodDiffers => "Header mismatch: Mcp-Method differs from the request body"
+    | HeaderProblem.nameDiffers => "Header mismatch: Mcp-Name differs from the request body"
+    | HeaderProblem.malformedValue kind => (match kind
+      | HeaderKind.protocolVersion => "Header mismatch: MCP-Protocol-Version has a malformed value"
+      | HeaderKind.method => "Header mismatch: Mcp-Method has a malformed value"
+      | HeaderKind.name => "Header mismatch: Mcp-Name has a malformed value")
+    | HeaderProblem.repeatedField kind => (match kind
+      | HeaderKind.protocolVersion => "Header mismatch: MCP-Protocol-Version is repeated"
+      | HeaderKind.method => "Header mismatch: Mcp-Method is repeated"
+      | HeaderKind.name => "Header mismatch: Mcp-Name is repeated")
+    | HeaderProblem.missingParamHeader header => "Header mismatch: a required Mcp-Param header is missing"
+    | HeaderProblem.paramDiffers header => "Header mismatch: an Mcp-Param header differs from the request body"
+    | HeaderProblem.malformedParamHeader header => "Header mismatch: an Mcp-Param header has a malformed value"),
+  executable: true
+}
+
+definition{
+  name: textListOnto,
+  parameters: [items : (List String), built : (List Json::Json)],
+  result: (List Json::Json),
+  body: (match items
+    | List.nil => built
+    | List.cons head tail => (textListOnto tail (cons (ctor Json::Json.text head) built))),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: textList,
+  parameters: [items : (List String)],
+  result: (List Json::Json),
+  body: (JsonRead::reverseOnto [Json::Json] (textListOnto items (nil Json::Json)) (nil Json::Json)),
+  executable: true
+}
+
+definition{
+  name: optionalMember,
+  parameters: [key : String, value : (Option Json::JsonObject)],
+  result: (List (String * Json::Json)),
+  body: (match value
+    | Option.none => (nil (String * Json::Json))
+    | Option.some declared => (cons (key, (ctor Json::Json.object (project declared members))) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: capabilitiesJson,
+  parameters: [capabilities : Capabilities::ClientCapabilities],
+  result: Json::Json,
+  body: (ctor Json::Json.object (prim append (optionalMember "experimental" (project capabilities experimental)) (prim append (optionalMember "roots" (project capabilities roots)) (prim append (optionalMember "sampling" (project capabilities sampling)) (prim append (optionalMember "elicitation" (project capabilities elicitation)) (optionalMember "extensions" (project capabilities extensions)) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: dataOf,
+  parameters: [refusal : Refusal],
+  result: (Option Json::Json),
+  body: (match refusal
+    | Refusal.invalidParams problem => (ctor Option.none [Json::Json])
+    | Refusal.unsupportedProtocolVersion requested supported => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("supported", (ctor Json::Json.array (textList supported))) (cons ("requested", (ctor Json::Json.text requested)) (nil (String * Json::Json))))))
+    | Refusal.headerMismatch problem => (ctor Option.none [Json::Json])
+    | Refusal.methodNotFound method => (ctor Option.none [Json::Json])
+    | Refusal.provider inner => (match inner
+      | ProviderRefusal.unknownTool name => (ctor Option.none [Json::Json])
+      | ProviderRefusal.unknownPrompt name => (ctor Option.none [Json::Json])
+      | ProviderRefusal.resourceNotFound uri => (ctor Option.none [Json::Json])
+      | ProviderRefusal.unknownTask taskId => (ctor Option.none [Json::Json])
+      | ProviderRefusal.invalidArguments reason => (ctor Option.none [Json::Json])
+      | ProviderRefusal.missingCapability required => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("requiredCapabilities", (capabilitiesJson required)) (nil (String * Json::Json)))))
+      | ProviderRefusal.internal reason => (ctor Option.none [Json::Json]))),
+  executable: true
+}
+
+definition{
+  name: messageOf,
+  parameters: [refusal : Refusal],
+  result: String,
+  body: (match refusal
+    | Refusal.invalidParams problem => (messageOfProblem problem)
+    | Refusal.unsupportedProtocolVersion requested supported => "Unsupported protocol version"
+    | Refusal.headerMismatch problem => (messageOfHeader problem)
+    | Refusal.methodNotFound method => "Method not found"
+    | Refusal.provider inner => (match inner
+      | ProviderRefusal.unknownTool name => "Invalid params: unknown tool"
+      | ProviderRefusal.unknownPrompt name => "Invalid params: unknown prompt"
+      | ProviderRefusal.resourceNotFound uri => "Invalid params: resource not found"
+      | ProviderRefusal.unknownTask taskId => "Invalid params: unknown task"
+      | ProviderRefusal.invalidArguments reason => "Invalid params: invalid arguments"
+      | ProviderRefusal.missingCapability required => "Missing required client capability"
+      | ProviderRefusal.internal reason => "Internal error")),
+  executable: true
+}
+
+definition{
+  name: errorObjectOf,
+  parameters: [refusal : Refusal],
+  result: JsonRpc::ErrorObject,
+  body: (record JsonRpc::ErrorObject {code := (codeOf refusal), message := (messageOf refusal), data := (dataOf refusal)}),
+  executable: true
+}
+
+theorem{
+  name: error_object_carries_the_refusal_code,
+  parameters: [refusal : Refusal],
+  statement: ((project (errorObjectOf refusal) code) = (codeOf refusal)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: unsupported_version_has_the_schema_code,
+  parameters: [requested : String, supported : (List String)],
+  statement: ((codeOf (ctor Refusal.unsupportedProtocolVersion requested supported)) = (-32022 : Int)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: header_mismatch_has_the_schema_code,
+  parameters: [problem : HeaderProblem],
+  statement: ((codeOf (ctor Refusal.headerMismatch problem)) = (-32020 : Int)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: invalid_params_has_the_jsonrpc_code,
+  parameters: [problem : ParamsProblem],
+  statement: ((codeOf (ctor Refusal.invalidParams problem)) = (-32602 : Int)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: unknown_method_has_the_jsonrpc_code,
+  parameters: [method : String],
+  statement: ((codeOf (ctor Refusal.methodNotFound method)) = (-32601 : Int)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: unsupported_version_error_data_lists_the_supported_versions,
+  parameters: [requested : String, supported : (List String)],
+  statement: ((dataOf (ctor Refusal.unsupportedProtocolVersion requested supported)) = (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("supported", (ctor Json::Json.array (textList supported))) (cons ("requested", (ctor Json::Json.text requested)) (nil (String * Json::Json))))))),
+  proof: reflexivity{}
+}
+\end{semanticmodule}
+\end{lexlean}

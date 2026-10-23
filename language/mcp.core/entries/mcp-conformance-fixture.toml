@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-conformance-fixture"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Fixture"
+component = "Fixture"
+
+[[form]]
+id = "mcp-conformance-fixture"
+channel = "text"
+surface = "MCP conformance fixture"
+canonical_source = true
+features = ["sentence-case", "singular"]

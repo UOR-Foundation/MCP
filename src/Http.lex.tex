@@ -1,0 +1,445 @@
+\begin{lexlean}{Http}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Base64}
+\importmodule{Common}
+\importmodule{Extension}
+\importmodule{Json}
+\importmodule{JsonRead}
+\importmodule{JsonText}
+\importmodule{Methods}
+\importmodule{Param}
+\importmodule{Refusal}
+\importmodule{Validation}
+\title{MCP HTTP exchange}
+\begin{semanticmodule}
+structure{
+  name: Field,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: name, type: (List Nat)}, {name: value, type: (List Nat)}]
+}
+
+structure{
+  name: HttpRequest,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: method, type: (List Nat)},
+    {name: target, type: (List Nat)},
+    {name: fields, type: (List Field)},
+    {name: body, type: Bytes}
+  ]
+}
+
+structure{
+  name: HttpResponse,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: status, type: Nat},
+    {name: fields, type: (List Field)},
+    {name: body, type: (List Nat)}
+  ]
+}
+
+definition{
+  name: protocolVersionName,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 109 (cons 99 (cons 112 (cons 45 (cons 112 (cons 114 (cons 111 (cons 116 (cons 111 (cons 99 (cons 111 (cons 108 (cons 45 (cons 118 (cons 101 (cons 114 (cons 115 (cons 105 (cons 111 (cons 110 (nil Nat))))))))))))))))))))),
+  executable: true
+}
+
+definition{
+  name: methodName,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 109 (cons 99 (cons 112 (cons 45 (cons 109 (cons 101 (cons 116 (cons 104 (cons 111 (cons 100 (nil Nat))))))))))),
+  executable: true
+}
+
+definition{
+  name: nameName,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 109 (cons 99 (cons 112 (cons 45 (cons 110 (cons 97 (cons 109 (cons 101 (nil Nat))))))))),
+  executable: true
+}
+
+definition{
+  name: paramPrefix,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 109 (cons 99 (cons 112 (cons 45 (cons 112 (cons 97 (cons 114 (cons 97 (cons 109 (cons 45 (nil Nat))))))))))),
+  executable: true
+}
+
+definition{
+  name: sentinelPrefix,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 61 (cons 63 (cons 98 (cons 97 (cons 115 (cons 101 (cons 54 (cons 52 (cons 63 (nil Nat)))))))))),
+  executable: true
+}
+
+definition{
+  name: sentinelSuffixReversed,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 61 (cons 63 (nil Nat))),
+  executable: true
+}
+
+definition{
+  name: postName,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 80 (cons 79 (cons 83 (cons 84 (nil Nat))))),
+  executable: true
+}
+
+definition{
+  name: lowerByte,
+  parameters: [byte : Nat],
+  result: Nat,
+  body: (if ((64 <? byte) && (byte <? 91)) then (byte + 32) else byte),
+  executable: true
+}
+
+definition{
+  name: sameName,
+  parameters: [left : (List Nat), right : (List Nat)],
+  result: Bool,
+  body: (match left
+    | List.nil => (match right | List.nil => true | List.cons y ys => false)
+    | List.cons x xs => (match right
+      | List.nil => false
+      | List.cons y ys => (if ((lowerByte x) =? (lowerByte y)) then (sameName xs ys) else false))),
+  executable: true,
+  recursive_argument: left
+}
+
+definition{
+  name: sameBytes,
+  parameters: [left : (List Nat), right : (List Nat)],
+  result: Bool,
+  body: (match left
+    | List.nil => (match right | List.nil => true | List.cons y ys => false)
+    | List.cons x xs => (match right
+      | List.nil => false
+      | List.cons y ys => (if (x =? y) then (sameBytes xs ys) else false))),
+  executable: true,
+  recursive_argument: left
+}
+
+inductive{
+  name: Seen,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: none, fields: []},
+    {name: one, fields: [(List Nat)]},
+    {name: many, fields: []}
+  ]
+}
+
+definition{
+  name: seenAgain,
+  parameters: [seen : Seen, value : (List Nat)],
+  result: Seen,
+  body: (match seen
+    | Seen.none => (ctor Seen.one value)
+    | Seen.one earlier => (ctor Seen.many)
+    | Seen.many => (ctor Seen.many)),
+  executable: true
+}
+
+definition{
+  name: scanFields,
+  parameters: [fields : (List Field), wanted : (List Nat), seen : Seen],
+  result: Seen,
+  body: (match fields
+    | List.nil => seen
+    | List.cons head tail => (if (sameName (project head name) wanted) then (scanFields tail wanted (seenAgain seen (project head value))) else (scanFields tail wanted seen))),
+  executable: true,
+  recursive_argument: fields
+}
+
+definition{
+  name: isOws,
+  parameters: [byte : Nat],
+  result: Bool,
+  body: ((byte =? 9) || (byte =? 32)),
+  executable: true
+}
+
+definition{
+  name: dropOws,
+  parameters: [bytes : (List Nat)],
+  result: (List Nat),
+  body: (match bytes
+    | List.nil => (nil Nat)
+    | List.cons head tail => (if (isOws head) then (dropOws tail) else (cons head tail))),
+  executable: true,
+  recursive_argument: bytes
+}
+
+definition{
+  name: reverseOnto,
+  parameters: [bytes : (List Nat), built : (List Nat)],
+  result: (List Nat),
+  body: (match bytes
+    | List.nil => built
+    | List.cons head tail => (reverseOnto tail (cons head built))),
+  executable: true,
+  recursive_argument: bytes
+}
+
+definition{
+  name: trimOws,
+  parameters: [bytes : (List Nat)],
+  result: (List Nat),
+  body: (reverseOnto (dropOws (reverseOnto (dropOws bytes) (nil Nat))) (nil Nat)),
+  executable: true
+}
+
+definition{
+  name: isVisible,
+  parameters: [byte : Nat],
+  result: Bool,
+  body: ((byte =? 9) || ((31 <? byte) && (byte <? 127))),
+  executable: true
+}
+
+definition{
+  name: allVisible,
+  parameters: [bytes : (List Nat)],
+  result: Bool,
+  body: (match bytes
+    | List.nil => true
+    | List.cons head tail => (if (isVisible head) then (allVisible tail) else false)),
+  executable: true,
+  recursive_argument: bytes
+}
+
+definition{
+  name: cleanValue,
+  parameters: [bytes : (List Nat)],
+  result: (Option (List Nat)),
+  body: (let trimmed : (List Nat) := (trimOws bytes); (if (allVisible trimmed) then (ctor Option.some [(List Nat)] trimmed) else (ctor Option.none [(List Nat)]))),
+  executable: true
+}
+
+inductive{
+  name: Reading,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: absent, fields: []},
+    {name: malformed, fields: []},
+    {name: repeated, fields: []},
+    {name: value, fields: [(List Nat)]}
+  ]
+}
+
+definition{
+  name: readField,
+  parameters: [fields : (List Field), wanted : (List Nat)],
+  result: Reading,
+  body: (match (scanFields fields wanted (ctor Seen.none))
+    | Seen.none => (ctor Reading.absent)
+    | Seen.many => (ctor Reading.repeated)
+    | Seen.one only => (match (cleanValue only)
+      | Option.none => (ctor Reading.malformed)
+      | Option.some trimmed => (ctor Reading.value trimmed))),
+  executable: true
+}
+
+definition{
+  name: stripPrefix,
+  parameters: [prefix : (List Nat), bytes : (List Nat)],
+  result: (Option (List Nat)),
+  body: (match prefix
+    | List.nil => (ctor Option.some [(List Nat)] bytes)
+    | List.cons wanted more => (match bytes
+      | List.nil => (ctor Option.none [(List Nat)])
+      | List.cons head tail => (if (head =? wanted) then (stripPrefix more tail) else (ctor Option.none [(List Nat)])))),
+  executable: true,
+  recursive_argument: prefix
+}
+
+definition{
+  name: sentinelPayload,
+  parameters: [bytes : (List Nat)],
+  result: (Option (List Nat)),
+  body: (match (stripPrefix (sentinelPrefix) bytes)
+    | Option.none => (ctor Option.none [(List Nat)])
+    | Option.some rest => (match (stripPrefix (sentinelSuffixReversed) (reverseOnto rest (nil Nat)))
+      | Option.none => (ctor Option.none [(List Nat)])
+      | Option.some reversed => (ctor Option.some [(List Nat)] (reverseOnto reversed (nil Nat))))),
+  executable: true
+}
+
+definition{
+  name: decodedReading,
+  parameters: [reading : Reading],
+  result: Reading,
+  body: (match reading
+    | Reading.value bytes => (match (sentinelPayload bytes)
+      | Option.none => reading
+      | Option.some payload => (match (Base64::decode payload)
+        | Option.none => (ctor Reading.malformed)
+        | Option.some decoded => (ctor Reading.value decoded)))
+    | Reading.absent => reading
+    | Reading.malformed => reading
+    | Reading.repeated => reading),
+  executable: true
+}
+
+definition{
+  name: textOf,
+  parameters: [bytes : (List Nat)],
+  result: (Option String),
+  body: (prim utf8_decode (JsonText::listToBytes (JsonText::emptyBytes) bytes) : (Option String)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: asciiOf,
+  parameters: [text : String],
+  result: (List Nat),
+  body: (JsonText::bytesToList (prim utf8_encode text : Bytes)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+structure{
+  name: Std,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: text, type: (Option String)},
+    {name: problem, type: (Option Refusal::HeaderProblem)}
+  ]
+}
+
+definition{
+  name: noStd,
+  parameters: [],
+  result: Std,
+  body: (record Std {text := (ctor Option.none [String]), problem := (ctor Option.none [Refusal::HeaderProblem])}),
+  executable: true
+}
+
+definition{
+  name: stdOf,
+  parameters: [kind : Refusal::HeaderKind, reading : Reading],
+  result: Std,
+  body: (match reading
+    | Reading.absent => (noStd)
+    | Reading.malformed => (record Std {text := (ctor Option.none [String]), problem := (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.malformedValue kind))})
+    | Reading.repeated => (record Std {text := (ctor Option.none [String]), problem := (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.repeatedField kind))})
+    | Reading.value bytes => (match (textOf bytes)
+      | Option.none => (record Std {text := (ctor Option.none [String]), problem := (ctor Option.some [Refusal::HeaderProblem] (ctor Refusal::HeaderProblem.malformedValue kind))})
+      | Option.some content => (record Std {text := (ctor Option.some [String] content), problem := (ctor Option.none [Refusal::HeaderProblem])}))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: firstProblem,
+  parameters: [left : (Option Refusal::HeaderProblem), right : (Option Refusal::HeaderProblem)],
+  result: (Option Refusal::HeaderProblem),
+  body: (match left | Option.some problem => left | Option.none => right),
+  executable: true
+}
+
+definition{
+  name: paramSeen,
+  parameters: [fields : (List Field), header : String],
+  result: Param::ParamSeen,
+  body: (match (decodedReading (readField fields (prim append (paramPrefix) (asciiOf header) : (List Nat))))
+    | Reading.absent => (ctor Param::ParamSeen.absent)
+    | Reading.malformed => (ctor Param::ParamSeen.malformed)
+    | Reading.repeated => (ctor Param::ParamSeen.malformed)
+    | Reading.value bytes => (match (textOf bytes)
+      | Option.none => (ctor Param::ParamSeen.malformed)
+      | Option.some content => (ctor Param::ParamSeen.value content))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: ruleApplies,
+  parameters: [rule : Extension::ParamRule, tool : (Option String)],
+  result: Bool,
+  body: (match tool
+    | Option.none => false
+    | Option.some called => (prim equal (project rule tool) called : Bool)),
+  executable: true
+}
+
+definition{
+  name: paramHeadersOnto,
+  parameters: [
+    fields : (List Field),
+    rules : (List Extension::ParamRule),
+    tool : (Option String),
+    built : (List Param::ParamHeader)
+  ],
+  result: (List Param::ParamHeader),
+  body: (match rules
+    | List.nil => built
+    | List.cons rule rest => (if (ruleApplies rule tool) then (paramHeadersOnto fields rest tool (cons (record Param::ParamHeader {header := (project rule header), path := (project rule path), kind := (project rule kind), seen := (paramSeen fields (project rule header))}) built)) else (paramHeadersOnto fields rest tool built))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true,
+  recursive_argument: rules
+}
+
+definition{
+  name: paramHeaders,
+  parameters: [fields : (List Field), rules : (List Extension::ParamRule), tool : (Option String)],
+  result: (List Param::ParamHeader),
+  body: (JsonRead::reverseOnto [Param::ParamHeader] (paramHeadersOnto fields rules tool (nil Param::ParamHeader)) (nil Param::ParamHeader)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: hasNameField,
+  parameters: [wire : String],
+  result: Bool,
+  body: (match (Methods::nameFieldOfWire wire)
+    | Methods::NameField.noName => false
+    | Methods::NameField.name => true
+    | Methods::NameField.uri => true
+    | Methods::NameField.taskId => true),
+  executable: true
+}
+
+definition{
+  name: headersOf,
+  parameters: [
+    fields : (List Field),
+    rules : (List Extension::ParamRule),
+    tool : (Option String),
+    wire : String
+  ],
+  result: Validation::Headers,
+  body: (let version : Std := (stdOf (ctor Refusal::HeaderKind.protocolVersion) (readField fields (protocolVersionName))); (let method : Std := (stdOf (ctor Refusal::HeaderKind.method) (readField fields (methodName))); (let named : Std := (if (hasNameField wire) then (stdOf (ctor Refusal::HeaderKind.name) (decodedReading (readField fields (nameName)))) else (noStd)); (record Validation::Headers {protocolVersion := (project version text), method := (project method text), name := (project named text), fault := (firstProblem (project version problem) (firstProblem (project method problem) (project named problem))), custom := (paramHeaders fields rules tool)})))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: isPost,
+  parameters: [method : (List Nat)],
+  result: Bool,
+  body: (sameBytes method (postName)),
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

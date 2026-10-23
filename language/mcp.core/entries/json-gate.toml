@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "json-gate"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "JsonGate"
+component = "JsonGate"
+
+[[form]]
+id = "json-gate"
+channel = "text"
+surface = "JSON codec theorems"
+canonical_source = true
+features = ["sentence-case", "singular"]

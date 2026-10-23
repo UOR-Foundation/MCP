@@ -1,0 +1,177 @@
+\begin{lexlean}{Common}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Json}
+\title{MCP common types}
+\begin{semanticmodule}
+inductive{
+  name: Role,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: user, fields: []}, {name: assistant, fields: []}]
+}
+
+inductive{
+  name: LoggingLevel,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: debug, fields: []},
+    {name: info, fields: []},
+    {name: notice, fields: []},
+    {name: warning, fields: []},
+    {name: error, fields: []},
+    {name: critical, fields: []},
+    {name: alert, fields: []},
+    {name: emergency, fields: []}
+  ]
+}
+
+inductive{
+  name: IconTheme,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: light, fields: []}, {name: dark, fields: []}]
+}
+
+structure{
+  name: Icon,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: src, type: String},
+    {name: mimeType, type: (Option String)},
+    {name: sizes, type: (Option (List String))},
+    {name: theme, type: (Option IconTheme)}
+  ]
+}
+
+structure{
+  name: Implementation,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: name, type: String},
+    {name: title, type: (Option String)},
+    {name: version, type: String},
+    {name: description, type: (Option String)},
+    {name: websiteUrl, type: (Option String)},
+    {name: icons, type: (Option (List Icon))}
+  ]
+}
+
+structure{
+  name: Annotations,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: audience, type: (Option (List Role))},
+    {name: priority, type: (Option Json::Decimal)},
+    {name: lastModified, type: (Option String)}
+  ]
+}
+
+inductive{
+  name: ProgressToken,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: text, fields: [String]}, {name: number, fields: [Int]}]
+}
+
+inductive{
+  name: CacheScope,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: public, fields: []}, {name: private, fields: []}]
+}
+
+inductive{
+  name: ParamKind,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: text, fields: []}, {name: integer, fields: []}, {name: boolean, fields: []}]
+}
+
+structure{
+  name: CacheHint,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: ttlMs, type: Nat}, {name: cacheScope, type: CacheScope}]
+}
+
+definition{
+  name: roleWire,
+  parameters: [role : Role],
+  result: String,
+  body: (match role | Role.user => "user" | Role.assistant => "assistant"),
+  executable: true
+}
+
+definition{
+  name: loggingLevelWire,
+  parameters: [level : LoggingLevel],
+  result: String,
+  body: (match level
+    | LoggingLevel.debug => "debug"
+    | LoggingLevel.info => "info"
+    | LoggingLevel.notice => "notice"
+    | LoggingLevel.warning => "warning"
+    | LoggingLevel.error => "error"
+    | LoggingLevel.critical => "critical"
+    | LoggingLevel.alert => "alert"
+    | LoggingLevel.emergency => "emergency"),
+  executable: true
+}
+
+inductive{
+  name: LoggingLevelRead,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: unrecognized, fields: []}, {name: recognized, fields: [LoggingLevel]}]
+}
+
+definition{
+  name: loggingLevelOfWire,
+  parameters: [wire : String],
+  result: LoggingLevelRead,
+  body: (if (prim equal wire "debug" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.debug)) else (if (prim equal wire "info" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.info)) else (if (prim equal wire "notice" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.notice)) else (if (prim equal wire "warning" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.warning)) else (if (prim equal wire "error" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.error)) else (if (prim equal wire "critical" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.critical)) else (if (prim equal wire "alert" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.alert)) else (if (prim equal wire "emergency" : Bool) then (ctor LoggingLevelRead.recognized (ctor LoggingLevel.emergency)) else (ctor LoggingLevelRead.unrecognized))))))))),
+  executable: true
+}
+
+theorem{
+  name: logging_level_wire_round_trips,
+  parameters: [level : LoggingLevel],
+  statement: ((loggingLevelOfWire (loggingLevelWire level)) = (ctor LoggingLevelRead.recognized level)),
+  proof: cases{
+    branches: [
+      {proof: reflexivity{}, binders: [], constructor: debug},
+      {proof: reflexivity{}, binders: [], constructor: info},
+      {proof: reflexivity{}, binders: [], constructor: notice},
+      {proof: reflexivity{}, binders: [], constructor: warning},
+      {proof: reflexivity{}, binders: [], constructor: error},
+      {proof: reflexivity{}, binders: [], constructor: critical},
+      {proof: reflexivity{}, binders: [], constructor: alert},
+      {proof: reflexivity{}, binders: [], constructor: emergency}
+    ],
+    scrutinee: level
+  }
+}
+
+definition{
+  name: cacheScopeWire,
+  parameters: [scope : CacheScope],
+  result: String,
+  body: (match scope | CacheScope.public => "public" | CacheScope.private => "private"),
+  executable: true
+}
+
+definition{
+  name: iconThemeWire,
+  parameters: [theme : IconTheme],
+  result: String,
+  body: (match theme | IconTheme.light => "light" | IconTheme.dark => "dark"),
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

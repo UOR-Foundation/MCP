@@ -1,0 +1,235 @@
+\begin{lexlean}{Json}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\title{MCP JSON values}
+\begin{semanticmodule}
+structure{
+  name: Decimal,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: mantissa, type: Int}, {name: exponent, type: Int}]
+}
+
+inductive{
+  name: Json,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: null, fields: []},
+    {name: bool, fields: [Bool]},
+    {name: number, fields: [Decimal]},
+    {name: text, fields: [String]},
+    {name: array, fields: [(List Json)]},
+    {name: object, fields: [(List (String * Json))]}
+  ]
+}
+
+structure{
+  name: JsonObject,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: members, type: (List (String * Json))}]
+}
+
+inductive{
+  name: KeyMatch,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: same, fields: []}, {name: different, fields: []}]
+}
+
+definition{
+  name: compareKey,
+  parameters: [left : String, right : String],
+  result: KeyMatch,
+  body: (if (prim equal left right : Bool) then (ctor KeyMatch.same) else (ctor KeyMatch.different)),
+  executable: true
+}
+
+inductive{
+  name: Lookup,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: absent, fields: []}, {name: present, fields: [Json]}]
+}
+
+definition{
+  name: lookupIn,
+  parameters: [key : String, members : (List (String * Json))],
+  result: Lookup,
+  body: (match members
+    | List.nil => (ctor Lookup.absent)
+    | List.cons entry rest => (match (compareKey (first entry) key)
+      | KeyMatch.same => (ctor Lookup.present (second entry))
+      | KeyMatch.different => (lookupIn key rest))),
+  executable: true,
+  recursive_argument: members
+}
+
+definition{
+  name: lookup,
+  parameters: [key : String, object : JsonObject],
+  result: Lookup,
+  body: (lookupIn key (project object members)),
+  executable: true
+}
+
+definition{
+  name: isPresent,
+  parameters: [found : Lookup],
+  result: Bool,
+  body: (match found | Lookup.absent => false | Lookup.present value => true),
+  executable: true
+}
+
+definition{
+  name: hasKey,
+  parameters: [key : String, object : JsonObject],
+  result: Bool,
+  body: (isPresent (lookup key object)),
+  executable: true
+}
+
+definition{
+  name: asText,
+  parameters: [value : Json],
+  result: (Option String),
+  body: (match value
+    | Json.null => (ctor Option.none [String])
+    | Json.bool flag => (ctor Option.none [String])
+    | Json.number amount => (ctor Option.none [String])
+    | Json.text content => (ctor Option.some [String] content)
+    | Json.array items => (ctor Option.none [String])
+    | Json.object members => (ctor Option.none [String])),
+  executable: true
+}
+
+definition{
+  name: asObject,
+  parameters: [value : Json],
+  result: (Option JsonObject),
+  body: (match value
+    | Json.null => (ctor Option.none [JsonObject])
+    | Json.bool flag => (ctor Option.none [JsonObject])
+    | Json.number amount => (ctor Option.none [JsonObject])
+    | Json.text content => (ctor Option.none [JsonObject])
+    | Json.array items => (ctor Option.none [JsonObject])
+    | Json.object members => (ctor Option.some [JsonObject] (record JsonObject {members := members}))),
+  executable: true
+}
+
+definition{
+  name: asBool,
+  parameters: [value : Json],
+  result: (Option Bool),
+  body: (match value
+    | Json.null => (ctor Option.none [Bool])
+    | Json.bool flag => (ctor Option.some [Bool] flag)
+    | Json.number amount => (ctor Option.none [Bool])
+    | Json.text content => (ctor Option.none [Bool])
+    | Json.array items => (ctor Option.none [Bool])
+    | Json.object members => (ctor Option.none [Bool])),
+  executable: true
+}
+
+definition{
+  name: asNumber,
+  parameters: [value : Json],
+  result: (Option Decimal),
+  body: (match value
+    | Json.null => (ctor Option.none [Decimal])
+    | Json.bool flag => (ctor Option.none [Decimal])
+    | Json.number amount => (ctor Option.some [Decimal] amount)
+    | Json.text content => (ctor Option.none [Decimal])
+    | Json.array items => (ctor Option.none [Decimal])
+    | Json.object members => (ctor Option.none [Decimal])),
+  executable: true
+}
+
+definition{
+  name: asArray,
+  parameters: [value : Json],
+  result: (Option (List Json)),
+  body: (match value
+    | Json.null => (ctor Option.none [(List Json)])
+    | Json.bool flag => (ctor Option.none [(List Json)])
+    | Json.number amount => (ctor Option.none [(List Json)])
+    | Json.text content => (ctor Option.none [(List Json)])
+    | Json.array items => (ctor Option.some [(List Json)] items)
+    | Json.object members => (ctor Option.none [(List Json)])),
+  executable: true
+}
+
+definition{
+  name: isZero,
+  parameters: [whole : Int],
+  result: Bool,
+  body: (not ((prim less_than whole (0 : Int) : Bool) || (prim less_than (0 : Int) whole : Bool))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: asInteger,
+  parameters: [value : Json],
+  result: (Option Int),
+  body: (match value
+    | Json.null => (ctor Option.none [Int])
+    | Json.bool flag => (ctor Option.none [Int])
+    | Json.number amount => (if (isZero (project amount exponent)) then (ctor Option.some [Int] (project amount mantissa)) else (ctor Option.none [Int]))
+    | Json.text content => (ctor Option.none [Int])
+    | Json.array items => (ctor Option.none [Int])
+    | Json.object members => (ctor Option.none [Int])),
+  axioms: [propext],
+  executable: true
+}
+
+theorem{
+  name: lookup_in_empty,
+  parameters: [key : String],
+  statement: ((lookupIn key (nil (String * Json))) = (ctor Lookup.absent)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: lookup_first_match,
+  parameters: [key : String],
+  statement: ((lookupIn "a" (cons ("a", (ctor Json.null)) (cons ("a", (ctor Json.bool true)) (nil (String * Json))))) = (ctor Lookup.present (ctor Json.null))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: lookup_skips_other_key,
+  parameters: [],
+  statement: ((lookupIn "b" (cons ("a", (ctor Json.null)) (cons ("b", (ctor Json.bool true)) (nil (String * Json))))) = (ctor Lookup.present (ctor Json.bool true))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: lookup_misses_absent_key,
+  parameters: [],
+  statement: ((lookupIn "c" (cons ("a", (ctor Json.null)) (nil (String * Json)))) = (ctor Lookup.absent)),
+  proof: reflexivity{}
+}
+
+definition{
+  name: isSame,
+  parameters: [outcome : KeyMatch],
+  result: Bool,
+  body: (match outcome | KeyMatch.same => true | KeyMatch.different => false),
+  executable: true
+}
+
+theorem{
+  name: lookup_cons_is_membership_or_tail,
+  parameters: [key : String, entry : (String * Json), rest : (List (String * Json))],
+  statement: ((isPresent (lookupIn key (cons entry rest))) = (if (isSame (compareKey (first entry) key)) then true else (isPresent (lookupIn key rest)))),
+  proof: term_cases{
+    definitions: [isPresent, isSame, lookupIn],
+    scrutinee: (compareKey (first entry) key)
+  },
+  axioms: [propext]
+}
+\end{semanticmodule}
+\end{lexlean}

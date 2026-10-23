@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-typed-refusals"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Refusal"
+component = "Refusal"
+
+[[form]]
+id = "mcp-typed-refusals"
+channel = "text"
+surface = "MCP typed refusals"
+canonical_source = true
+features = ["sentence-case", "singular"]

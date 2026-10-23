@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "json-text-bridge"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "JsonText"
+component = "JsonText"
+
+[[form]]
+id = "json-text-bridge"
+channel = "text"
+surface = "JSON text bridge"
+canonical_source = true
+features = ["sentence-case", "singular"]

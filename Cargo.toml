@@ -8,9 +8,8 @@ edition = "2021"
 # Raise this when something here needs a newer compiler; nothing does yet.
 rust-version = "1.89"
 license = "MIT OR Apache-2.0"
-# Instantiated repositories set their own URLs here.
-repository = "https://github.com/UOR-Foundation/template"
-homepage = "https://github.com/UOR-Foundation/template"
+repository = "https://github.com/UOR-Foundation/MCP"
+homepage = "https://github.com/UOR-Foundation/MCP"
 authors = ["UOR Foundation"]
 keywords = []
 categories = []
@@ -29,6 +28,17 @@ unsafe_op_in_unsafe_fn = "deny"
 [workspace.lints.clippy]
 undocumented_unsafe_blocks = "deny"
 missing_safety_doc = "deny"
+
+# The oracle crate compiles the generated LexLean package into itself, and its tests run
+# frames of millions of bytes through it; at opt-level 0 they take minutes.
+[profile.dev.package.lifecycle-oracle]
+opt-level = 1
+
+# The same for the codec oracle: its stress tests (JC-13) read strings of megabytes
+# through the exported package, and its differential tests run the validator over
+# millions of sequences.
+[profile.dev.package.json-oracle]
+opt-level = 1
 
 [profile.release]
 opt-level = 3
