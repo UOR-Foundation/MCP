@@ -205,7 +205,31 @@ response of its method.
 
 ## Planted defects
 
-PLANTED-DEFECTS-TABLE
+Each was planted alone in the sources of the tree of commit `c02af88`, run, and reverted with
+`git checkout`. The first group is stopped by the kernel before an export is possible. The
+second passes `lexlean verify` because no theorem covers it, and is stopped by the oracle after
+`lexlean production build` exported the packages again (the request's `expect` pins were left
+out for the plant, so the build did not stop at `LLC0204`). The third is stopped by the
+provenance and register gates.
+
+| Defect | Planted in | Gate | Command | Diagnostic |
+| --- | --- | --- | --- | --- |
+| `localhost` is not an allowed name | `Transport.hostAllowed`: the `localhost` condition replaced by `false` | kernel | `lexlean verify src/TransportLaws.lex.tex` | `LLV7002`, `Tactic rfl failed` in `localhost_is_allowed_without_a_port` (`TransportLaws.lex.tex:21`), `a_host_name_is_compared_without_regard_to_case` (:35) and `optional_whitespace_around_the_origin_is_not_part_of_it` (:56) |
+| an event ends with one line feed, so a client never sees it dispatched | `Transport.eventEnd`: `[10, 10]` made `[10]` | kernel | same | `LLV7002`, `Tactic rfl failed` in `an_event_is_a_data_line_and_a_blank_line` (:308) and `the_events_of_a_stream_are_its_messages_in_order` (:322) |
+| the `Host` is judged before the `Origin` | `Transport.gateOf`: the two problems swapped | kernel | same | `Tactic rfl failed` in `the_origin_is_judged_before_the_host` (:84) |
+| a refused request is served anyway | `Serve.serveGated`: `some refusal` answered by `serveOpen` | kernel | same | `Tactic rfl failed` in `a_refused_gate_is_answered_by_the_refusal_alone` (:441) and `a_refusal_does_not_depend_on_the_provider_or_the_request` (:466) |
+| a forbidden `Origin` is answered 400 | `Status.transportStatus`: `forbiddenOrigin` maps to `badRequestStatus` | kernel | `lexlean verify src/Status.lex.tex` | `Tactic rfl failed` in `a_forbidden_origin_is_forbidden` (`Status.lex.tex:258`) |
+| the result comes before the notifications in a stream | `Serve.streamed`: the result appended ahead of the notes | oracle | `cargo test -p lifecycle-oracle --no-fail-fast` | passes `lexlean verify` (no theorem states the order of a stream with notifications); fails `a_request_that_accepts_the_stream_and_has_notifications_is_answered_as_a_stream_sh_01`, `a_stream_has_no_resumption_fields_and_every_line_is_a_data_line_sh_01`, `the_notifications_and_the_result_are_one_event_stream_for_a_client_that_accepts_it_tl_13`, `a_token_gets_increasing_progress_notifications_that_echo_it_tl_13`, `every_vector_response_validates_against_the_schema_lc_15` and two TL-15 tests: the last event is read as the response and is a notification |
+| bytes after the allow-list are accepted | `Frame.afterCalls`: the end-of-frame comparison replaced by `true` | oracle | same | passes `lexlean verify`; `a_frame_cut_inside_the_allow_list_or_followed_by_bytes_is_unreadable_sh_08` (`transport.rs:660`): left 200, right 500 |
+| a vendored scenario file is altered | `suite/.../dns-rebinding.ts`: one check id misspelled | pin and checksum | `cargo test -p lifecycle-oracle --test provenance` | `the_vendored_suite_is_the_pinned_commit_and_matches_its_recorded_checksum_lc_12`: `the vendored files are not the files the authority records`, left `b4a65fc1...b5db15`, right `74d3c617...e3d6` |
+| a vector cites the wrong line | `vectors/transport.json`: DR-01 line 206 made 207 | coverage | `cargo test -p lifecycle-oracle --test transport` | `every_request_the_transport_scenarios_send_is_a_vector_sh_10` and `every_vector_and_listed_probe_of_the_transport_cites_the_pin_and_a_real_line_sh_10`: `"DR-01": line 207 of src/scenarios/server/dns-rebinding.ts does not contain "const response = await sendRequestWithHostAndOrigin("` |
+| tests are renamed so none ends in `sh_06` | `tests/transport.rs` | meta-gate | `cargo test -p repo-conformance` | `CM-02: SH-06 is registered but no test name ends in `sh_06`. A claim with no test is an assertion.` |
+
+Restored result: every defect was reverted with `git checkout`; on the final tree `lexlean
+verify` (inside `lexlean production build`) reports the project verified, the packages equal a
+fresh export, and `cargo test --workspace`, `cargo fmt --all -- --check`, `cargo clippy
+--workspace --all-targets -- -D warnings`, `cargo xtask check-model`, `audit-limits` and
+`audit-deferral` pass.
 
 ## Not met
 
@@ -254,3 +278,6 @@ PLANTED-DEFECTS-TABLE
   stream now (`common::notes_of`), and the test `the_content_type_stays_json_and_the_body_is_the_result_tl_13`
   became two tests that state both answers. TL-13's register row changes its last clause from
   "their SSE encoding is issue 11" to the stream.
+* `tests/boundary.rs` (LC-11) listed `Origin: http://evil.example` among the header fields the
+  core must ignore. The core reads `Origin` and `Host` since this issue, so the test sends
+  `Referer` instead; the other unrelated fields are unchanged.
