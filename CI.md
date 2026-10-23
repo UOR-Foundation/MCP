@@ -119,3 +119,17 @@ One definition, `definition{name: plantedConstant, parameters: [], result: Nat, 
 
 The same stale pin is what `cargo xtask export` rewrites: after it, the same command builds.
 
+### A hand-edited package (#21)
+
+One comment, ` // hand edit`, appended to line 10 of
+`crates/json-oracle/generated/mcp_json_codec/src/lib.rs` in the tree of commit `e821637`
+(a blank line there, so the line becomes the comment). It changes no behavior. Pushed as the
+head of a throwaway pull request (#29, based on this branch, closed unmerged, branch deleted).
+
+| | |
+| --- | --- |
+| failing step | `lexlean / export json-oracle`, step "5. the committed packages are the export of their sources" |
+| diagnostic | `export of crates/json-oracle/generated/request.json failed (exit 1)`, then `== crates/json-oracle/generated/mcp_json_codec differs from the export of crates/json-oracle/generated/request.json ==` and the `diff -ru` hunk with ` // hand edit` on the committed side and an empty line on the export's |
+| also failing | `cargo test`: `error: 1 target failed: -p json-oracle --test provenance` |
+| passing | `lexlean / verify` |
+| run | commit `d2fca58`, run 39953428770, jobs 120415836688 (export, 12 min 1 s) and 120413275623 (cargo) |
