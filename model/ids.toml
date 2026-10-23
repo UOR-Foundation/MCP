@@ -113,7 +113,7 @@ statement = "The encoder's work loop agrees with its structural specification fo
 id = "JC-16"
 level = "build"
 suite = "json-codec"
-statement = "Writing and reading again returns the same value for values that hold string escapes, non-ASCII characters, an empty member name, members in a stated order and a repeated member name, by kernel-checked theorems with exact axiom policies."
+statement = "The encoder escapes bytes as RFC 8259 section 7 and the decisions table state, byte for byte, and keeps the order of array items: every control byte from 0 to 31, the quotation mark and the reverse solidus are escaped, bytes that need no escape are written unchanged, and the items of an array are written in order, by kernel-checked theorems with exact axiom policies. The write of a string value is not kernel-evaluated, so the read of a written string is not claimed."
 
 [[id]]
 id = "LC-01"

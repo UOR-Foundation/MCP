@@ -1,0 +1,1790 @@
+\begin{lexlean}{JsonWriteLaws}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Json}
+\importmodule{JsonRead}
+\importmodule{JsonText}
+\importmodule{JsonWrite}
+\title{JSON write laws}
+\begin{semanticmodule}
+inductive{
+  name: Phase,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: single, fields: []},
+    {name: items, fields: []},
+    {name: afterItem, fields: []},
+    {name: entries, fields: []},
+    {name: afterEntry, fields: []}
+  ]
+}
+
+inductive{
+  name: Forest,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: stop, fields: []},
+    {name: null, fields: [(Option String), Forest]},
+    {name: bool, fields: [(Option String), Bool, Forest]},
+    {name: number, fields: [(Option String), Json::Decimal, Forest]},
+    {name: text, fields: [(Option String), String, Forest]},
+    {name: array, fields: [(Option String), Forest, Forest]},
+    {name: object, fields: [(Option String), Forest, Forest]}
+  ]
+}
+
+inductive{
+  name: Halt,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: clear, fields: []}, {name: stopped, fields: [JsonText::JsonRefusal]}]
+}
+
+structure{
+  name: Outline,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: bytes, type: (List Nat)}, {name: cost, type: Nat}, {name: failure, type: Halt}]
+}
+
+definition{
+  name: keyOf,
+  parameters: [label : (Option String)],
+  result: String,
+  body: (match label | Option.none => "" | Option.some key => key)
+}
+
+definition{
+  name: jsonsOf,
+  parameters: [trees : Forest],
+  result: (List Json::Json),
+  body: (match trees
+    | Forest.stop => (nil Json::Json)
+    | Forest.null label next => (cons (ctor Json::Json.null) (jsonsOf next))
+    | Forest.bool label flag next => (cons (ctor Json::Json.bool flag) (jsonsOf next))
+    | Forest.number label amount next => (cons (ctor Json::Json.number amount) (jsonsOf next))
+    | Forest.text label content next => (cons (ctor Json::Json.text content) (jsonsOf next))
+    | Forest.array label kids next => (cons (ctor Json::Json.array (jsonsOf kids)) (jsonsOf next))
+    | Forest.object label kids next => (cons (ctor Json::Json.object (membersOf kids)) (jsonsOf next))),
+  mutual: Spread,
+  recursive_argument: trees
+}
+
+definition{
+  name: membersOf,
+  parameters: [trees : Forest],
+  result: (List (String * Json::Json)),
+  body: (match trees
+    | Forest.stop => (nil (String * Json::Json))
+    | Forest.null label next => (cons ((keyOf label), (ctor Json::Json.null)) (membersOf next))
+    | Forest.bool label flag next => (cons ((keyOf label), (ctor Json::Json.bool flag)) (membersOf next))
+    | Forest.number label amount next => (cons ((keyOf label), (ctor Json::Json.number amount)) (membersOf next))
+    | Forest.text label content next => (cons ((keyOf label), (ctor Json::Json.text content)) (membersOf next))
+    | Forest.array label kids next => (cons ((keyOf label), (ctor Json::Json.array (jsonsOf kids))) (membersOf next))
+    | Forest.object label kids next => (cons ((keyOf label), (ctor Json::Json.object (membersOf kids))) (membersOf next))),
+  mutual: Spread,
+  recursive_argument: trees
+}
+
+definition{
+  name: firstOr,
+  parameters: [items : (List Json::Json)],
+  result: Json::Json,
+  body: (match items | List.nil => (ctor Json::Json.null) | List.cons head tail => head),
+  recursive_argument: items
+}
+
+definition{
+  name: headOf,
+  parameters: [trees : Forest],
+  result: Json::Json,
+  body: (firstOr (jsonsOf trees))
+}
+
+definition{
+  name: plus,
+  parameters: [base : Nat, extra : Nat],
+  result: Nat,
+  body: (match extra | Nat.zero => base | Nat.succ below => ((plus base below) + 1)),
+  recursive_argument: extra
+}
+
+definition{
+  name: cat,
+  parameters: [left : (List Nat), right : (List Nat)],
+  result: (List Nat),
+  body: (match left | List.nil => right | List.cons head tail => (cons head (cat tail right))),
+  recursive_argument: left
+}
+
+definition{
+  name: orElse,
+  parameters: [lead : Halt, trail : Halt],
+  result: Halt,
+  body: (match lead | Halt.clear => trail | Halt.stopped reason => (ctor Halt.stopped reason))
+}
+
+definition{
+  name: failOr,
+  parameters: [failure : Halt, otherwise : (Result (List Nat) JsonText::JsonRefusal)],
+  result: (Result (List Nat) JsonText::JsonRefusal),
+  body: (match failure
+    | Halt.clear => otherwise
+    | Halt.stopped reason => (ctor Result.error [(List Nat), JsonText::JsonRefusal] reason))
+}
+
+definition{
+  name: gateFailure,
+  parameters: [ok : Bool, failure : Halt],
+  result: Halt,
+  body: (if ok then failure else (ctor Halt.stopped (ctor JsonText::JsonRefusal.encodeTooDeep)))
+}
+
+definition{
+  name: numberFailure,
+  parameters: [ok : Bool],
+  result: Halt,
+  body: (if ok then (ctor Halt.clear) else (ctor Halt.stopped (ctor JsonText::JsonRefusal.encodeNumberOutOfRange)))
+}
+
+definition{
+  name: gateResult,
+  parameters: [ok : Bool, otherwise : (Result (List Nat) JsonText::JsonRefusal)],
+  result: (Result (List Nat) JsonText::JsonRefusal),
+  body: (if ok then otherwise else (ctor Result.error [(List Nat), JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.encodeTooDeep)))
+}
+
+definition{
+  name: numberResult,
+  parameters: [ok : Bool, otherwise : (Result (List Nat) JsonText::JsonRefusal)],
+  result: (Result (List Nat) JsonText::JsonRefusal),
+  body: (if ok then otherwise else (ctor Result.error [(List Nat), JsonText::JsonRefusal] (ctor JsonText::JsonRefusal.encodeNumberOutOfRange)))
+}
+
+definition{
+  name: nextPhase,
+  parameters: [phase : Phase],
+  result: Phase,
+  body: (match phase
+    | Phase.single => (ctor Phase.single)
+    | Phase.items => (ctor Phase.afterItem)
+    | Phase.afterItem => (ctor Phase.afterItem)
+    | Phase.entries => (ctor Phase.afterEntry)
+    | Phase.afterEntry => (ctor Phase.afterEntry))
+}
+
+definition{
+  name: stopOutline,
+  parameters: [phase : Phase],
+  result: Outline,
+  body: (match phase
+    | Phase.single => (record Outline {bytes := (JsonWrite::literalText 2), cost := 1, failure := (ctor Halt.clear)})
+    | Phase.items => (record Outline {bytes := (cons 93 (nil Nat)), cost := 2, failure := (ctor Halt.clear)})
+    | Phase.afterItem => (record Outline {bytes := (cons 93 (nil Nat)), cost := 2, failure := (ctor Halt.clear)})
+    | Phase.entries => (record Outline {bytes := (cons 125 (nil Nat)), cost := 2, failure := (ctor Halt.clear)})
+    | Phase.afterEntry => (record Outline {bytes := (cons 125 (nil Nat)), cost := 2, failure := (ctor Halt.clear)}))
+}
+
+definition{
+  name: wrapOutline,
+  parameters: [phase : Phase, key : String, value : Outline, rest : Outline],
+  result: Outline,
+  body: (match phase
+    | Phase.single => value
+    | Phase.items => (record Outline {bytes := (cat (project value bytes) (project rest bytes)), cost := ((plus (project rest cost) (project value cost)) + 1), failure := (orElse (project value failure) (project rest failure))})
+    | Phase.afterItem => (record Outline {bytes := (cons 44 (cat (project value bytes) (project rest bytes))), cost := ((((plus (project rest cost) (project value cost)) + 1) + 1) + 1), failure := (orElse (project value failure) (project rest failure))})
+    | Phase.entries => (record Outline {bytes := (cat (prim append (JsonWrite::quoted key) (cons 58 (nil Nat)) : (List Nat)) (cat (project value bytes) (project rest bytes))), cost := ((plus (project rest cost) ((project value cost) + 1)) + 1), failure := (orElse (project value failure) (project rest failure))})
+    | Phase.afterEntry => (record Outline {bytes := (cons 44 (cat (prim append (JsonWrite::quoted key) (cons 58 (nil Nat)) : (List Nat)) (cat (project value bytes) (project rest bytes)))), cost := ((((plus (project rest cost) ((project value cost) + 1)) + 1) + 1) + 1), failure := (orElse (project value failure) (project rest failure))})),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: outlineOf,
+  parameters: [depth : Nat, phase : Phase, trees : Forest],
+  result: Outline,
+  body: (match trees
+    | Forest.stop => (stopOutline phase)
+    | Forest.null label next => (wrapOutline phase (keyOf label) (record Outline {bytes := (JsonWrite::literalText 2), cost := 1, failure := (ctor Halt.clear)}) (outlineOf depth (nextPhase phase) next))
+    | Forest.bool label flag next => (wrapOutline phase (keyOf label) (record Outline {bytes := (if flag then (JsonWrite::literalText 0) else (JsonWrite::literalText 1)), cost := 1, failure := (ctor Halt.clear)}) (outlineOf depth (nextPhase phase) next))
+    | Forest.number label amount next => (wrapOutline phase (keyOf label) (record Outline {bytes := (JsonWrite::numberBytes amount), cost := 1, failure := (numberFailure (JsonWrite::inBounds amount))}) (outlineOf depth (nextPhase phase) next))
+    | Forest.text label content next => (wrapOutline phase (keyOf label) (record Outline {bytes := (JsonWrite::quoted content), cost := 1, failure := (ctor Halt.clear)}) (outlineOf depth (nextPhase phase) next))
+    | Forest.array label kids next => (wrapOutline phase (keyOf label) (record Outline {bytes := (cons 91 (project (outlineOf (depth + 1) (ctor Phase.items) kids) bytes)), cost := (((project (outlineOf (depth + 1) (ctor Phase.items) kids) cost) + 1) + 1), failure := (gateFailure (depth <? (JsonRead::maxDepth)) (project (outlineOf (depth + 1) (ctor Phase.items) kids) failure))}) (outlineOf depth (nextPhase phase) next))
+    | Forest.object label kids next => (wrapOutline phase (keyOf label) (record Outline {bytes := (cons 123 (project (outlineOf (depth + 1) (ctor Phase.entries) kids) bytes)), cost := (((project (outlineOf (depth + 1) (ctor Phase.entries) kids) cost) + 1) + 1), failure := (gateFailure (depth <? (JsonRead::maxDepth)) (project (outlineOf (depth + 1) (ctor Phase.entries) kids) failure))}) (outlineOf depth (nextPhase phase) next))),
+  axioms: [Quot.sound, propext],
+  recursive_argument: trees
+}
+
+definition{
+  name: continueWith,
+  parameters: [budget : Nat, step : JsonWrite::WriteStep],
+  result: (Result (List Nat) JsonText::JsonRefusal),
+  body: (match step
+    | JsonWrite::WriteStep.failed reason => (ctor Result.error [(List Nat), JsonText::JsonRefusal] reason)
+    | JsonWrite::WriteStep.advanced pending produced => (JsonWrite::writeLoop budget pending produced)),
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: numberStepGated,
+  parameters: [ok : Bool, amount : Json::Decimal, rest : (List JsonWrite::Task), col : (List Nat)],
+  result: JsonWrite::WriteStep,
+  body: (if ok then (ctor JsonWrite::WriteStep.advanced rest (JsonRead::reverseOnto [Nat] (JsonWrite::numberBytes amount) col)) else (ctor JsonWrite::WriteStep.failed (ctor JsonText::JsonRefusal.encodeNumberOutOfRange))),
+  axioms: [propext]
+}
+
+definition{
+  name: arrayStepGated,
+  parameters: [
+    ok : Bool,
+    depth : Nat,
+    elements : (List Json::Json),
+    rest : (List JsonWrite::Task),
+    col : (List Nat)
+  ],
+  result: JsonWrite::WriteStep,
+  body: (if ok then (ctor JsonWrite::WriteStep.advanced (JsonWrite::openTasks 91 (ctor JsonWrite::Task.items (depth + 1) elements) rest) col) else (ctor JsonWrite::WriteStep.failed (ctor JsonText::JsonRefusal.encodeTooDeep)))
+}
+
+definition{
+  name: objectStepGated,
+  parameters: [
+    ok : Bool,
+    depth : Nat,
+    entries : (List (String * Json::Json)),
+    rest : (List JsonWrite::Task),
+    col : (List Nat)
+  ],
+  result: JsonWrite::WriteStep,
+  body: (if ok then (ctor JsonWrite::WriteStep.advanced (JsonWrite::openTasks 123 (ctor JsonWrite::Task.members (depth + 1) entries) rest) col) else (ctor JsonWrite::WriteStep.failed (ctor JsonText::JsonRefusal.encodeTooDeep)))
+}
+
+theorem{
+  name: loop_step,
+  parameters: [
+    budget : Nat,
+    task : JsonWrite::Task,
+    rest : (List JsonWrite::Task),
+    col : (List Nat)
+  ],
+  statement: ((JsonWrite::writeLoop (budget + 1) (cons task rest) col) = (continueWith budget (JsonWrite::taskStep task rest col))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: continue_advanced,
+  parameters: [budget : Nat, pending : (List JsonWrite::Task), produced : (List Nat)],
+  statement: ((continueWith budget (ctor JsonWrite::WriteStep.advanced pending produced)) = (JsonWrite::writeLoop budget pending produced)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: value_step_number,
+  parameters: [
+    depth : Nat,
+    amount : Json::Decimal,
+    rest : (List JsonWrite::Task),
+    col : (List Nat)
+  ],
+  statement: ((JsonWrite::valueStep depth (ctor Json::Json.number amount) rest col) = (numberStepGated (JsonWrite::inBounds amount) amount rest col)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: continue_number,
+  parameters: [
+    ok : Bool,
+    amount : Json::Decimal,
+    budget : Nat,
+    rest : (List JsonWrite::Task),
+    col : (List Nat)
+  ],
+  statement: ((continueWith budget (numberStepGated ok amount rest col)) = (numberResult ok (JsonWrite::writeLoop budget rest (JsonRead::reverseOnto [Nat] (JsonWrite::numberBytes amount) col)))),
+  proof: cases{
+    branches: [
+      {proof: reflexivity{}, binders: [], constructor: "false"},
+      {proof: reflexivity{}, binders: [], constructor: "true"}
+    ],
+    scrutinee: ok
+  },
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: value_step_array,
+  parameters: [
+    depth : Nat,
+    elements : (List Json::Json),
+    rest : (List JsonWrite::Task),
+    col : (List Nat)
+  ],
+  statement: ((JsonWrite::valueStep depth (ctor Json::Json.array elements) rest col) = (arrayStepGated (depth <? (JsonRead::maxDepth)) depth elements rest col)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: value_step_object,
+  parameters: [
+    depth : Nat,
+    entries : (List (String * Json::Json)),
+    rest : (List JsonWrite::Task),
+    col : (List Nat)
+  ],
+  statement: ((JsonWrite::valueStep depth (ctor Json::Json.object entries) rest col) = (objectStepGated (depth <? (JsonRead::maxDepth)) depth entries rest col)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: continue_array,
+  parameters: [
+    ok : Bool,
+    budget : Nat,
+    depth : Nat,
+    elements : (List Json::Json),
+    rest : (List JsonWrite::Task),
+    col : (List Nat)
+  ],
+  statement: ((continueWith budget (arrayStepGated ok depth elements rest col)) = (gateResult ok (JsonWrite::writeLoop budget (JsonWrite::openTasks 91 (ctor JsonWrite::Task.items (depth + 1) elements) rest) col))),
+  proof: cases{
+    branches: [
+      {proof: reflexivity{}, binders: [], constructor: "false"},
+      {proof: reflexivity{}, binders: [], constructor: "true"}
+    ],
+    scrutinee: ok
+  },
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: continue_object,
+  parameters: [
+    ok : Bool,
+    budget : Nat,
+    depth : Nat,
+    entries : (List (String * Json::Json)),
+    rest : (List JsonWrite::Task),
+    col : (List Nat)
+  ],
+  statement: ((continueWith budget (objectStepGated ok depth entries rest col)) = (gateResult ok (JsonWrite::writeLoop budget (JsonWrite::openTasks 123 (ctor JsonWrite::Task.members (depth + 1) entries) rest) col))),
+  proof: cases{
+    branches: [
+      {proof: reflexivity{}, binders: [], constructor: "false"},
+      {proof: reflexivity{}, binders: [], constructor: "true"}
+    ],
+    scrutinee: ok
+  },
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: failure_or,
+  parameters: [lead : Halt, trail : Halt, otherwise : (Result (List Nat) JsonText::JsonRefusal)],
+  statement: ((failOr lead (failOr trail otherwise)) = (failOr (orElse lead trail) otherwise)),
+  proof: cases{
+    branches: [
+      {proof: reflexivity{}, binders: [], constructor: clear},
+      {proof: reflexivity{}, binders: [reason], constructor: stopped}
+    ],
+    scrutinee: lead
+  }
+}
+
+theorem{
+  name: orElse_gate,
+  parameters: [
+    ok : Bool,
+    failure : Halt,
+    trail : Halt,
+    otherwise : (Result (List Nat) JsonText::JsonRefusal)
+  ],
+  statement: ((failOr (orElse (gateFailure ok failure) trail) otherwise) = (gateResult ok (failOr (orElse failure trail) otherwise))),
+  proof: cases{
+    branches: [
+      {proof: reflexivity{}, binders: [], constructor: "false"},
+      {proof: reflexivity{}, binders: [], constructor: "true"}
+    ],
+    scrutinee: ok
+  }
+}
+
+theorem{
+  name: orElse_number,
+  parameters: [ok : Bool, trail : Halt, otherwise : (Result (List Nat) JsonText::JsonRefusal)],
+  statement: ((failOr (orElse (numberFailure ok) trail) otherwise) = (numberResult ok (failOr trail otherwise))),
+  proof: cases{
+    branches: [
+      {proof: reflexivity{}, binders: [], constructor: "false"},
+      {proof: reflexivity{}, binders: [], constructor: "true"}
+    ],
+    scrutinee: ok
+  }
+}
+
+theorem{
+  name: failure_gate,
+  parameters: [ok : Bool, failure : Halt, otherwise : (Result (List Nat) JsonText::JsonRefusal)],
+  statement: ((failOr (gateFailure ok failure) otherwise) = (gateResult ok (failOr failure otherwise))),
+  proof: cases{
+    branches: [
+      {proof: reflexivity{}, binders: [], constructor: "false"},
+      {proof: reflexivity{}, binders: [], constructor: "true"}
+    ],
+    scrutinee: ok
+  }
+}
+
+theorem{
+  name: failure_number,
+  parameters: [ok : Bool, otherwise : (Result (List Nat) JsonText::JsonRefusal)],
+  statement: ((failOr (numberFailure ok) otherwise) = (numberResult ok otherwise)),
+  proof: cases{
+    branches: [
+      {proof: reflexivity{}, binders: [], constructor: "false"},
+      {proof: reflexivity{}, binders: [], constructor: "true"}
+    ],
+    scrutinee: ok
+  }
+}
+
+theorem{
+  name: orElse_none,
+  parameters: [trail : Halt],
+  statement: ((orElse (ctor Halt.clear) trail) = trail),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: failure_none_passes,
+  parameters: [otherwise : (Result (List Nat) JsonText::JsonRefusal)],
+  statement: ((failOr (ctor Halt.clear) otherwise) = otherwise),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: failure_some_stops,
+  parameters: [
+    reason : JsonText::JsonRefusal,
+    otherwise : (Result (List Nat) JsonText::JsonRefusal)
+  ],
+  statement: ((failOr (ctor Halt.stopped reason) otherwise) = (ctor Result.error [(List Nat), JsonText::JsonRefusal] reason)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: plus_assoc,
+  parameters: [base : Nat, left : Nat, right : Nat],
+  statement: ((plus base (plus left right)) = (plus (plus base left) right)),
+  proof: induction{
+    branches: [
+      {proof: simplify{definitions: [plus]}, binders: [], constructor: zero},
+      {
+        proof: simplify{definitions: [hypothesis, plus]},
+        binders: [below, hypothesis],
+        constructor: succ
+      }
+    ],
+    scrutinee: right
+  },
+  axioms: [propext]
+}
+
+theorem{
+  name: reverse_cat,
+  parameters: [left : (List Nat), right : (List Nat), onto : (List Nat)],
+  statement: ((JsonRead::reverseOnto [Nat] (cat left right) onto) = (JsonRead::reverseOnto [Nat] right (JsonRead::reverseOnto [Nat] left onto))),
+  proof: induction{
+    branches: [
+      {proof: simplify{definitions: [cat, JsonRead::reverseOnto]}, binders: [], constructor: nil},
+      {
+        proof: simplify{definitions: [cat, hypothesis, JsonRead::reverseOnto]},
+        binders: [head, tail, hypothesis],
+        constructor: cons
+      }
+    ],
+    generalizing: [onto],
+    scrutinee: left
+  },
+  axioms: [propext]
+}
+
+theorem{
+  name: writer_loop_agrees_with_outline,
+  parameters: [
+    trees : Forest,
+    depth : Nat,
+    budget : Nat,
+    rest : (List JsonWrite::Task),
+    col : (List Nat)
+  ],
+  statement: (((JsonWrite::writeLoop (plus budget (project (outlineOf depth (ctor Phase.single) trees) cost)) (cons (ctor JsonWrite::Task.value depth (headOf trees)) rest) col) = (failOr (project (outlineOf depth (ctor Phase.single) trees) failure) (JsonWrite::writeLoop budget rest (JsonRead::reverseOnto [Nat] (project (outlineOf depth (ctor Phase.single) trees) bytes) col)))) /\ (((JsonWrite::writeLoop (plus budget (project (outlineOf depth (ctor Phase.items) trees) cost)) (cons (ctor JsonWrite::Task.items depth (jsonsOf trees)) rest) col) = (failOr (project (outlineOf depth (ctor Phase.items) trees) failure) (JsonWrite::writeLoop budget rest (JsonRead::reverseOnto [Nat] (project (outlineOf depth (ctor Phase.items) trees) bytes) col)))) /\ (((JsonWrite::writeLoop (plus budget (project (outlineOf depth (ctor Phase.afterItem) trees) cost)) (cons (ctor JsonWrite::Task.afterItem depth (jsonsOf trees)) rest) col) = (failOr (project (outlineOf depth (ctor Phase.afterItem) trees) failure) (JsonWrite::writeLoop budget rest (JsonRead::reverseOnto [Nat] (project (outlineOf depth (ctor Phase.afterItem) trees) bytes) col)))) /\ (((JsonWrite::writeLoop (plus budget (project (outlineOf depth (ctor Phase.entries) trees) cost)) (cons (ctor JsonWrite::Task.members depth (membersOf trees)) rest) col) = (failOr (project (outlineOf depth (ctor Phase.entries) trees) failure) (JsonWrite::writeLoop budget rest (JsonRead::reverseOnto [Nat] (project (outlineOf depth (ctor Phase.entries) trees) bytes) col)))) /\ ((JsonWrite::writeLoop (plus budget (project (outlineOf depth (ctor Phase.afterEntry) trees) cost)) (cons (ctor JsonWrite::Task.afterMember depth (membersOf trees)) rest) col) = (failOr (project (outlineOf depth (ctor Phase.afterEntry) trees) failure) (JsonWrite::writeLoop budget rest (JsonRead::reverseOnto [Nat] (project (outlineOf depth (ctor Phase.afterEntry) trees) bytes) col)))))))),
+  proof: induction{
+    branches: [
+      {
+        proof: constructor{
+          branches: [
+            simplify{
+              definitions: [
+                continue_advanced,
+                failure_none_passes,
+                firstOr,
+                headOf,
+                jsonsOf,
+                loop_step,
+                outlineOf,
+                plus,
+                stopOutline,
+                JsonWrite::taskStep,
+                JsonWrite::valueStep
+              ]
+            },
+            constructor{
+              branches: [
+                simplify{
+                  definitions: [
+                    continue_advanced,
+                    failure_none_passes,
+                    jsonsOf,
+                    loop_step,
+                    outlineOf,
+                    plus,
+                    stopOutline,
+                    JsonRead::reverseOnto,
+                    JsonWrite::taskStep
+                  ]
+                },
+                constructor{
+                  branches: [
+                    simplify{
+                      definitions: [
+                        continue_advanced,
+                        failure_none_passes,
+                        jsonsOf,
+                        loop_step,
+                        outlineOf,
+                        plus,
+                        stopOutline,
+                        JsonRead::reverseOnto,
+                        JsonWrite::taskStep
+                      ]
+                    },
+                    constructor{
+                      branches: [
+                        simplify{
+                          definitions: [
+                            continue_advanced,
+                            failure_none_passes,
+                            loop_step,
+                            membersOf,
+                            outlineOf,
+                            plus,
+                            stopOutline,
+                            JsonRead::reverseOnto,
+                            JsonWrite::taskStep
+                          ]
+                        },
+                        simplify{
+                          definitions: [
+                            continue_advanced,
+                            failure_none_passes,
+                            loop_step,
+                            membersOf,
+                            outlineOf,
+                            plus,
+                            stopOutline,
+                            JsonRead::reverseOnto,
+                            JsonWrite::taskStep
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        binders: [],
+        constructor: stop
+      },
+      {
+        proof: constructor{
+          branches: [
+            simplify{
+              definitions: [
+                continue_advanced,
+                failure_none_passes,
+                firstOr,
+                headOf,
+                jsonsOf,
+                loop_step,
+                outlineOf,
+                plus,
+                wrapOutline,
+                JsonWrite::taskStep,
+                JsonWrite::valueStep
+              ]
+            },
+            constructor{
+              branches: [
+                simplify{
+                  definitions: [
+                    continue_advanced,
+                    jsonsOf,
+                    loop_step,
+                    nextHypothesis,
+                    nextPhase,
+                    orElse,
+                    outlineOf,
+                    plus,
+                    reverse_cat,
+                    wrapOutline,
+                    JsonWrite::taskStep,
+                    JsonWrite::valueStep
+                  ]
+                },
+                constructor{
+                  branches: [
+                    simplify{
+                      definitions: [
+                        continue_advanced,
+                        jsonsOf,
+                        loop_step,
+                        nextHypothesis,
+                        nextPhase,
+                        orElse,
+                        outlineOf,
+                        plus,
+                        reverse_cat,
+                        wrapOutline,
+                        JsonRead::reverseOnto,
+                        JsonWrite::taskStep,
+                        JsonWrite::valueStep
+                      ]
+                    },
+                    constructor{
+                      branches: [
+                        simplify{
+                          definitions: [
+                            continue_advanced,
+                            loop_step,
+                            membersOf,
+                            nextHypothesis,
+                            nextPhase,
+                            orElse,
+                            outlineOf,
+                            plus,
+                            reverse_cat,
+                            wrapOutline,
+                            JsonWrite::taskStep,
+                            JsonWrite::valueStep
+                          ]
+                        },
+                        simplify{
+                          definitions: [
+                            continue_advanced,
+                            loop_step,
+                            membersOf,
+                            nextHypothesis,
+                            nextPhase,
+                            orElse,
+                            outlineOf,
+                            plus,
+                            reverse_cat,
+                            wrapOutline,
+                            JsonRead::reverseOnto,
+                            JsonWrite::taskStep,
+                            JsonWrite::valueStep
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        binders: [label, next, nextHypothesis],
+        constructor: null
+      },
+      {
+        proof: constructor{
+          branches: [
+            simplify{
+              definitions: [
+                continue_advanced,
+                failure_none_passes,
+                firstOr,
+                headOf,
+                jsonsOf,
+                loop_step,
+                outlineOf,
+                plus,
+                wrapOutline,
+                JsonWrite::taskStep,
+                JsonWrite::valueStep
+              ]
+            },
+            constructor{
+              branches: [
+                simplify{
+                  definitions: [
+                    continue_advanced,
+                    jsonsOf,
+                    loop_step,
+                    nextHypothesis,
+                    nextPhase,
+                    orElse_none,
+                    outlineOf,
+                    plus,
+                    reverse_cat,
+                    wrapOutline,
+                    JsonWrite::taskStep,
+                    JsonWrite::valueStep
+                  ]
+                },
+                constructor{
+                  branches: [
+                    simplify{
+                      definitions: [
+                        continue_advanced,
+                        jsonsOf,
+                        loop_step,
+                        nextHypothesis,
+                        nextPhase,
+                        orElse_none,
+                        outlineOf,
+                        plus,
+                        reverse_cat,
+                        wrapOutline,
+                        JsonRead::reverseOnto,
+                        JsonWrite::taskStep,
+                        JsonWrite::valueStep
+                      ]
+                    },
+                    constructor{
+                      branches: [
+                        simplify{
+                          definitions: [
+                            continue_advanced,
+                            loop_step,
+                            membersOf,
+                            nextHypothesis,
+                            nextPhase,
+                            orElse_none,
+                            outlineOf,
+                            plus,
+                            reverse_cat,
+                            wrapOutline,
+                            JsonWrite::taskStep,
+                            JsonWrite::valueStep
+                          ]
+                        },
+                        simplify{
+                          definitions: [
+                            continue_advanced,
+                            loop_step,
+                            membersOf,
+                            nextHypothesis,
+                            nextPhase,
+                            orElse_none,
+                            outlineOf,
+                            plus,
+                            reverse_cat,
+                            wrapOutline,
+                            JsonRead::reverseOnto,
+                            JsonWrite::taskStep,
+                            JsonWrite::valueStep
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        binders: [label, flag, next, nextHypothesis],
+        constructor: bool
+      },
+      {
+        proof: constructor{
+          branches: [
+            simplify{
+              definitions: [
+                continue_number,
+                failure_number,
+                firstOr,
+                headOf,
+                jsonsOf,
+                loop_step,
+                outlineOf,
+                plus,
+                value_step_number,
+                wrapOutline,
+                JsonWrite::taskStep
+              ]
+            },
+            constructor{
+              branches: [
+                simplify{
+                  definitions: [
+                    continue_advanced,
+                    continue_number,
+                    jsonsOf,
+                    loop_step,
+                    nextHypothesis,
+                    nextPhase,
+                    orElse_number,
+                    outlineOf,
+                    plus,
+                    reverse_cat,
+                    value_step_number,
+                    wrapOutline,
+                    JsonWrite::taskStep
+                  ]
+                },
+                constructor{
+                  branches: [
+                    simplify{
+                      definitions: [
+                        continue_advanced,
+                        continue_number,
+                        jsonsOf,
+                        loop_step,
+                        nextHypothesis,
+                        nextPhase,
+                        orElse_number,
+                        outlineOf,
+                        plus,
+                        reverse_cat,
+                        value_step_number,
+                        wrapOutline,
+                        JsonRead::reverseOnto,
+                        JsonWrite::taskStep
+                      ]
+                    },
+                    constructor{
+                      branches: [
+                        simplify{
+                          definitions: [
+                            continue_advanced,
+                            continue_number,
+                            loop_step,
+                            membersOf,
+                            nextHypothesis,
+                            nextPhase,
+                            orElse_number,
+                            outlineOf,
+                            plus,
+                            reverse_cat,
+                            value_step_number,
+                            wrapOutline,
+                            JsonWrite::taskStep
+                          ]
+                        },
+                        simplify{
+                          definitions: [
+                            continue_advanced,
+                            continue_number,
+                            loop_step,
+                            membersOf,
+                            nextHypothesis,
+                            nextPhase,
+                            orElse_number,
+                            outlineOf,
+                            plus,
+                            reverse_cat,
+                            value_step_number,
+                            wrapOutline,
+                            JsonRead::reverseOnto,
+                            JsonWrite::taskStep
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        binders: [label, amount, next, nextHypothesis],
+        constructor: number
+      },
+      {
+        proof: constructor{
+          branches: [
+            simplify{
+              definitions: [
+                continue_advanced,
+                failure_none_passes,
+                firstOr,
+                headOf,
+                jsonsOf,
+                loop_step,
+                outlineOf,
+                plus,
+                wrapOutline,
+                JsonWrite::taskStep,
+                JsonWrite::valueStep
+              ]
+            },
+            constructor{
+              branches: [
+                simplify{
+                  definitions: [
+                    continue_advanced,
+                    jsonsOf,
+                    loop_step,
+                    nextHypothesis,
+                    nextPhase,
+                    orElse_none,
+                    outlineOf,
+                    plus,
+                    reverse_cat,
+                    wrapOutline,
+                    JsonWrite::taskStep,
+                    JsonWrite::valueStep
+                  ]
+                },
+                constructor{
+                  branches: [
+                    simplify{
+                      definitions: [
+                        continue_advanced,
+                        jsonsOf,
+                        loop_step,
+                        nextHypothesis,
+                        nextPhase,
+                        orElse_none,
+                        outlineOf,
+                        plus,
+                        reverse_cat,
+                        wrapOutline,
+                        JsonRead::reverseOnto,
+                        JsonWrite::taskStep,
+                        JsonWrite::valueStep
+                      ]
+                    },
+                    constructor{
+                      branches: [
+                        simplify{
+                          definitions: [
+                            continue_advanced,
+                            loop_step,
+                            membersOf,
+                            nextHypothesis,
+                            nextPhase,
+                            orElse_none,
+                            outlineOf,
+                            plus,
+                            reverse_cat,
+                            wrapOutline,
+                            JsonWrite::taskStep,
+                            JsonWrite::valueStep
+                          ]
+                        },
+                        simplify{
+                          definitions: [
+                            continue_advanced,
+                            loop_step,
+                            membersOf,
+                            nextHypothesis,
+                            nextPhase,
+                            orElse_none,
+                            outlineOf,
+                            plus,
+                            reverse_cat,
+                            wrapOutline,
+                            JsonRead::reverseOnto,
+                            JsonWrite::taskStep,
+                            JsonWrite::valueStep
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        binders: [label, content, next, nextHypothesis],
+        constructor: text
+      },
+      {
+        proof: constructor{
+          branches: [
+            simplify{
+              definitions: [
+                continue_advanced,
+                continue_array,
+                failure_gate,
+                firstOr,
+                headOf,
+                jsonsOf,
+                kidsHypothesis,
+                loop_step,
+                outlineOf,
+                plus,
+                value_step_array,
+                wrapOutline,
+                JsonRead::reverseOnto,
+                JsonWrite::openTasks,
+                JsonWrite::taskStep
+              ]
+            },
+            constructor{
+              branches: [
+                simplify{
+                  definitions: [
+                    cat,
+                    continue_advanced,
+                    continue_array,
+                    failure_or,
+                    jsonsOf,
+                    kidsHypothesis,
+                    loop_step,
+                    nextHypothesis,
+                    nextPhase,
+                    orElse_gate,
+                    outlineOf,
+                    plus,
+                    plus_assoc,
+                    reverse_cat,
+                    value_step_array,
+                    wrapOutline,
+                    JsonRead::reverseOnto,
+                    JsonWrite::openTasks,
+                    JsonWrite::taskStep
+                  ]
+                },
+                constructor{
+                  branches: [
+                    simplify{
+                      definitions: [
+                        cat,
+                        continue_advanced,
+                        continue_array,
+                        failure_or,
+                        jsonsOf,
+                        kidsHypothesis,
+                        loop_step,
+                        nextHypothesis,
+                        nextPhase,
+                        orElse_gate,
+                        outlineOf,
+                        plus,
+                        plus_assoc,
+                        reverse_cat,
+                        value_step_array,
+                        wrapOutline,
+                        JsonRead::reverseOnto,
+                        JsonWrite::openTasks,
+                        JsonWrite::taskStep
+                      ]
+                    },
+                    constructor{
+                      branches: [
+                        simplify{
+                          definitions: [
+                            cat,
+                            continue_advanced,
+                            continue_array,
+                            failure_or,
+                            kidsHypothesis,
+                            loop_step,
+                            membersOf,
+                            nextHypothesis,
+                            nextPhase,
+                            orElse_gate,
+                            outlineOf,
+                            plus,
+                            plus_assoc,
+                            reverse_cat,
+                            value_step_array,
+                            wrapOutline,
+                            JsonRead::reverseOnto,
+                            JsonWrite::openTasks,
+                            JsonWrite::taskStep
+                          ]
+                        },
+                        simplify{
+                          definitions: [
+                            cat,
+                            continue_advanced,
+                            continue_array,
+                            failure_or,
+                            kidsHypothesis,
+                            loop_step,
+                            membersOf,
+                            nextHypothesis,
+                            nextPhase,
+                            orElse_gate,
+                            outlineOf,
+                            plus,
+                            plus_assoc,
+                            reverse_cat,
+                            value_step_array,
+                            wrapOutline,
+                            JsonRead::reverseOnto,
+                            JsonWrite::openTasks,
+                            JsonWrite::taskStep
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        binders: [label, kids, next, kidsHypothesis, nextHypothesis],
+        constructor: array
+      },
+      {
+        proof: constructor{
+          branches: [
+            simplify{
+              definitions: [
+                continue_advanced,
+                continue_object,
+                failure_gate,
+                firstOr,
+                headOf,
+                jsonsOf,
+                kidsHypothesis,
+                loop_step,
+                outlineOf,
+                plus,
+                value_step_object,
+                wrapOutline,
+                JsonRead::reverseOnto,
+                JsonWrite::openTasks,
+                JsonWrite::taskStep
+              ]
+            },
+            constructor{
+              branches: [
+                simplify{
+                  definitions: [
+                    cat,
+                    continue_advanced,
+                    continue_object,
+                    failure_or,
+                    jsonsOf,
+                    kidsHypothesis,
+                    loop_step,
+                    nextHypothesis,
+                    nextPhase,
+                    orElse_gate,
+                    outlineOf,
+                    plus,
+                    plus_assoc,
+                    reverse_cat,
+                    value_step_object,
+                    wrapOutline,
+                    JsonRead::reverseOnto,
+                    JsonWrite::openTasks,
+                    JsonWrite::taskStep
+                  ]
+                },
+                constructor{
+                  branches: [
+                    simplify{
+                      definitions: [
+                        cat,
+                        continue_advanced,
+                        continue_object,
+                        failure_or,
+                        jsonsOf,
+                        kidsHypothesis,
+                        loop_step,
+                        nextHypothesis,
+                        nextPhase,
+                        orElse_gate,
+                        outlineOf,
+                        plus,
+                        plus_assoc,
+                        reverse_cat,
+                        value_step_object,
+                        wrapOutline,
+                        JsonRead::reverseOnto,
+                        JsonWrite::openTasks,
+                        JsonWrite::taskStep
+                      ]
+                    },
+                    constructor{
+                      branches: [
+                        simplify{
+                          definitions: [
+                            cat,
+                            continue_advanced,
+                            continue_object,
+                            failure_or,
+                            kidsHypothesis,
+                            loop_step,
+                            membersOf,
+                            nextHypothesis,
+                            nextPhase,
+                            orElse_gate,
+                            outlineOf,
+                            plus,
+                            plus_assoc,
+                            reverse_cat,
+                            value_step_object,
+                            wrapOutline,
+                            JsonRead::reverseOnto,
+                            JsonWrite::openTasks,
+                            JsonWrite::taskStep
+                          ]
+                        },
+                        simplify{
+                          definitions: [
+                            cat,
+                            continue_advanced,
+                            continue_object,
+                            failure_or,
+                            kidsHypothesis,
+                            loop_step,
+                            membersOf,
+                            nextHypothesis,
+                            nextPhase,
+                            orElse_gate,
+                            outlineOf,
+                            plus,
+                            plus_assoc,
+                            reverse_cat,
+                            value_step_object,
+                            wrapOutline,
+                            JsonRead::reverseOnto,
+                            JsonWrite::openTasks,
+                            JsonWrite::taskStep
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        binders: [label, kids, next, kidsHypothesis, nextHypothesis],
+        constructor: object
+      }
+    ],
+    generalizing: [budget, col, depth, rest],
+    scrutinee: trees
+  },
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: appendForest,
+  parameters: [lead : Forest, trail : Forest],
+  result: Forest,
+  body: (match lead
+    | Forest.stop => trail
+    | Forest.null label next => (ctor Forest.null label (appendForest next trail))
+    | Forest.bool label flag next => (ctor Forest.bool label flag (appendForest next trail))
+    | Forest.number label amount next => (ctor Forest.number label amount (appendForest next trail))
+    | Forest.text label content next => (ctor Forest.text label content (appendForest next trail))
+    | Forest.array label kids next => (ctor Forest.array label kids (appendForest next trail))
+    | Forest.object label kids next => (ctor Forest.object label kids (appendForest next trail))),
+  recursive_argument: lead
+}
+
+definition{
+  name: relabel,
+  parameters: [key : String, trees : Forest],
+  result: Forest,
+  body: (match trees
+    | Forest.stop => (ctor Forest.stop)
+    | Forest.null label next => (ctor Forest.null (ctor Option.some [String] key) next)
+    | Forest.bool label flag next => (ctor Forest.bool (ctor Option.some [String] key) flag next)
+    | Forest.number label amount next => (ctor Forest.number (ctor Option.some [String] key) amount next)
+    | Forest.text label content next => (ctor Forest.text (ctor Option.some [String] key) content next)
+    | Forest.array label kids next => (ctor Forest.array (ctor Option.some [String] key) kids next)
+    | Forest.object label kids next => (ctor Forest.object (ctor Option.some [String] key) kids next))
+}
+
+definition{
+  name: appendJsons,
+  parameters: [left : (List Json::Json), right : (List Json::Json)],
+  result: (List Json::Json),
+  body: (match left
+    | List.nil => right
+    | List.cons head tail => (cons head (appendJsons tail right))),
+  recursive_argument: left
+}
+
+definition{
+  name: appendMembers,
+  parameters: [left : (List (String * Json::Json)), right : (List (String * Json::Json))],
+  result: (List (String * Json::Json)),
+  body: (match left
+    | List.nil => right
+    | List.cons head tail => (cons head (appendMembers tail right))),
+  recursive_argument: left
+}
+
+definition{
+  name: relabelHead,
+  parameters: [key : String, entries : (List (String * Json::Json))],
+  result: (List (String * Json::Json)),
+  body: (match entries
+    | List.nil => (nil (String * Json::Json))
+    | List.cons head tail => (match head | Prod.mk old value => (cons (key, value) tail)))
+}
+
+definition{
+  name: toForest,
+  parameters: [value : Json::Json],
+  result: Forest,
+  body: (match value
+    | Json::Json.null => (ctor Forest.null (ctor Option.none [String]) (ctor Forest.stop))
+    | Json::Json.bool flag => (ctor Forest.bool (ctor Option.none [String]) flag (ctor Forest.stop))
+    | Json::Json.number amount => (ctor Forest.number (ctor Option.none [String]) amount (ctor Forest.stop))
+    | Json::Json.text content => (ctor Forest.text (ctor Option.none [String]) content (ctor Forest.stop))
+    | Json::Json.array items => (ctor Forest.array (ctor Option.none [String]) (toForestList items) (ctor Forest.stop))
+    | Json::Json.object entries => (ctor Forest.object (ctor Option.none [String]) (toForestMembers entries) (ctor Forest.stop))),
+  mutual: Encode,
+  recursive_argument: value
+}
+
+definition{
+  name: toForestList,
+  parameters: [items : (List Json::Json)],
+  result: Forest,
+  body: (match items
+    | List.nil => (ctor Forest.stop)
+    | List.cons head tail => (appendForest (toForest head) (toForestList tail))),
+  mutual: Encode,
+  recursive_argument: items
+}
+
+definition{
+  name: toForestMembers,
+  parameters: [entries : (List (String * Json::Json))],
+  result: Forest,
+  body: (match entries
+    | List.nil => (ctor Forest.stop)
+    | List.cons entry tail => (appendForest (toForestPair entry) (toForestMembers tail))),
+  mutual: Encode,
+  recursive_argument: entries
+}
+
+definition{
+  name: toForestPair,
+  parameters: [entry : (String * Json::Json)],
+  result: Forest,
+  body: (match entry | Prod.mk key value => (relabel key (toForest value))),
+  mutual: Encode,
+  recursive_argument: entry
+}
+
+theorem{
+  name: jsons_append,
+  parameters: [lead : Forest, trail : Forest],
+  statement: ((jsonsOf (appendForest lead trail)) = (appendJsons (jsonsOf lead) (jsonsOf trail))),
+  proof: induction{
+    branches: [
+      {
+        proof: simplify{definitions: [appendForest, appendJsons, jsonsOf]},
+        binders: [],
+        constructor: stop
+      },
+      {
+        proof: simplify{definitions: [appendForest, appendJsons, jsonsOf, nextHypothesis]},
+        binders: [label, next, nextHypothesis],
+        constructor: null
+      },
+      {
+        proof: simplify{definitions: [appendForest, appendJsons, jsonsOf, nextHypothesis]},
+        binders: [label, flag, next, nextHypothesis],
+        constructor: bool
+      },
+      {
+        proof: simplify{definitions: [appendForest, appendJsons, jsonsOf, nextHypothesis]},
+        binders: [label, amount, next, nextHypothesis],
+        constructor: number
+      },
+      {
+        proof: simplify{definitions: [appendForest, appendJsons, jsonsOf, nextHypothesis]},
+        binders: [label, content, next, nextHypothesis],
+        constructor: text
+      },
+      {
+        proof: simplify{definitions: [appendForest, appendJsons, jsonsOf, nextHypothesis]},
+        binders: [label, kids, next, kidsHypothesis, nextHypothesis],
+        constructor: array
+      },
+      {
+        proof: simplify{definitions: [appendForest, appendJsons, jsonsOf, nextHypothesis]},
+        binders: [label, kids, next, kidsHypothesis, nextHypothesis],
+        constructor: object
+      }
+    ],
+    scrutinee: lead
+  },
+  axioms: [propext]
+}
+
+theorem{
+  name: members_append,
+  parameters: [lead : Forest, trail : Forest],
+  statement: ((membersOf (appendForest lead trail)) = (appendMembers (membersOf lead) (membersOf trail))),
+  proof: induction{
+    branches: [
+      {
+        proof: simplify{definitions: [appendForest, appendMembers, membersOf]},
+        binders: [],
+        constructor: stop
+      },
+      {
+        proof: simplify{definitions: [appendForest, appendMembers, membersOf, nextHypothesis]},
+        binders: [label, next, nextHypothesis],
+        constructor: null
+      },
+      {
+        proof: simplify{definitions: [appendForest, appendMembers, membersOf, nextHypothesis]},
+        binders: [label, flag, next, nextHypothesis],
+        constructor: bool
+      },
+      {
+        proof: simplify{definitions: [appendForest, appendMembers, membersOf, nextHypothesis]},
+        binders: [label, amount, next, nextHypothesis],
+        constructor: number
+      },
+      {
+        proof: simplify{definitions: [appendForest, appendMembers, membersOf, nextHypothesis]},
+        binders: [label, content, next, nextHypothesis],
+        constructor: text
+      },
+      {
+        proof: simplify{definitions: [appendForest, appendMembers, membersOf, nextHypothesis]},
+        binders: [label, kids, next, kidsHypothesis, nextHypothesis],
+        constructor: array
+      },
+      {
+        proof: simplify{definitions: [appendForest, appendMembers, membersOf, nextHypothesis]},
+        binders: [label, kids, next, kidsHypothesis, nextHypothesis],
+        constructor: object
+      }
+    ],
+    scrutinee: lead
+  },
+  axioms: [propext]
+}
+
+theorem{
+  name: members_relabel,
+  parameters: [key : String, trees : Forest],
+  statement: ((membersOf (relabel key trees)) = (relabelHead key (membersOf trees))),
+  proof: cases{
+    branches: [
+      {
+        proof: simplify{definitions: [membersOf, relabel, relabelHead]},
+        binders: [],
+        constructor: stop
+      },
+      {
+        proof: simplify{definitions: [keyOf, membersOf, relabel, relabelHead]},
+        binders: [label, next],
+        constructor: null
+      },
+      {
+        proof: simplify{definitions: [keyOf, membersOf, relabel, relabelHead]},
+        binders: [label, flag, next],
+        constructor: bool
+      },
+      {
+        proof: simplify{definitions: [keyOf, membersOf, relabel, relabelHead]},
+        binders: [label, amount, next],
+        constructor: number
+      },
+      {
+        proof: simplify{definitions: [keyOf, membersOf, relabel, relabelHead]},
+        binders: [label, content, next],
+        constructor: text
+      },
+      {
+        proof: simplify{definitions: [keyOf, membersOf, relabel, relabelHead]},
+        binders: [label, kids, next],
+        constructor: array
+      },
+      {
+        proof: simplify{definitions: [keyOf, membersOf, relabel, relabelHead]},
+        binders: [label, kids, next],
+        constructor: object
+      }
+    ],
+    scrutinee: trees
+  },
+  axioms: [propext]
+}
+
+theorem{
+  name: forest_encoding_is_faithful,
+  parameters: [value : Json::Json],
+  statement: (((jsonsOf (toForest value)) = (cons value (nil Json::Json))) /\ ((membersOf (toForest value)) = (cons ("", value) (nil (String * Json::Json))))),
+  proof: nested_induction{
+    branches: [
+      {
+        proof: constructor{
+          branches: [
+            simplify{definitions: [jsonsOf, toForest]},
+            simplify{definitions: [keyOf, membersOf, toForest]}
+          ]
+        },
+        binders: [],
+        constructor: null
+      },
+      {
+        proof: constructor{
+          branches: [
+            simplify{definitions: [jsonsOf, toForest]},
+            simplify{definitions: [keyOf, membersOf, toForest]}
+          ]
+        },
+        binders: [flag],
+        constructor: bool
+      },
+      {
+        proof: constructor{
+          branches: [
+            simplify{definitions: [jsonsOf, toForest]},
+            simplify{definitions: [keyOf, membersOf, toForest]}
+          ]
+        },
+        binders: [amount],
+        constructor: number
+      },
+      {
+        proof: constructor{
+          branches: [
+            simplify{definitions: [jsonsOf, toForest]},
+            simplify{definitions: [keyOf, membersOf, toForest]}
+          ]
+        },
+        binders: [content],
+        constructor: text
+      },
+      {
+        proof: constructor{
+          branches: [
+            simplify{definitions: [itemsHypothesis, jsonsOf, toForest]},
+            simplify{definitions: [itemsHypothesis, keyOf, membersOf, toForest]}
+          ]
+        },
+        binders: [items, itemsHypothesis],
+        constructor: array
+      },
+      {
+        proof: constructor{
+          branches: [
+            simplify{definitions: [entriesHypothesis, jsonsOf, toForest]},
+            simplify{definitions: [entriesHypothesis, keyOf, membersOf, toForest]}
+          ]
+        },
+        binders: [entries, entriesHypothesis],
+        constructor: object
+      }
+    ],
+    members: [
+      {
+        type: (List Json::Json),
+        statement: ((jsonsOf (toForestList items)) = items),
+        binder: items,
+        branches: [
+          {proof: simplify{definitions: [jsonsOf, toForestList]}, binders: [], constructor: nil},
+          {
+            proof: simplify{
+              definitions: [appendJsons, headHypothesis, jsons_append, tailHypothesis, toForestList]
+            },
+            binders: [head, tail, headHypothesis, tailHypothesis],
+            constructor: cons
+          }
+        ]
+      },
+      {
+        type: (List (String * Json::Json)),
+        statement: ((membersOf (toForestMembers entries)) = entries),
+        binder: entries,
+        branches: [
+          {
+            proof: simplify{definitions: [membersOf, toForestMembers]},
+            binders: [],
+            constructor: nil
+          },
+          {
+            proof: simplify{
+              definitions: [
+                appendMembers,
+                entryHypothesis,
+                members_append,
+                tailHypothesis,
+                toForestMembers
+              ]
+            },
+            binders: [entry, tail, entryHypothesis, tailHypothesis],
+            constructor: cons
+          }
+        ]
+      },
+      {
+        type: (String * Json::Json),
+        statement: ((membersOf (toForestPair entry)) = (cons entry (nil (String * Json::Json)))),
+        binder: entry,
+        branches: [
+          {
+            proof: simplify{
+              definitions: [contentHypothesis, members_relabel, relabelHead, toForestPair]
+            },
+            binders: [key, content, contentHypothesis],
+            constructor: mk
+          }
+        ]
+      }
+    ],
+    scrutinee: value
+  },
+  axioms: [propext]
+}
+
+definition{
+  name: finalize,
+  parameters: [result : (Result (List Nat) JsonText::JsonRefusal)],
+  result: (Result (List Nat) JsonText::JsonRefusal),
+  body: (match result
+    | Result.ok produced => (ctor Result.ok [(List Nat), JsonText::JsonRefusal] (JsonRead::reverseOnto [Nat] produced (nil Nat)))
+    | Result.error reason => (ctor Result.error [(List Nat), JsonText::JsonRefusal] reason))
+}
+
+theorem{
+  name: write_with_finalize,
+  parameters: [budget : Nat, item : Json::Json],
+  statement: ((JsonWrite::writeListWith budget item) = (finalize (JsonWrite::writeLoop budget (cons (ctor JsonWrite::Task.value 0 item) (nil JsonWrite::Task)) (nil Nat)))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: finalize_failure,
+  parameters: [failure : Halt, produced : (List Nat)],
+  statement: ((finalize (failOr failure (ctor Result.ok [(List Nat), JsonText::JsonRefusal] produced))) = (failOr failure (ctor Result.ok [(List Nat), JsonText::JsonRefusal] (JsonRead::reverseOnto [Nat] produced (nil Nat))))),
+  proof: cases{
+    branches: [
+      {proof: reflexivity{}, binders: [], constructor: clear},
+      {proof: reflexivity{}, binders: [reason], constructor: stopped}
+    ],
+    scrutinee: failure
+  }
+}
+
+theorem{
+  name: reverse_reverse,
+  parameters: [items : (List Nat), onto : (List Nat)],
+  statement: ((JsonRead::reverseOnto [Nat] (JsonRead::reverseOnto [Nat] items onto) (nil Nat)) = (JsonRead::reverseOnto [Nat] onto items)),
+  proof: induction{
+    branches: [
+      {proof: simplify{definitions: [JsonRead::reverseOnto]}, binders: [], constructor: nil},
+      {
+        proof: simplify{definitions: [hypothesis, JsonRead::reverseOnto]},
+        binders: [head, tail, hypothesis],
+        constructor: cons
+      }
+    ],
+    generalizing: [onto],
+    scrutinee: items
+  },
+  axioms: [propext]
+}
+
+theorem{
+  name: loop_finished,
+  parameters: [budget : Nat, col : (List Nat)],
+  statement: ((JsonWrite::writeLoop (budget + 1) (nil JsonWrite::Task) col) = (ctor Result.ok [(List Nat), JsonText::JsonRefusal] col)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+definition{
+  name: outcomeOf,
+  parameters: [outline : Outline],
+  result: (Result (List Nat) JsonText::JsonRefusal),
+  body: (failOr (project outline failure) (ctor Result.ok [(List Nat), JsonText::JsonRefusal] (project outline bytes)))
+}
+
+theorem{
+  name: writer_agrees_with_outline,
+  parameters: [trees : Forest, budget : Nat],
+  statement: ((JsonWrite::writeListWith (plus (budget + 1) (project (outlineOf 0 (ctor Phase.single) trees) cost)) (headOf trees)) = (outcomeOf (outlineOf 0 (ctor Phase.single) trees))),
+  proof: simplify{
+    definitions: [
+      finalize_failure,
+      loop_finished,
+      outcomeOf,
+      reverse_reverse,
+      write_with_finalize,
+      writer_loop_agrees_with_outline,
+      JsonRead::reverseOnto
+    ]
+  },
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: writer_agrees_on_every_value,
+  parameters: [value : Json::Json, budget : Nat],
+  statement: (((headOf (toForest value)) = value) /\ ((JsonWrite::writeListWith (plus (budget + 1) (project (outlineOf 0 (ctor Phase.single) (toForest value)) cost)) (headOf (toForest value))) = (outcomeOf (outlineOf 0 (ctor Phase.single) (toForest value))))),
+  proof: constructor{
+    branches: [
+      simplify{definitions: [firstOr, forest_encoding_is_faithful, headOf]},
+      apply{arguments: [(toForest value), budget], theorem: writer_agrees_with_outline}
+    ]
+  },
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: escape_every_control_byte,
+  parameters: [],
+  statement: ((JsonRead::reverseOnto [Nat] (JsonWrite::escapeLoop (prim append (prim append (cons 0 (cons 1 (cons 2 (cons 3 (cons 4 (cons 5 (cons 6 (cons 7 (nil Nat))))))))) (cons 8 (cons 9 (cons 10 (cons 11 (cons 12 (cons 13 (cons 14 (cons 15 (nil Nat))))))))) : (List Nat)) (prim append (cons 16 (cons 17 (cons 18 (cons 19 (cons 20 (cons 21 (cons 22 (cons 23 (nil Nat))))))))) (cons 24 (cons 25 (cons 26 (cons 27 (cons 28 (cons 29 (cons 30 (cons 31 (nil Nat))))))))) : (List Nat)) : (List Nat)) (nil Nat)) (nil Nat)) = (prim append (prim append (prim append (prim append (cons 92 (cons 117 (cons 48 (cons 48 (cons 48 (cons 48 (cons 92 (cons 117 (cons 48 (cons 48 (nil Nat))))))))))) (cons 48 (cons 49 (cons 92 (cons 117 (cons 48 (cons 48 (cons 48 (cons 50 (cons 92 (cons 117 (cons 48 (nil Nat)))))))))))) : (List Nat)) (prim append (cons 48 (cons 48 (cons 51 (cons 92 (cons 117 (cons 48 (cons 48 (cons 48 (cons 52 (cons 92 (cons 117 (nil Nat)))))))))))) (cons 48 (cons 48 (cons 48 (cons 53 (cons 92 (cons 117 (cons 48 (cons 48 (cons 48 (cons 54 (cons 92 (nil Nat)))))))))))) : (List Nat)) : (List Nat)) (prim append (prim append (cons 117 (cons 48 (cons 48 (cons 48 (cons 55 (cons 92 (cons 98 (cons 92 (cons 116 (cons 92 (nil Nat))))))))))) (cons 110 (cons 92 (cons 117 (cons 48 (cons 48 (cons 48 (cons 98 (cons 92 (cons 102 (cons 92 (cons 114 (nil Nat)))))))))))) : (List Nat)) (prim append (cons 92 (cons 117 (cons 48 (cons 48 (cons 48 (cons 101 (cons 92 (cons 117 (cons 48 (cons 48 (cons 48 (nil Nat)))))))))))) (cons 102 (cons 92 (cons 117 (cons 48 (cons 48 (cons 49 (cons 48 (cons 92 (cons 117 (cons 48 (cons 48 (nil Nat)))))))))))) : (List Nat)) : (List Nat)) : (List Nat)) (prim append (prim append (prim append (cons 49 (cons 49 (cons 92 (cons 117 (cons 48 (cons 48 (cons 49 (cons 50 (cons 92 (cons 117 (nil Nat))))))))))) (cons 48 (cons 48 (cons 49 (cons 51 (cons 92 (cons 117 (cons 48 (cons 48 (cons 49 (cons 52 (cons 92 (nil Nat)))))))))))) : (List Nat)) (prim append (cons 117 (cons 48 (cons 48 (cons 49 (cons 53 (cons 92 (cons 117 (cons 48 (cons 48 (cons 49 (cons 54 (nil Nat)))))))))))) (cons 92 (cons 117 (cons 48 (cons 48 (cons 49 (cons 55 (cons 92 (cons 117 (cons 48 (cons 48 (cons 49 (nil Nat)))))))))))) : (List Nat)) : (List Nat)) (prim append (prim append (cons 56 (cons 92 (cons 117 (cons 48 (cons 48 (cons 49 (cons 57 (cons 92 (cons 117 (cons 48 (nil Nat))))))))))) (cons 48 (cons 49 (cons 97 (cons 92 (cons 117 (cons 48 (cons 48 (cons 49 (cons 98 (cons 92 (cons 117 (nil Nat)))))))))))) : (List Nat)) (prim append (cons 48 (cons 48 (cons 49 (cons 99 (cons 92 (cons 117 (cons 48 (cons 48 (cons 49 (cons 100 (cons 92 (nil Nat)))))))))))) (cons 117 (cons 48 (cons 48 (cons 49 (cons 101 (cons 92 (cons 117 (cons 48 (cons 48 (cons 49 (cons 102 (nil Nat)))))))))))) : (List Nat)) : (List Nat)) : (List Nat)) : (List Nat))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: escape_quote_and_backslash,
+  parameters: [],
+  statement: ((JsonRead::reverseOnto [Nat] (JsonWrite::escapeLoop (cons 113 (cons 34 (cons 98 (cons 92 (cons 115 (cons 47 (cons 92 (cons 34 (cons 92 (nil Nat)))))))))) (nil Nat)) (nil Nat)) = (prim append (cons 113 (cons 92 (cons 34 (cons 98 (cons 92 (cons 92 (cons 115 (nil Nat)))))))) (cons 47 (cons 92 (cons 92 (cons 92 (cons 34 (cons 92 (cons 92 (nil Nat)))))))) : (List Nat))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: escape_leaves_other_bytes,
+  parameters: [],
+  statement: ((JsonRead::reverseOnto [Nat] (JsonWrite::escapeLoop (cons 32 (cons 47 (cons 65 (cons 126 (cons 127 (cons 128 (cons 194 (cons 195 (cons 255 (nil Nat)))))))))) (nil Nat)) (nil Nat)) = (cons 32 (cons 47 (cons 65 (cons 126 (cons 127 (cons 128 (cons 194 (cons 195 (cons 255 (nil Nat))))))))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: encoder_keeps_item_order,
+  parameters: [],
+  statement: ((JsonWrite::writeList (ctor Json::Json.array (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (3 : Int), exponent := (0 : Int)})) (cons (ctor Json::Json.array (nil Json::Json)) (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)})) (cons (ctor Json::Json.array (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (2 : Int), exponent := (0 : Int)})) (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (0 : Int), exponent := (0 : Int)})) (nil Json::Json)))) (nil Json::Json))))))) = (ctor Result.ok [(List Nat), JsonText::JsonRefusal] (prim append (cons 91 (cons 51 (cons 44 (cons 91 (cons 93 (cons 44 (cons 49 (nil Nat)))))))) (cons 44 (cons 91 (cons 50 (cons 44 (cons 48 (cons 93 (cons 93 (nil Nat)))))))) : (List Nat)))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+\end{semanticmodule}
+\end{lexlean}

@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "json-write-laws"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "JsonWriteLaws"
+component = "JsonWriteLaws"
+
+[[form]]
+id = "json-write-laws"
+channel = "text"
+surface = "JSON write laws"
+canonical_source = true
+features = ["sentence-case", "singular"]

@@ -93,7 +93,7 @@ Feature: JSON text codec
     Then the loop's result for any value equals the specification's, with the axiom policy each theorem declares and no placeholder proof
 
   @JC-16 @build
-  Scenario: Writing and reading again returns the same value for values that hold string escapes, non-ASCII characters, an empty member name, members in a stated order and a repeated member name, by kernel-checked theorems with exact axiom policies.
-    Given values that hold the escapes, a multi-byte character, an empty member name, three members in a stated order and a repeated member name
-    When each is written and read again by the kernel's evaluation of the codec
-    Then the value read is the value written, with the axiom policy each theorem declares and no placeholder proof
+  Scenario: The encoder escapes bytes as RFC 8259 section 7 and the decisions table state, byte for byte, and keeps the order of array items: every control byte from 0 to 31, the quotation mark and the reverse solidus are escaped, bytes that need no escape are written unchanged, and the items of an array are written in order, by kernel-checked theorems with exact axiom policies. The write of a string value is not kernel-evaluated, so the read of a written string is not claimed.
+    Given the control bytes from 0 to 31, the quotation mark, the reverse solidus, bytes that need no escape, and an array of nested items in a stated order
+    When the escaping loop of the encoder and the encoder itself are evaluated by the kernel
+    Then each byte is written as the table states and the items come out in order, with the axiom policy each theorem declares and no placeholder proof

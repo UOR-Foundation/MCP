@@ -102,16 +102,20 @@ Read them with
 gh api repos/UOR-Foundation/MCP/check-runs/<job id>/annotations
 ```
 
-## Planted defect
+## Planted defects
 
-One comment, ` // hand edit`, appended to line 10 (`pub fn tick`) of
-`crates/json-oracle/generated/mcp_json_codec/src/lib.rs`. It changes no
-behavior.
+Each was planted alone in a tree that passes, and reverted.
+
+### A source edit without a re-export (#21)
+
+One definition, `definition{name: plantedConstant, parameters: [], result: Nat, body: 7}`, added to
+`src/JsonText.lex.tex` in the tree of commit `cd390ef` (consistent pins), and nothing re-exported.
 
 | | |
 | --- | --- |
-| failing step | `lexlean / export json-oracle`, step "5. the committed packages are the export of their sources" |
-| diagnostic | `export of crates/json-oracle/generated/request.json failed (exit 1)`, then `== crates/json-oracle/generated/mcp_json_codec differs from the export of crates/json-oracle/generated/request.json ==` and the `diff -ru` hunk showing the `// hand edit` line |
-| also failing | `cargo test`: `error: 1 target failed: -p json-oracle --test provenance` |
-| passing | `lexlean / verify` and `lexlean / export lifecycle-oracle` |
-| runs | commit `33ef09f`, run 39904326478, jobs 120253214743 and 120253076251; reverted by `c138d0e` |
+| command | `lexlean production build --request crates/json-oracle/generated/request.json` |
+| diagnostic | `error[LLC0204]: the request pins the source ID 7e3c5254...a2a1; the project's is b9de8e63...6f71`, exit 2, after 9 s: before any Lean process runs, so neither the build nor the comparison is reached |
+| where CI stops it | `lexlean / export json-oracle` and `lexlean / export lifecycle-oracle`, step "5. the committed packages are the export of their sources": `export of <request> failed (exit 2)` with the `LLC0204` line as the tail of its output; `lexlean / verify` passes, since the edit is a valid definition |
+
+The same stale pin is what `cargo xtask export` rewrites: after it, the same command builds.
+
