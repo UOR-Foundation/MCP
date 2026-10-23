@@ -345,7 +345,8 @@ fn the_target_and_unrelated_headers_do_not_change_the_response_lc_11() {
     }
     let mut request = base.clone();
     request.fields.extend([
-        (b"Origin".to_vec(), b"http://evil.example".to_vec()),
+        // Origin and Host are read since issue 11 (SH-04); Referer is not
+        (b"Referer".to_vec(), b"http://evil.example".to_vec()),
         (b"Accept".to_vec(), b"text/plain".to_vec()),
         (b"Content-Length".to_vec(), b"0".to_vec()),
         (b"Authorization".to_vec(), b"Bearer x".to_vec()),

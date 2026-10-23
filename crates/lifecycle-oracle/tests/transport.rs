@@ -327,9 +327,9 @@ fn concurrent_posts_are_independent_exchanges_each_with_its_own_stream_sh_03() {
         progress_call(Some(BOTH), "c", 13),
         progress_call(None, "d", 14),
     ];
-    let alone: Vec<Vec<u8>> = requests
+    let alone: Vec<Response> = requests
         .iter()
-        .map(|r| lifecycle_oracle::exchange_frame(&encode_request(r)))
+        .map(|r| frame_checked(&encode_request(r)).expect("a response"))
         .collect();
     // the same frames on separate threads, repeatedly and interleaved
     let handles: Vec<_> = (0..8)
@@ -338,13 +338,14 @@ fn concurrent_posts_are_independent_exchanges_each_with_its_own_stream_sh_03() {
             std::thread::spawn(move || {
                 requests
                     .iter()
+                    .enumerate()
                     .cycle()
                     .skip(round)
                     .take(requests.len())
-                    .map(|r| {
+                    .map(|(index, r)| {
                         (
-                            encode_request(r),
-                            lifecycle_oracle::exchange_frame(&encode_request(r)),
+                            index,
+                            frame_checked(&encode_request(r)).expect("a response"),
                         )
                     })
                     .collect::<Vec<_>>()
@@ -352,11 +353,7 @@ fn concurrent_posts_are_independent_exchanges_each_with_its_own_stream_sh_03() {
         })
         .collect();
     for handle in handles {
-        for (frame, answer) in handle.join().expect("a thread") {
-            let index = requests
-                .iter()
-                .position(|r| encode_request(r) == frame)
-                .expect("a known frame");
+        for (index, answer) in handle.join().expect("a thread") {
             assert_eq!(
                 answer, alone[index],
                 "the answer depends on its frame alone"

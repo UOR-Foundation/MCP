@@ -643,9 +643,7 @@ fn the_notifications_and_the_result_are_one_event_stream_for_a_client_that_accep
 #[test]
 fn a_client_that_does_not_accept_a_stream_gets_the_result_alone_as_json_tl_13() {
     // the same call without an Accept header: progress is optional, so it is not sent
-    let body = format!(
-        r#"{{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{{"name":"test_tool_with_progress","arguments":{{}},"_meta":{{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{{}},"progressToken":"t"}}}}}}"#
-    );
+    let body = r#"{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"test_tool_with_progress","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"progressToken":"t"}}}"#.to_owned();
     let (response, json) = send(&post_owned(
         &standard("tools/call", Some("test_tool_with_progress")),
         &body,
