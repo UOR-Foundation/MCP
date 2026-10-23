@@ -1,0 +1,427 @@
+\begin{lexlean}{ResourceFixture}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Common}
+\importmodule{Content}
+\importmodule{Json}
+\importmodule{JsonRead}
+\importmodule{JsonText}
+\importmodule{JsonWrite}
+\importmodule{Methods}
+\importmodule{Refusal}
+\importmodule{Resources}
+\title{MCP resource fixture}
+\begin{semanticmodule}
+definition{
+  name: listCache,
+  parameters: [],
+  result: Common::CacheHint,
+  body: (record Common::CacheHint {ttlMs := 300000, cacheScope := (ctor Common::CacheScope.public)}),
+  executable: true
+}
+
+definition{
+  name: readCache,
+  parameters: [],
+  result: Common::CacheHint,
+  body: (record Common::CacheHint {ttlMs := 300000, cacheScope := (ctor Common::CacheScope.private)}),
+  executable: true
+}
+
+definition{
+  name: sampleImageData,
+  parameters: [],
+  result: String,
+  body: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==",
+  executable: true
+}
+
+definition{
+  name: resourceOf,
+  parameters: [
+    name : String,
+    title : (Option String),
+    uri : String,
+    description : String,
+    mime : String
+  ],
+  result: Content::Resource,
+  body: (record Content::Resource {name := name, title := title, icons := (ctor Option.none [(List Common::Icon)]), uri := uri, description := (ctor Option.some [String] description), mimeType := (ctor Option.some [String] mime), annotations := (ctor Option.none [Common::Annotations]), size := (ctor Option.none [Nat]), meta := (ctor Option.none [Json::JsonObject])}),
+  executable: true
+}
+
+definition{
+  name: textContents,
+  parameters: [uri : String, mime : String, content : String],
+  result: Content::ResourceContents,
+  body: (ctor Content::ResourceContents.text (record Content::TextResourceContents {uri := uri, mimeType := (ctor Option.some [String] mime), text := content, meta := (ctor Option.none [Json::JsonObject])})),
+  executable: true
+}
+
+definition{
+  name: blobContents,
+  parameters: [uri : String, mime : String, blob : String],
+  result: Content::ResourceContents,
+  body: (ctor Content::ResourceContents.blob (record Content::BlobResourceContents {uri := uri, mimeType := (ctor Option.some [String] mime), blob := blob, meta := (ctor Option.none [Json::JsonObject])})),
+  executable: true
+}
+
+definition{
+  name: entryOf,
+  parameters: [resource : Content::Resource, contents : Content::ResourceContents],
+  result: (Content::Resource * (List Content::ResourceContents)),
+  body: (resource, (cons contents (nil Content::ResourceContents))),
+  executable: true
+}
+
+definition{
+  name: staticEntries,
+  parameters: [],
+  result: (List (Content::Resource * (List Content::ResourceContents))),
+  body: (cons (entryOf (resourceOf "static-text" (ctor Option.some [String] "Static Text Resource") "test://static-text" "A static text resource for testing" "text/plain") (textContents "test://static-text" "text/plain" "This is the content of the static text resource.")) (cons (entryOf (resourceOf "static-binary" (ctor Option.some [String] "Static Binary Resource") "test://static-binary" "A static binary resource (image) for testing" "image/png") (blobContents "test://static-binary" "image/png" (sampleImageData))) (cons (entryOf (resourceOf "watched-resource" (ctor Option.some [String] "Watched Resource") "test://watched-resource" "A resource that auto-updates every 3 seconds" "text/plain") (textContents "test://watched-resource" "text/plain" "Watched resource content")) (cons (entryOf (resourceOf "Stateless Static Text" (ctor Option.none [String]) "test://stateless-static-text" "A static text resource served on the draft path" "text/plain") (textContents "test://stateless-static-text" "text/plain" "Static text content from the stateless draft path.")) (nil (Content::Resource * (List Content::ResourceContents))))))),
+  executable: true
+}
+
+definition{
+  name: resourcesOnto,
+  parameters: [
+    entries : (List (Content::Resource * (List Content::ResourceContents))),
+    built : (List Content::Resource)
+  ],
+  result: (List Content::Resource),
+  body: (match entries
+    | List.nil => built
+    | List.cons head rest => (resourcesOnto rest (cons (first head) built))),
+  executable: true,
+  recursive_argument: entries
+}
+
+definition{
+  name: resourcesOf,
+  parameters: [entries : (List (Content::Resource * (List Content::ResourceContents)))],
+  result: (List Content::Resource),
+  body: (JsonRead::reverseOnto [Content::Resource] (resourcesOnto entries (nil Content::Resource)) (nil Content::Resource)),
+  executable: true
+}
+
+definition{
+  name: fixtureResources,
+  parameters: [],
+  result: (List Content::Resource),
+  body: (resourcesOf (staticEntries)),
+  executable: true
+}
+
+definition{
+  name: urisOnto,
+  parameters: [resources : (List Content::Resource), built : (List String)],
+  result: (List String),
+  body: (match resources
+    | List.nil => built
+    | List.cons head rest => (urisOnto rest (cons (project head uri) built))),
+  executable: true,
+  recursive_argument: resources
+}
+
+definition{
+  name: resourceUris,
+  parameters: [],
+  result: (List String),
+  body: (JsonRead::reverseOnto [String] (urisOnto (fixtureResources) (nil String)) (nil String)),
+  executable: true
+}
+
+definition{
+  name: lookupStatic,
+  parameters: [
+    uri : String,
+    entries : (List (Content::Resource * (List Content::ResourceContents)))
+  ],
+  result: (Option (List Content::ResourceContents)),
+  body: (match entries
+    | List.nil => (ctor Option.none [(List Content::ResourceContents)])
+    | List.cons head rest => (if (prim equal (project (first head) uri) uri : Bool) then (ctor Option.some [(List Content::ResourceContents)] (second head)) else (lookupStatic uri rest))),
+  executable: true,
+  recursive_argument: entries
+}
+
+definition{
+  name: templateUri,
+  parameters: [],
+  result: String,
+  body: "test://template/{id}/data",
+  executable: true
+}
+
+definition{
+  name: templatePrefix,
+  parameters: [],
+  result: String,
+  body: "test://template/",
+  executable: true
+}
+
+definition{name: templateSuffix, parameters: [], result: String, body: "data", executable: true}
+
+definition{
+  name: fixtureTemplates,
+  parameters: [],
+  result: (List Content::ResourceTemplate),
+  body: (cons (record Content::ResourceTemplate {name := "template", title := (ctor Option.some [String] "Resource Template"), icons := (ctor Option.none [(List Common::Icon)]), uriTemplate := (templateUri), description := (ctor Option.some [String] "A resource template with parameter substitution"), mimeType := (ctor Option.some [String] "application/json"), annotations := (ctor Option.none [Common::Annotations]), meta := (ctor Option.none [Json::JsonObject])}) (nil Content::ResourceTemplate)),
+  executable: true
+}
+
+definition{
+  name: dropPrefix,
+  parameters: [leading : (List Nat), text : (List Nat)],
+  result: (Option (List Nat)),
+  body: (match leading
+    | List.nil => (ctor Option.some [(List Nat)] text)
+    | List.cons wanted rest => (match text
+      | List.nil => (ctor Option.none [(List Nat)])
+      | List.cons seen tail => (if (wanted =? seen) then (dropPrefix rest tail) else (ctor Option.none [(List Nat)])))),
+  executable: true,
+  recursive_argument: leading
+}
+
+definition{
+  name: reversed,
+  parameters: [items : (List Nat)],
+  result: (List Nat),
+  body: (JsonRead::reverseOnto [Nat] items (nil Nat)),
+  executable: true
+}
+
+definition{
+  name: withoutSlash,
+  parameters: [items : (List Nat)],
+  result: Bool,
+  body: (match items
+    | List.nil => true
+    | List.cons head rest => (if (head =? 47) then false else (withoutSlash rest))),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: isNonEmpty,
+  parameters: [items : (List Nat)],
+  result: Bool,
+  body: (match items | List.nil => false | List.cons head rest => true),
+  executable: true
+}
+
+definition{
+  name: middleOf,
+  parameters: [uri : String],
+  result: (Option (List Nat)),
+  body: (match (dropPrefix (Resources::bytesOfText (templatePrefix)) (Resources::bytesOfText uri))
+    | Option.none => (ctor Option.none [(List Nat)])
+    | Option.some rest => (match (dropPrefix (reversed (cons 47 (Resources::bytesOfText (templateSuffix)))) (reversed rest))
+      | Option.none => (ctor Option.none [(List Nat)])
+      | Option.some inner => (let middle : (List Nat) := (reversed inner); (if ((isNonEmpty middle) && (withoutSlash middle)) then (ctor Option.some [(List Nat)] middle) else (ctor Option.none [(List Nat)]))))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: templateId,
+  parameters: [uri : String],
+  result: (Option String),
+  body: (match (middleOf uri)
+    | Option.none => (ctor Option.none [String])
+    | Option.some middle => (prim utf8_decode (JsonText::listToBytes (JsonText::emptyBytes) middle) : (Option String))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: templateText,
+  parameters: [ident : String],
+  result: (Option String),
+  body: (match (JsonWrite::writeJson (ctor Json::Json.object (cons ("id", (ctor Json::Json.text ident)) (cons ("templateTest", (ctor Json::Json.bool true)) (cons ("data", (ctor Json::Json.text (prim join (cons "Data for ID:" (cons ident (nil String))) " " : String))) (nil (String * Json::Json)))))))
+    | Result.ok written => (prim utf8_decode written : (Option String))
+    | Result.error reason => (ctor Option.none [String])),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: templateContents,
+  parameters: [uri : String],
+  result: (Option (List Content::ResourceContents)),
+  body: (match (templateId uri)
+    | Option.none => (ctor Option.none [(List Content::ResourceContents)])
+    | Option.some ident => (match (templateText ident)
+      | Option.none => (ctor Option.none [(List Content::ResourceContents)])
+      | Option.some content => (ctor Option.some [(List Content::ResourceContents)] (cons (textContents uri "application/json" content) (nil Content::ResourceContents))))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: lookupFixture,
+  parameters: [uri : String],
+  result: (Option (List Content::ResourceContents)),
+  body: (match (lookupStatic uri (staticEntries))
+    | Option.some contents => (ctor Option.some [(List Content::ResourceContents)] contents)
+    | Option.none => (templateContents uri)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: promptArgument,
+  parameters: [name : String, description : String],
+  result: Content::PromptArgument,
+  body: (record Content::PromptArgument {name := name, title := (ctor Option.none [String]), description := (ctor Option.some [String] description), required := (ctor Option.some [Bool] true)}),
+  executable: true
+}
+
+definition{
+  name: promptOf,
+  parameters: [
+    name : String,
+    title : String,
+    description : String,
+    arguments : (Option (List Content::PromptArgument))
+  ],
+  result: Content::Prompt,
+  body: (record Content::Prompt {name := name, title := (ctor Option.some [String] title), icons := (ctor Option.none [(List Common::Icon)]), description := (ctor Option.some [String] description), arguments := arguments, meta := (ctor Option.none [Json::JsonObject])}),
+  executable: true
+}
+
+definition{
+  name: fixturePrompts,
+  parameters: [],
+  result: (List Content::Prompt),
+  body: (cons (promptOf "test_simple_prompt" "Simple Test Prompt" "A simple prompt without arguments" (ctor Option.none [(List Content::PromptArgument)])) (cons (promptOf "test_prompt_with_arguments" "Prompt With Arguments" "A prompt with required arguments" (ctor Option.some [(List Content::PromptArgument)] (cons (promptArgument "arg1" "First test argument") (cons (promptArgument "arg2" "Second test argument") (nil Content::PromptArgument))))) (cons (promptOf "test_prompt_with_embedded_resource" "Prompt With Embedded Resource" "A prompt that includes an embedded resource" (ctor Option.some [(List Content::PromptArgument)] (cons (promptArgument "resourceUri" "URI of the resource to embed") (nil Content::PromptArgument)))) (cons (promptOf "test_prompt_with_image" "Prompt With Image" "A prompt that includes image content" (ctor Option.none [(List Content::PromptArgument)])) (nil Content::Prompt))))),
+  executable: true
+}
+
+definition{
+  name: textMessage,
+  parameters: [content : String],
+  result: Content::PromptMessage,
+  body: (record Content::PromptMessage {role := (ctor Common::Role.user), content := (ctor Content::ContentBlock.text (record Content::TextContent {text := content, annotations := (ctor Option.none [Common::Annotations]), meta := (ctor Option.none [Json::JsonObject])}))}),
+  executable: true
+}
+
+definition{
+  name: argumentOr,
+  parameters: [name : String, given : (List (String * String))],
+  result: String,
+  body: (match (Resources::argumentOf name given) | Option.none => "" | Option.some value => value),
+  executable: true
+}
+
+definition{
+  name: promptResult,
+  parameters: [messages : (List Content::PromptMessage)],
+  result: Methods::GetPromptResult,
+  body: (record Methods::GetPromptResult {description := (ctor Option.none [String]), messages := messages}),
+  executable: true
+}
+
+definition{
+  name: renderPrompt,
+  parameters: [name : String, given : (List (String * String))],
+  result: Methods::GetPromptResult,
+  body: (if (prim equal name "test_simple_prompt" : Bool) then (promptResult (cons (textMessage "This is a simple prompt for testing.") (nil Content::PromptMessage))) else (if (prim equal name "test_prompt_with_arguments" : Bool) then (promptResult (cons (textMessage (prim join (cons "Prompt with arguments: arg1='" (cons (argumentOr "arg1" given) (cons "', arg2='" (cons (argumentOr "arg2" given) (cons "'" (nil String)))))) "" : String)) (nil Content::PromptMessage))) else (if (prim equal name "test_prompt_with_embedded_resource" : Bool) then (promptResult (cons (record Content::PromptMessage {role := (ctor Common::Role.user), content := (ctor Content::ContentBlock.resource (record Content::EmbeddedResource {resource := (textContents (argumentOr "resourceUri" given) "text/plain" "Embedded resource content for testing."), annotations := (ctor Option.none [Common::Annotations]), meta := (ctor Option.none [Json::JsonObject])}))}) (cons (textMessage "Please process the embedded resource above.") (nil Content::PromptMessage)))) else (if (prim equal name "test_prompt_with_image" : Bool) then (promptResult (cons (record Content::PromptMessage {role := (ctor Common::Role.user), content := (ctor Content::ContentBlock.image (record Content::ImageContent {data := (sampleImageData), mimeType := "image/png", annotations := (ctor Option.none [Common::Annotations]), meta := (ctor Option.none [Json::JsonObject])}))}) (cons (textMessage "Please analyze the image above.") (nil Content::PromptMessage)))) else (promptResult (nil Content::PromptMessage)))))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: hasArgument,
+  parameters: [declared : (List Content::PromptArgument), name : String],
+  result: Bool,
+  body: (match declared
+    | List.nil => false
+    | List.cons head rest => (if (prim equal (project head name) name : Bool) then true else (hasArgument rest name))),
+  executable: true,
+  recursive_argument: declared
+}
+
+definition{
+  name: templateIdCandidates,
+  parameters: [],
+  result: (List String),
+  body: (cons "123" (cons "124" (cons "456" (nil String)))),
+  executable: true
+}
+
+definition{
+  name: promptCandidates,
+  parameters: [prompt : String, argument : String],
+  result: (List String),
+  body: (if ((prim equal prompt "test_prompt_with_embedded_resource" : Bool) && (prim equal argument "resourceUri" : Bool)) then (resourceUris) else (nil String)),
+  executable: true
+}
+
+definition{
+  name: candidatesFor,
+  parameters: [params : Methods::CompleteParams],
+  result: (Result (List String) Refusal::ProviderRefusal),
+  body: (match (project params reference)
+    | Methods::CompletionReference.prompt named => (match (Resources::findPrompt (project named name) (fixturePrompts))
+      | Option.none => (ctor Result.error [(List String), Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.unknownPrompt (project named name)))
+      | Option.some prompt => (if (hasArgument (Resources::declaredArguments prompt) (project (project params argument) name)) then (ctor Result.ok [(List String), Refusal::ProviderRefusal] (Resources::matching (project (project params argument) value) (promptCandidates (project named name) (project (project params argument) name)))) else (ctor Result.error [(List String), Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidArguments "the prompt declares no such argument"))))
+    | Methods::CompletionReference.resourceTemplate uri => (if (prim equal uri (templateUri) : Bool) then (if (prim equal (project (project params argument) name) "id" : Bool) then (ctor Result.ok [(List String), Refusal::ProviderRefusal] (Resources::matching (project (project params argument) value) (templateIdCandidates))) else (ctor Result.error [(List String), Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidArguments "the template declares no such argument"))) else (ctor Result.error [(List String), Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.resourceNotFound uri)))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: answerResourcesList,
+  parameters: [params : Methods::PaginatedParams],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (Resources::answerListResources (listCache) (fixtureResources) params),
+  executable: true
+}
+
+definition{
+  name: answerTemplatesList,
+  parameters: [params : Methods::PaginatedParams],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (Resources::answerListTemplates (listCache) (fixtureTemplates) params),
+  executable: true
+}
+
+definition{
+  name: answerPromptsList,
+  parameters: [params : Methods::PaginatedParams],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (Resources::answerListPrompts (listCache) (fixturePrompts) params),
+  executable: true
+}
+
+definition{
+  name: answerResourcesRead,
+  parameters: [params : Methods::ReadResourceParams],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (Resources::answerRead (readCache) (ref lookupFixture) params),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: answerPromptsGet,
+  parameters: [params : Methods::GetPromptParams],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (Resources::promptOutcome (fixturePrompts) (ref renderPrompt) params),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: answerCompletion,
+  parameters: [params : Methods::CompleteParams],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (Resources::answerComplete (ref candidatesFor) params),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

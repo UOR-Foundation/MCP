@@ -1,0 +1,1156 @@
+{
+ "spec": "lifecycle-vectors/1",
+ "suite": {
+  "repository": "https://github.com/modelcontextprotocol/conformance",
+  "commit": "232a9014457eaf4c59559916e3d616d2f7f28f05"
+ },
+ "vectors": [
+  {
+   "id": "RS-01",
+   "scenario": "resources-list",
+   "file": "src/scenarios/server/resources.ts",
+   "line": 42,
+   "quote": "conn.request<ListResourcesResult>('resources/list')",
+   "suite_checks": [
+    "resources-list"
+   ],
+   "register": [
+    "RP-01"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "resources/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":401,\"method\":\"resources/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/resources",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/resources",
+      "each_has": [
+       "uri",
+       "name"
+      ]
+     }
+    ]
+   },
+   "note": "The scenario sends no params of its own; the stateless connection adds _meta."
+  },
+  {
+   "id": "RS-02",
+   "scenario": "resources-read-text",
+   "file": "src/scenarios/server/resources.ts",
+   "line": 127,
+   "quote": "conn.request<ReadResourceResult>('resources/read', {",
+   "suite_checks": [
+    "resources-read-text"
+   ],
+   "register": [
+    "RP-02"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "resources/read"
+     ],
+     [
+      "Mcp-Name",
+      "test://static-text"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":402,\"method\":\"resources/read\",\"params\":{\"uri\":\"test://static-text\",\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/contents",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/contents/0/uri",
+      "eq": "test://static-text"
+     },
+     {
+      "at": "/result/contents/0/mimeType",
+      "eq": "text/plain"
+     },
+     {
+      "at": "/result/contents/0/text",
+      "eq": "This is the content of the static text resource."
+     }
+    ]
+   },
+   "note": "The stateless connection sends the uri as Mcp-Name (SEP-2243)."
+  },
+  {
+   "id": "RS-03",
+   "scenario": "resources-read-binary",
+   "file": "src/scenarios/server/resources.ts",
+   "line": 214,
+   "quote": "conn.request<ReadResourceResult>('resources/read', {",
+   "suite_checks": [
+    "resources-read-binary"
+   ],
+   "register": [
+    "RP-03"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "resources/read"
+     ],
+     [
+      "Mcp-Name",
+      "test://static-binary"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":403,\"method\":\"resources/read\",\"params\":{\"uri\":\"test://static-binary\",\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/contents",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/contents/0/uri",
+      "eq": "test://static-binary"
+     },
+     {
+      "at": "/result/contents/0/mimeType",
+      "eq": "image/png"
+     },
+     {
+      "at": "/result/contents/0/blob",
+      "nonempty_string": true
+     },
+     {
+      "at": "/result/contents/0/text",
+      "absent": true
+     }
+    ]
+   },
+   "note": "The blob is compared with the reference fixture's TEST_IMAGE_BASE64 by the test."
+  },
+  {
+   "id": "RS-04",
+   "scenario": "resources-templates-read",
+   "file": "src/scenarios/server/resources.ts",
+   "line": 303,
+   "quote": "conn.request<ReadResourceResult>('resources/read', {",
+   "suite_checks": [
+    "resources-templates-read"
+   ],
+   "register": [
+    "RP-05"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "resources/read"
+     ],
+     [
+      "Mcp-Name",
+      "test://template/123/data"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":404,\"method\":\"resources/read\",\"params\":{\"uri\":\"test://template/123/data\",\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/contents",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/contents/0/uri",
+      "eq": "test://template/123/data"
+     },
+     {
+      "at": "/result/contents/0/mimeType",
+      "eq": "application/json"
+     },
+     {
+      "at": "/result/contents/0/text",
+      "contains": "123"
+     }
+    ]
+   },
+   "note": "The scenario checks that the text includes 123."
+  },
+  {
+   "id": "RS-05",
+   "scenario": "sep-2164-resource-not-found",
+   "file": "src/scenarios/server/resources.ts",
+   "line": 515,
+   "quote": "result = await conn.request<ReadResourceResult>('resources/read', {",
+   "suite_checks": [
+    "sep-2164-no-empty-contents",
+    "sep-2164-error-code",
+    "sep-2164-data-uri"
+   ],
+   "register": [
+    "RP-06"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "resources/read"
+     ],
+     [
+      "Mcp-Name",
+      "test://nonexistent-resource-for-conformance-testing"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":405,\"method\":\"resources/read\",\"params\":{\"uri\":\"test://nonexistent-resource-for-conformance-testing\",\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 400,
+    "checks": [
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/error/code",
+      "eq": -32602
+     },
+     {
+      "at": "/error/data/uri",
+      "eq": "test://nonexistent-resource-for-conformance-testing"
+     },
+     {
+      "at": "/id",
+      "eq": 405
+     }
+    ]
+   },
+   "note": "SEP-2164: the code and the data.uri are SHOULD checks of the suite; the specification makes the code a MUST."
+  },
+  {
+   "id": "RS-06",
+   "scenario": "prompts-list",
+   "file": "src/scenarios/server/prompts.ts",
+   "line": 34,
+   "quote": "conn.request<ListPromptsResult>('prompts/list')",
+   "suite_checks": [
+    "prompts-list"
+   ],
+   "register": [
+    "RP-07"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "prompts/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":406,\"method\":\"prompts/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/prompts",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/prompts",
+      "each_has": [
+       "name",
+       "description"
+      ]
+     }
+    ]
+   },
+   "note": "The scenario sends no params of its own; the stateless connection adds _meta."
+  },
+  {
+   "id": "RS-07",
+   "scenario": "prompts-get-simple",
+   "file": "src/scenarios/server/prompts.ts",
+   "line": 122,
+   "quote": "conn.request<GetPromptResult>('prompts/get', {",
+   "suite_checks": [
+    "prompts-get-simple"
+   ],
+   "register": [
+    "RP-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "prompts/get"
+     ],
+     [
+      "Mcp-Name",
+      "test_simple_prompt"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":407,\"method\":\"prompts/get\",\"params\":{\"name\":\"test_simple_prompt\",\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/messages",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/messages",
+      "each_has": [
+       "role",
+       "content"
+      ]
+     },
+     {
+      "at": "/result/messages/0/role",
+      "eq": "user"
+     },
+     {
+      "at": "/result/messages/0/content/type",
+      "eq": "text"
+     },
+     {
+      "at": "/result/messages/0/content/text",
+      "eq": "This is a simple prompt for testing."
+     }
+    ]
+   },
+   "note": "The stateless connection sends the name as Mcp-Name (SEP-2243)."
+  },
+  {
+   "id": "RS-08",
+   "scenario": "prompts-get-with-args",
+   "file": "src/scenarios/server/prompts.ts",
+   "line": 211,
+   "quote": "conn.request<GetPromptResult>('prompts/get', {",
+   "suite_checks": [
+    "prompts-get-with-args"
+   ],
+   "register": [
+    "RP-09"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "prompts/get"
+     ],
+     [
+      "Mcp-Name",
+      "test_prompt_with_arguments"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":408,\"method\":\"prompts/get\",\"params\":{\"name\":\"test_prompt_with_arguments\",\"arguments\":{\"arg1\":\"testValue1\",\"arg2\":\"testValue2\"},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/messages",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/messages/0/content/text",
+      "eq": "Prompt with arguments: arg1='testValue1', arg2='testValue2'"
+     }
+    ]
+   },
+   "note": "The scenario checks that both values appear in the messages."
+  },
+  {
+   "id": "RS-09",
+   "scenario": "prompts-get-embedded-resource",
+   "file": "src/scenarios/server/prompts.ts",
+   "line": 317,
+   "quote": "conn.request<GetPromptResult>('prompts/get', {",
+   "suite_checks": [
+    "prompts-get-embedded-resource"
+   ],
+   "register": [
+    "RP-10"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "prompts/get"
+     ],
+     [
+      "Mcp-Name",
+      "test_prompt_with_embedded_resource"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":409,\"method\":\"prompts/get\",\"params\":{\"name\":\"test_prompt_with_embedded_resource\",\"arguments\":{\"resourceUri\":\"test://example-resource\"},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/messages",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/messages/0/content/type",
+      "eq": "resource"
+     },
+     {
+      "at": "/result/messages/0/content/resource/uri",
+      "eq": "test://example-resource"
+     },
+     {
+      "at": "/result/messages/0/content/resource/mimeType",
+      "eq": "text/plain"
+     },
+     {
+      "at": "/result/messages/0/content/resource/text",
+      "eq": "Embedded resource content for testing."
+     },
+     {
+      "at": "/result/messages/1/content/text",
+      "eq": "Please process the embedded resource above."
+     }
+    ]
+   },
+   "note": "The scenario checks that some message holds a resource."
+  },
+  {
+   "id": "RS-10",
+   "scenario": "prompts-get-with-image",
+   "file": "src/scenarios/server/prompts.ts",
+   "line": 417,
+   "quote": "conn.request<GetPromptResult>('prompts/get', {",
+   "suite_checks": [
+    "prompts-get-with-image"
+   ],
+   "register": [
+    "RP-11"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "prompts/get"
+     ],
+     [
+      "Mcp-Name",
+      "test_prompt_with_image"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":410,\"method\":\"prompts/get\",\"params\":{\"name\":\"test_prompt_with_image\",\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/messages",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/messages/0/content/type",
+      "eq": "image"
+     },
+     {
+      "at": "/result/messages/0/content/data",
+      "nonempty_string": true
+     },
+     {
+      "at": "/result/messages/0/content/mimeType",
+      "eq": "image/png"
+     },
+     {
+      "at": "/result/messages/1/content/text",
+      "eq": "Please analyze the image above."
+     }
+    ]
+   },
+   "note": "The image is compared with the reference fixture's TEST_IMAGE_BASE64 by the test."
+  },
+  {
+   "id": "RS-11",
+   "scenario": "completion-complete",
+   "file": "src/scenarios/server/utils.ts",
+   "line": 243,
+   "quote": "conn.request<CompleteResult>('completion/complete', {",
+   "suite_checks": [
+    "completion-complete"
+   ],
+   "register": [
+    "RP-13"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "completion/complete"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":411,\"method\":\"completion/complete\",\"params\":{\"ref\":{\"type\":\"ref/prompt\",\"name\":\"test_prompt_with_arguments\"},\"argument\":{\"name\":\"arg1\",\"value\":\"test\"},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/completion/values",
+      "is_array": true
+     },
+     {
+      "at": "/result/completion/values",
+      "eq": []
+     },
+     {
+      "at": "/result/completion/total",
+      "eq": 0
+     },
+     {
+      "at": "/result/completion/hasMore",
+      "eq": false
+     }
+    ]
+   },
+   "note": "The reference fixture answers every completion with no values, total 0 and hasMore false."
+  },
+  {
+   "id": "RS-12",
+   "scenario": "caching",
+   "file": "src/scenarios/server/caching.ts",
+   "line": 156,
+   "quote": "await queryEndpoint(",
+   "suite_checks": [
+    "sep-2549-tools-list-caching-hints",
+    "sep-2549-ttl-non-negative",
+    "sep-2549-cache-scope-valid"
+   ],
+   "register": [
+    "RP-15"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":412,\"method\":\"tools/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/ttlMs",
+      "non_negative_integer": true
+     },
+     {
+      "at": "/result/cacheScope",
+      "one_of": [
+       "public",
+       "private"
+      ]
+     }
+    ]
+   },
+   "note": "The caching scenario sends no params of its own for the list methods; the stateless connection adds _meta."
+  },
+  {
+   "id": "RS-13",
+   "scenario": "caching",
+   "file": "src/scenarios/server/caching.ts",
+   "line": 163,
+   "quote": "await queryEndpoint(",
+   "suite_checks": [
+    "sep-2549-prompts-list-caching-hints"
+   ],
+   "register": [
+    "RP-15"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "prompts/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":413,\"method\":\"prompts/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/ttlMs",
+      "non_negative_integer": true
+     },
+     {
+      "at": "/result/cacheScope",
+      "one_of": [
+       "public",
+       "private"
+      ]
+     }
+    ]
+   },
+   "note": "The caching scenario sends no params of its own for the list methods; the stateless connection adds _meta."
+  },
+  {
+   "id": "RS-14",
+   "scenario": "caching",
+   "file": "src/scenarios/server/caching.ts",
+   "line": 170,
+   "quote": "const resourcesResult = await queryEndpoint(",
+   "suite_checks": [
+    "sep-2549-resources-list-caching-hints"
+   ],
+   "register": [
+    "RP-15"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "resources/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":414,\"method\":\"resources/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/ttlMs",
+      "non_negative_integer": true
+     },
+     {
+      "at": "/result/cacheScope",
+      "one_of": [
+       "public",
+       "private"
+      ]
+     }
+    ]
+   },
+   "note": "The caching scenario sends no params of its own for the list methods; the stateless connection adds _meta."
+  },
+  {
+   "id": "RS-15",
+   "scenario": "caching",
+   "file": "src/scenarios/server/caching.ts",
+   "line": 177,
+   "quote": "await queryEndpoint(",
+   "suite_checks": [
+    "sep-2549-resources-templates-list-caching-hints"
+   ],
+   "register": [
+    "RP-04",
+    "RP-15"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "resources/templates/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":415,\"method\":\"resources/templates/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/ttlMs",
+      "non_negative_integer": true
+     },
+     {
+      "at": "/result/cacheScope",
+      "one_of": [
+       "public",
+       "private"
+      ]
+     },
+     {
+      "at": "/result/resourceTemplates",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/resourceTemplates",
+      "each_has": [
+       "name",
+       "uriTemplate"
+      ]
+     }
+    ]
+   },
+   "note": "The caching scenario sends no params of its own for the list methods; the stateless connection adds _meta."
+  },
+  {
+   "id": "RS-16",
+   "scenario": "caching",
+   "file": "src/scenarios/server/caching.ts",
+   "line": 189,
+   "quote": "await queryEndpoint(",
+   "suite_checks": [
+    "sep-2549-resources-read-caching-hints"
+   ],
+   "register": [
+    "RP-15"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "resources/read"
+     ],
+     [
+      "Mcp-Name",
+      "test://static-text"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":416,\"method\":\"resources/read\",\"params\":{\"uri\":\"test://static-text\",\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/ttlMs",
+      "non_negative_integer": true
+     },
+     {
+      "at": "/result/cacheScope",
+      "one_of": [
+       "public",
+       "private"
+      ]
+     },
+     {
+      "at": "/result/contents/0/uri",
+      "eq": "test://static-text"
+     }
+    ]
+   },
+   "note": "The scenario reads the first resource of resources/list, which is test://static-text."
+  }
+ ],
+ "not_run": [
+  {
+   "file": "src/scenarios/server/resources.ts",
+   "line": 408,
+   "quote": "await conn.request<EmptyResult>('resources/subscribe', {",
+   "scenario": "resources-subscribe",
+   "checks": [
+    "resources-subscribe"
+   ],
+   "reason": "resources/subscribe: the method is removed from the 2026-07-28 protocol (the scenario's source says it is removed in the draft version), the core answers it as method not found (LC-06), and the scenario is not in the required list of requirements/2026-07-28.yaml",
+   "owner": "#13"
+  },
+  {
+   "file": "src/scenarios/server/resources.ts",
+   "line": 629,
+   "quote": "await conn.request<EmptyResult>('resources/subscribe', {",
+   "scenario": "resources-unsubscribe",
+   "checks": [
+    "resources-unsubscribe"
+   ],
+   "reason": "resources/subscribe, the first request of the unsubscribe scenario: the method is removed from the 2026-07-28 protocol (the scenario's source says it is removed in the draft version), the core answers it as method not found (LC-06), and the scenario is not in the required list of requirements/2026-07-28.yaml",
+   "owner": "#13"
+  },
+  {
+   "file": "src/scenarios/server/resources.ts",
+   "line": 634,
+   "quote": "await conn.request<EmptyResult>('resources/unsubscribe', {",
+   "scenario": "resources-unsubscribe",
+   "checks": [
+    "resources-unsubscribe"
+   ],
+   "reason": "resources/unsubscribe: the method is removed from the 2026-07-28 protocol (the scenario's source says it is removed in the draft version), the core answers it as method not found (LC-06), and the scenario is not in the required list of requirements/2026-07-28.yaml",
+   "owner": "#13"
+  },
+  {
+   "file": "src/scenarios/server/utils.ts",
+   "line": 47,
+   "quote": "const result = await conn.request<EmptyResult>('logging/setLevel', {",
+   "scenario": "logging-set-level",
+   "checks": [
+    "logging-set-level"
+   ],
+   "reason": "logging/setLevel: the method is removed from the 2026-07-28 protocol (the scenario's source says it is removed in the draft version), the core answers it as method not found (LC-06), and the scenario is not in the required list of requirements/2026-07-28.yaml",
+   "owner": "#13"
+  },
+  {
+   "file": "src/scenarios/server/utils.ts",
+   "line": 142,
+   "quote": "const result = await conn.request<EmptyResult>('ping');",
+   "scenario": "ping",
+   "checks": [
+    "ping"
+   ],
+   "reason": "ping: the method is removed from the 2026-07-28 protocol (the scenario's source says it is removed in the draft version), the core answers it as method not found (LC-06), and the scenario is not in the required list of requirements/2026-07-28.yaml",
+   "owner": "#13"
+  }
+ ],
+ "unreached": [
+  {
+   "id": "sep-2549-caching-connection",
+   "reason": "the caching scenario emits it when the connection cannot be made; the stateless connection has no handshake, so a request to the root cannot fail to connect"
+  }
+ ]
+}

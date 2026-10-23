@@ -49,7 +49,7 @@ definition{
   name: crowdInfo,
   parameters: [],
   result: Extension::ProviderInfo,
-  body: (record Extension::ProviderInfo {serverInfo := (Fixture::fixtureServerInfo), instructions := (ctor Option.none [String]), capabilities := (Fixture::fixtureCapabilities), discoverCache := (Fixture::fixtureCache), paramRules := (Admission::rulesOf (crowdTools)), toolCallLimit := (Fixture::callLimit)}),
+  body: (record Extension::ProviderInfo {serverInfo := (Fixture::fixtureServerInfo), instructions := (ctor Option.none [String]), capabilities := (Fixture::toolsCapabilities), discoverCache := (Fixture::fixtureCache), paramRules := (Admission::rulesOf (crowdTools)), toolCallLimit := (Fixture::callLimit)}),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
