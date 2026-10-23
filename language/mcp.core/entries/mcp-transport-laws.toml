@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-transport-laws"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "TransportLaws"
+component = "TransportLaws"
+
+[[form]]
+id = "mcp-transport-laws"
+channel = "text"
+surface = "MCP transport laws"
+canonical_source = true
+features = ["sentence-case", "singular"]

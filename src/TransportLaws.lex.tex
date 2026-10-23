@@ -1,0 +1,504 @@
+\begin{lexlean}{TransportLaws}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Extension}
+\importmodule{Http}
+\importmodule{JsonRpc}
+\importmodule{Methods}
+\importmodule{Refusal}
+\importmodule{Serve}
+\importmodule{Transport}
+\title{MCP transport laws}
+\begin{semanticmodule}
+theorem{
+  name: a_loopback_address_with_a_port_is_allowed,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 72 (cons 111 (cons 115 (cons 116 (nil Nat))))), value := (cons 49 (cons 50 (cons 55 (cons 46 (cons 48 (cons 46 (cons 48 (cons 46 (cons 49 (cons 58 (cons 56 (cons 48 (cons 56 (cons 48 (nil Nat)))))))))))))))}) (cons (record Http::Field {name := (cons 79 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))), value := (cons 104 (cons 116 (cons 116 (cons 112 (cons 58 (cons 47 (cons 47 (cons 49 (cons 50 (cons 55 (cons 46 (cons 48 (cons 46 (cons 48 (cons 46 (cons 49 (cons 58 (cons 56 (cons 48 (cons 56 (cons 48 (nil Nat))))))))))))))))))))))}) (nil Http::Field))) (nil (List Nat))) = (ctor Option.none [Transport::TransportRefusal])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: localhost_is_allowed_without_a_port,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 72 (cons 111 (cons 115 (cons 116 (nil Nat))))), value := (cons 108 (cons 111 (cons 99 (cons 97 (cons 108 (cons 104 (cons 111 (cons 115 (cons 116 (nil Nat))))))))))}) (cons (record Http::Field {name := (cons 79 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))), value := (cons 104 (cons 116 (cons 116 (cons 112 (cons 115 (cons 58 (cons 47 (cons 47 (cons 108 (cons 111 (cons 99 (cons 97 (cons 108 (cons 104 (cons 111 (cons 115 (cons 116 (nil Nat))))))))))))))))))}) (nil Http::Field))) (nil (List Nat))) = (ctor Option.none [Transport::TransportRefusal])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_ipv6_loopback_is_allowed_in_brackets,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 72 (cons 111 (cons 115 (cons 116 (nil Nat))))), value := (cons 91 (cons 58 (cons 58 (cons 49 (cons 93 (cons 58 (cons 51 (cons 48 (cons 48 (cons 48 (nil Nat)))))))))))}) (cons (record Http::Field {name := (cons 79 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))), value := (cons 104 (cons 116 (cons 116 (cons 112 (cons 58 (cons 47 (cons 47 (cons 91 (cons 58 (cons 58 (cons 49 (cons 93 (cons 58 (cons 51 (cons 48 (cons 48 (cons 48 (nil Nat))))))))))))))))))}) (nil Http::Field))) (nil (List Nat))) = (ctor Option.none [Transport::TransportRefusal])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_host_name_is_compared_without_regard_to_case,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 104 (cons 111 (cons 115 (cons 116 (nil Nat))))), value := (cons 76 (cons 79 (cons 67 (cons 65 (cons 76 (cons 72 (cons 79 (cons 83 (cons 84 (cons 58 (cons 56 (cons 48 (nil Nat)))))))))))))}) (cons (record Http::Field {name := (cons 111 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))), value := (cons 72 (cons 84 (cons 84 (cons 80 (cons 58 (cons 47 (cons 47 (cons 76 (cons 111 (cons 99 (cons 97 (cons 108 (cons 104 (cons 111 (cons 115 (cons 116 (cons 58 (cons 56 (cons 48 (nil Nat))))))))))))))))))))}) (nil Http::Field))) (nil (List Nat))) = (ctor Option.none [Transport::TransportRefusal])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_request_without_origin_or_host_is_allowed,
+  parameters: [],
+  statement: ((Transport::gateOf (nil Http::Field) (nil (List Nat))) = (ctor Option.none [Transport::TransportRefusal])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_request_without_origin_is_allowed_when_the_host_is_loopback,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 72 (cons 111 (cons 115 (cons 116 (nil Nat))))), value := (cons 49 (cons 50 (cons 55 (cons 46 (cons 48 (cons 46 (cons 48 (cons 46 (cons 49 (cons 58 (cons 57 (cons 48 (cons 48 (cons 48 (nil Nat)))))))))))))))}) (nil Http::Field)) (nil (List Nat))) = (ctor Option.none [Transport::TransportRefusal])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: optional_whitespace_around_the_origin_is_not_part_of_it,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 79 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))), value := (cons 32 (cons 32 (cons 104 (cons 116 (cons 116 (cons 112 (cons 58 (cons 47 (cons 47 (cons 108 (cons 111 (cons 99 (cons 97 (cons 108 (cons 104 (cons 111 (cons 115 (cons 116 (cons 58 (cons 49 (cons 32 (cons 32 (nil Nat)))))))))))))))))))))))}) (nil Http::Field)) (nil (List Nat))) = (ctor Option.none [Transport::TransportRefusal])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_configured_name_is_allowed,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 72 (cons 111 (cons 115 (cons 116 (nil Nat))))), value := (cons 109 (cons 99 (cons 112 (cons 46 (cons 101 (cons 120 (cons 97 (cons 109 (cons 112 (cons 108 (cons 101 (cons 46 (cons 116 (cons 101 (cons 115 (cons 116 (cons 58 (cons 52 (cons 52 (cons 51 (nil Nat)))))))))))))))))))))}) (cons (record Http::Field {name := (cons 79 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))), value := (cons 104 (cons 116 (cons 116 (cons 112 (cons 115 (cons 58 (cons 47 (cons 47 (cons 109 (cons 99 (cons 112 (cons 46 (cons 101 (cons 120 (cons 97 (cons 109 (cons 112 (cons 108 (cons 101 (cons 46 (cons 116 (cons 101 (cons 115 (cons 116 (nil Nat)))))))))))))))))))))))))}) (nil Http::Field))) (cons (cons 109 (cons 99 (cons 112 (cons 46 (cons 101 (cons 120 (cons 97 (cons 109 (cons 112 (cons 108 (cons 101 (cons 46 (cons 116 (cons 101 (cons 115 (cons 116 (nil Nat))))))))))))))))) (nil (List Nat)))) = (ctor Option.none [Transport::TransportRefusal])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_foreign_host_is_refused,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 72 (cons 111 (cons 115 (cons 116 (nil Nat))))), value := (cons 101 (cons 118 (cons 105 (cons 108 (cons 46 (cons 101 (cons 120 (cons 97 (cons 109 (cons 112 (cons 108 (cons 101 (cons 46 (cons 99 (cons 111 (cons 109 (nil Nat)))))))))))))))))}) (nil Http::Field)) (nil (List Nat))) = (ctor Option.some [Transport::TransportRefusal] (ctor Transport::TransportRefusal.forbiddenHost))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_foreign_origin_is_refused,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 72 (cons 111 (cons 115 (cons 116 (nil Nat))))), value := (cons 49 (cons 50 (cons 55 (cons 46 (cons 48 (cons 46 (cons 48 (cons 46 (cons 49 (cons 58 (cons 56 (cons 48 (cons 56 (cons 48 (nil Nat)))))))))))))))}) (cons (record Http::Field {name := (cons 79 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))), value := (cons 104 (cons 116 (cons 116 (cons 112 (cons 58 (cons 47 (cons 47 (cons 101 (cons 118 (cons 105 (cons 108 (cons 46 (cons 101 (cons 120 (cons 97 (cons 109 (cons 112 (cons 108 (cons 101 (cons 46 (cons 99 (cons 111 (cons 109 (nil Nat))))))))))))))))))))))))}) (nil Http::Field))) (nil (List Nat))) = (ctor Option.some [Transport::TransportRefusal] (ctor Transport::TransportRefusal.forbiddenOrigin))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_origin_is_judged_before_the_host,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 72 (cons 111 (cons 115 (cons 116 (nil Nat))))), value := (cons 101 (cons 118 (cons 105 (cons 108 (cons 46 (cons 101 (cons 120 (cons 97 (cons 109 (cons 112 (cons 108 (cons 101 (cons 46 (cons 99 (cons 111 (cons 109 (nil Nat)))))))))))))))))}) (cons (record Http::Field {name := (cons 79 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))), value := (cons 104 (cons 116 (cons 116 (cons 112 (cons 58 (cons 47 (cons 47 (cons 101 (cons 118 (cons 105 (cons 108 (cons 46 (cons 101 (cons 120 (cons 97 (cons 109 (cons 112 (cons 108 (cons 101 (cons 46 (cons 99 (cons 111 (cons 109 (nil Nat))))))))))))))))))))))))}) (nil Http::Field))) (nil (List Nat))) = (ctor Option.some [Transport::TransportRefusal] (ctor Transport::TransportRefusal.forbiddenOrigin))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_configured_name_is_refused_when_the_host_did_not_configure_it,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 72 (cons 111 (cons 115 (cons 116 (nil Nat))))), value := (cons 109 (cons 99 (cons 112 (cons 46 (cons 101 (cons 120 (cons 97 (cons 109 (cons 112 (cons 108 (cons 101 (cons 46 (cons 116 (cons 101 (cons 115 (cons 116 (cons 58 (cons 52 (cons 52 (cons 51 (nil Nat)))))))))))))))))))))}) (nil Http::Field)) (nil (List Nat))) = (ctor Option.some [Transport::TransportRefusal] (ctor Transport::TransportRefusal.forbiddenHost))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_name_that_only_starts_like_localhost_is_refused,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 72 (cons 111 (cons 115 (cons 116 (nil Nat))))), value := (cons 108 (cons 111 (cons 99 (cons 97 (cons 108 (cons 104 (cons 111 (cons 115 (cons 116 (cons 46 (cons 101 (cons 118 (cons 105 (cons 108 (cons 46 (cons 101 (cons 120 (cons 97 (cons 109 (cons 112 (cons 108 (cons 101 (nil Nat)))))))))))))))))))))))}) (nil Http::Field)) (nil (List Nat))) = (ctor Option.some [Transport::TransportRefusal] (ctor Transport::TransportRefusal.forbiddenHost))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_address_that_only_starts_like_the_loopback_is_refused,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 79 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))), value := (cons 104 (cons 116 (cons 116 (cons 112 (cons 58 (cons 47 (cons 47 (cons 49 (cons 50 (cons 55 (cons 46 (cons 48 (cons 46 (cons 48 (cons 46 (cons 49 (cons 46 (cons 101 (cons 118 (cons 105 (cons 108 (cons 46 (cons 101 (cons 120 (cons 97 (cons 109 (cons 112 (cons 108 (cons 101 (nil Nat))))))))))))))))))))))))))))))}) (nil Http::Field)) (nil (List Nat))) = (ctor Option.some [Transport::TransportRefusal] (ctor Transport::TransportRefusal.forbiddenOrigin))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_opaque_origin_is_refused,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 79 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))), value := (cons 110 (cons 117 (cons 108 (cons 108 (nil Nat)))))}) (nil Http::Field)) (nil (List Nat))) = (ctor Option.some [Transport::TransportRefusal] (ctor Transport::TransportRefusal.forbiddenOrigin))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_origin_with_a_path_is_refused,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 79 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))), value := (cons 104 (cons 116 (cons 116 (cons 112 (cons 58 (cons 47 (cons 47 (cons 108 (cons 111 (cons 99 (cons 97 (cons 108 (cons 104 (cons 111 (cons 115 (cons 116 (cons 47 (cons 112 (cons 97 (cons 116 (cons 104 (nil Nat))))))))))))))))))))))}) (nil Http::Field)) (nil (List Nat))) = (ctor Option.some [Transport::TransportRefusal] (ctor Transport::TransportRefusal.forbiddenOrigin))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_origin_with_user_information_is_refused,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 79 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))), value := (cons 104 (cons 116 (cons 116 (cons 112 (cons 58 (cons 47 (cons 47 (cons 108 (cons 111 (cons 99 (cons 97 (cons 108 (cons 104 (cons 111 (cons 115 (cons 116 (cons 64 (cons 101 (cons 118 (cons 105 (cons 108 (cons 46 (cons 101 (cons 120 (cons 97 (cons 109 (cons 112 (cons 108 (cons 101 (nil Nat))))))))))))))))))))))))))))))}) (nil Http::Field)) (nil (List Nat))) = (ctor Option.some [Transport::TransportRefusal] (ctor Transport::TransportRefusal.forbiddenOrigin))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_origin_with_a_port_that_is_not_digits_is_refused,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 79 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))), value := (cons 104 (cons 116 (cons 116 (cons 112 (cons 58 (cons 47 (cons 47 (cons 108 (cons 111 (cons 99 (cons 97 (cons 108 (cons 104 (cons 111 (cons 115 (cons 116 (cons 58 (cons 56 (cons 48 (cons 120 (nil Nat)))))))))))))))))))))}) (nil Http::Field)) (nil (List Nat))) = (ctor Option.some [Transport::TransportRefusal] (ctor Transport::TransportRefusal.forbiddenOrigin))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_origin_with_an_empty_port_is_refused,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 79 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))), value := (cons 104 (cons 116 (cons 116 (cons 112 (cons 58 (cons 47 (cons 47 (cons 108 (cons 111 (cons 99 (cons 97 (cons 108 (cons 104 (cons 111 (cons 115 (cons 116 (cons 58 (nil Nat))))))))))))))))))}) (nil Http::Field)) (nil (List Nat))) = (ctor Option.some [Transport::TransportRefusal] (ctor Transport::TransportRefusal.forbiddenOrigin))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_origin_without_a_scheme_is_refused,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 79 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))), value := (cons 108 (cons 111 (cons 99 (cons 97 (cons 108 (cons 104 (cons 111 (cons 115 (cons 116 (nil Nat))))))))))}) (nil Http::Field)) (nil (List Nat))) = (ctor Option.some [Transport::TransportRefusal] (ctor Transport::TransportRefusal.forbiddenOrigin))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_empty_origin_is_refused,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 79 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))), value := (nil Nat)}) (nil Http::Field)) (nil (List Nat))) = (ctor Option.some [Transport::TransportRefusal] (ctor Transport::TransportRefusal.forbiddenOrigin))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_empty_host_is_refused,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 72 (cons 111 (cons 115 (cons 116 (nil Nat))))), value := (nil Nat)}) (nil Http::Field)) (nil (List Nat))) = (ctor Option.some [Transport::TransportRefusal] (ctor Transport::TransportRefusal.forbiddenHost))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_unclosed_bracket_is_refused,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 72 (cons 111 (cons 115 (cons 116 (nil Nat))))), value := (cons 91 (cons 58 (cons 58 (cons 49 (nil Nat)))))}) (nil Http::Field)) (nil (List Nat))) = (ctor Option.some [Transport::TransportRefusal] (ctor Transport::TransportRefusal.forbiddenHost))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_repeated_origin_is_refused_even_when_both_are_loopback,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 79 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))), value := (cons 104 (cons 116 (cons 116 (cons 112 (cons 58 (cons 47 (cons 47 (cons 108 (cons 111 (cons 99 (cons 97 (cons 108 (cons 104 (cons 111 (cons 115 (cons 116 (nil Nat)))))))))))))))))}) (cons (record Http::Field {name := (cons 79 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))), value := (cons 104 (cons 116 (cons 116 (cons 112 (cons 58 (cons 47 (cons 47 (cons 108 (cons 111 (cons 99 (cons 97 (cons 108 (cons 104 (cons 111 (cons 115 (cons 116 (nil Nat)))))))))))))))))}) (nil Http::Field))) (nil (List Nat))) = (ctor Option.some [Transport::TransportRefusal] (ctor Transport::TransportRefusal.forbiddenOrigin))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_repeated_host_is_refused_even_when_both_are_loopback,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 72 (cons 111 (cons 115 (cons 116 (nil Nat))))), value := (cons 108 (cons 111 (cons 99 (cons 97 (cons 108 (cons 104 (cons 111 (cons 115 (cons 116 (nil Nat))))))))))}) (cons (record Http::Field {name := (cons 72 (cons 111 (cons 115 (cons 116 (nil Nat))))), value := (cons 108 (cons 111 (cons 99 (cons 97 (cons 108 (cons 104 (cons 111 (cons 115 (cons 116 (nil Nat))))))))))}) (nil Http::Field))) (nil (List Nat))) = (ctor Option.some [Transport::TransportRefusal] (ctor Transport::TransportRefusal.forbiddenHost))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_control_byte_in_the_origin_is_refused,
+  parameters: [],
+  statement: ((Transport::gateOf (cons (record Http::Field {name := (cons 79 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))), value := (cons 104 (cons 116 (cons 116 (cons 112 (cons 58 (cons 47 (cons 47 (cons 108 (cons 111 (cons 99 (cons 97 (cons 108 (cons 104 (cons 111 (cons 115 (cons 116 (cons 1 (nil Nat))))))))))))))))))}) (nil Http::Field)) (nil (List Nat))) = (ctor Option.some [Transport::TransportRefusal] (ctor Transport::TransportRefusal.forbiddenOrigin))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_accept_of_the_event_stream_is_a_stream,
+  parameters: [],
+  statement: ((Transport::acceptsStream (cons (record Http::Field {name := (cons 65 (cons 99 (cons 99 (cons 101 (cons 112 (cons 116 (nil Nat))))))), value := (cons 116 (cons 101 (cons 120 (cons 116 (cons 47 (cons 101 (cons 118 (cons 101 (cons 110 (cons 116 (cons 45 (cons 115 (cons 116 (cons 114 (cons 101 (cons 97 (cons 109 (nil Nat))))))))))))))))))}) (nil Http::Field))) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_accept_of_both_types_is_a_stream,
+  parameters: [],
+  statement: ((Transport::acceptsStream (cons (record Http::Field {name := (cons 65 (cons 99 (cons 99 (cons 101 (cons 112 (cons 116 (nil Nat))))))), value := (prim append (cons 97 (cons 112 (cons 112 (cons 108 (cons 105 (cons 99 (cons 97 (cons 116 (cons 105 (cons 111 (cons 110 (cons 47 (cons 106 (cons 115 (cons 111 (cons 110 (cons 44 (cons 32 (cons 116 (cons 101 (cons 120 (cons 116 (cons 47 (cons 101 (cons 118 (cons 101 (cons 110 (cons 116 (cons 45 (cons 115 (nil Nat))))))))))))))))))))))))))))))) (cons 116 (cons 114 (cons 101 (cons 97 (cons 109 (nil Nat)))))) : (List Nat))}) (nil Http::Field))) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_event_stream_may_come_first,
+  parameters: [],
+  statement: ((Transport::acceptsStream (cons (record Http::Field {name := (cons 65 (cons 99 (cons 99 (cons 101 (cons 112 (cons 116 (nil Nat))))))), value := (prim append (cons 116 (cons 101 (cons 120 (cons 116 (cons 47 (cons 101 (cons 118 (cons 101 (cons 110 (cons 116 (cons 45 (cons 115 (cons 116 (cons 114 (cons 101 (cons 97 (cons 109 (cons 44 (cons 32 (cons 97 (cons 112 (cons 112 (cons 108 (cons 105 (cons 99 (cons 97 (cons 116 (cons 105 (cons 111 (cons 110 (nil Nat))))))))))))))))))))))))))))))) (cons 47 (cons 106 (cons 115 (cons 111 (cons 110 (nil Nat)))))) : (List Nat))}) (nil Http::Field))) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_media_type_is_compared_without_regard_to_case,
+  parameters: [],
+  statement: ((Transport::acceptsStream (cons (record Http::Field {name := (cons 65 (cons 99 (cons 99 (cons 101 (cons 112 (cons 116 (nil Nat))))))), value := (cons 84 (cons 69 (cons 88 (cons 84 (cons 47 (cons 69 (cons 118 (cons 101 (cons 110 (cons 116 (cons 45 (cons 83 (cons 116 (cons 114 (cons 101 (cons 97 (cons 109 (nil Nat))))))))))))))))))}) (nil Http::Field))) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_weight_above_zero_is_a_stream,
+  parameters: [],
+  statement: ((Transport::acceptsStream (cons (record Http::Field {name := (cons 65 (cons 99 (cons 99 (cons 101 (cons 112 (cons 116 (nil Nat))))))), value := (cons 116 (cons 101 (cons 120 (cons 116 (cons 47 (cons 101 (cons 118 (cons 101 (cons 110 (cons 116 (cons 45 (cons 115 (cons 116 (cons 114 (cons 101 (cons 97 (cons 109 (cons 59 (cons 113 (cons 61 (cons 48 (cons 46 (cons 53 (nil Nat))))))))))))))))))))))))}) (nil Http::Field))) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: white_space_around_the_weight_is_not_part_of_it,
+  parameters: [],
+  statement: ((Transport::acceptsStream (cons (record Http::Field {name := (cons 65 (cons 99 (cons 99 (cons 101 (cons 112 (cons 116 (nil Nat))))))), value := (cons 116 (cons 101 (cons 120 (cons 116 (cons 47 (cons 101 (cons 118 (cons 101 (cons 110 (cons 116 (cons 45 (cons 115 (cons 116 (cons 114 (cons 101 (cons 97 (cons 109 (cons 32 (cons 59 (cons 32 (cons 113 (cons 61 (cons 49 (nil Nat))))))))))))))))))))))))}) (nil Http::Field))) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_second_accept_field_is_read,
+  parameters: [],
+  statement: ((Transport::acceptsStream (cons (record Http::Field {name := (cons 65 (cons 99 (cons 99 (cons 101 (cons 112 (cons 116 (nil Nat))))))), value := (cons 97 (cons 112 (cons 112 (cons 108 (cons 105 (cons 99 (cons 97 (cons 116 (cons 105 (cons 111 (cons 110 (cons 47 (cons 106 (cons 115 (cons 111 (cons 110 (nil Nat)))))))))))))))))}) (cons (record Http::Field {name := (cons 65 (cons 99 (cons 99 (cons 101 (cons 112 (cons 116 (nil Nat))))))), value := (cons 116 (cons 101 (cons 120 (cons 116 (cons 47 (cons 101 (cons 118 (cons 101 (cons 110 (cons 116 (cons 45 (cons 115 (cons 116 (cons 114 (cons 101 (cons 97 (cons 109 (nil Nat))))))))))))))))))}) (nil Http::Field)))) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: no_accept_field_is_not_a_stream,
+  parameters: [],
+  statement: ((Transport::acceptsStream (nil Http::Field)) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: json_alone_is_not_a_stream,
+  parameters: [],
+  statement: ((Transport::acceptsStream (cons (record Http::Field {name := (cons 65 (cons 99 (cons 99 (cons 101 (cons 112 (cons 116 (nil Nat))))))), value := (cons 97 (cons 112 (cons 112 (cons 108 (cons 105 (cons 99 (cons 97 (cons 116 (cons 105 (cons 111 (cons 110 (cons 47 (cons 106 (cons 115 (cons 111 (cons 110 (nil Nat)))))))))))))))))}) (nil Http::Field))) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_wildcard_is_not_a_stream,
+  parameters: [],
+  statement: ((Transport::acceptsStream (cons (record Http::Field {name := (cons 65 (cons 99 (cons 99 (cons 101 (cons 112 (cons 116 (nil Nat))))))), value := (cons 42 (cons 47 (cons 42 (nil Nat))))}) (nil Http::Field))) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_type_wildcard_is_not_a_stream,
+  parameters: [],
+  statement: ((Transport::acceptsStream (cons (record Http::Field {name := (cons 65 (cons 99 (cons 99 (cons 101 (cons 112 (cons 116 (nil Nat))))))), value := (cons 116 (cons 101 (cons 120 (cons 116 (cons 47 (cons 42 (nil Nat)))))))}) (nil Http::Field))) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_longer_type_is_not_the_event_stream,
+  parameters: [],
+  statement: ((Transport::acceptsStream (cons (record Http::Field {name := (cons 65 (cons 99 (cons 99 (cons 101 (cons 112 (cons 116 (nil Nat))))))), value := (cons 116 (cons 101 (cons 120 (cons 116 (cons 47 (cons 101 (cons 118 (cons 101 (cons 110 (cons 116 (cons 45 (cons 115 (cons 116 (cons 114 (cons 101 (cons 97 (cons 109 (cons 115 (nil Nat)))))))))))))))))))}) (nil Http::Field))) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_longer_prefix_is_not_the_event_stream,
+  parameters: [],
+  statement: ((Transport::acceptsStream (cons (record Http::Field {name := (cons 65 (cons 99 (cons 99 (cons 101 (cons 112 (cons 116 (nil Nat))))))), value := (cons 120 (cons 116 (cons 101 (cons 120 (cons 116 (cons 47 (cons 101 (cons 118 (cons 101 (cons 110 (cons 116 (cons 45 (cons 115 (cons 116 (cons 114 (cons 101 (cons 97 (cons 109 (nil Nat)))))))))))))))))))}) (nil Http::Field))) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_weight_of_zero_refuses_the_stream,
+  parameters: [],
+  statement: ((Transport::acceptsStream (cons (record Http::Field {name := (cons 65 (cons 99 (cons 99 (cons 101 (cons 112 (cons 116 (nil Nat))))))), value := (cons 116 (cons 101 (cons 120 (cons 116 (cons 47 (cons 101 (cons 118 (cons 101 (cons 110 (cons 116 (cons 45 (cons 115 (cons 116 (cons 114 (cons 101 (cons 97 (cons 109 (cons 59 (cons 113 (cons 61 (cons 48 (nil Nat))))))))))))))))))))))}) (nil Http::Field))) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_weight_of_zero_with_decimals_refuses_the_stream,
+  parameters: [],
+  statement: ((Transport::acceptsStream (cons (record Http::Field {name := (cons 65 (cons 99 (cons 99 (cons 101 (cons 112 (cons 116 (nil Nat))))))), value := (prim append (cons 97 (cons 112 (cons 112 (cons 108 (cons 105 (cons 99 (cons 97 (cons 116 (cons 105 (cons 111 (cons 110 (cons 47 (cons 106 (cons 115 (cons 111 (cons 110 (cons 44 (cons 32 (cons 116 (cons 101 (cons 120 (cons 116 (cons 47 (cons 101 (cons 118 (cons 101 (cons 110 (cons 116 (cons 45 (cons 115 (nil Nat))))))))))))))))))))))))))))))) (cons 116 (cons 114 (cons 101 (cons 97 (cons 109 (cons 59 (cons 113 (cons 61 (cons 48 (cons 46 (cons 48 (cons 48 (cons 48 (nil Nat)))))))))))))) : (List Nat))}) (nil Http::Field))) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_empty_accept_is_not_a_stream,
+  parameters: [],
+  statement: ((Transport::acceptsStream (cons (record Http::Field {name := (cons 65 (cons 99 (cons 99 (cons 101 (cons 112 (cons 116 (nil Nat))))))), value := (nil Nat)}) (nil Http::Field))) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_event_is_a_data_line_and_a_blank_line,
+  parameters: [],
+  statement: ((Transport::eventOf (cons 123 (cons 125 (nil Nat)))) = (cons 100 (cons 97 (cons 116 (cons 97 (cons 58 (cons 32 (cons 123 (cons 125 (cons 10 (cons 10 (nil Nat)))))))))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: no_messages_make_an_empty_stream,
+  parameters: [],
+  statement: ((Transport::streamOf (nil (List Nat))) = (nil Nat)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_events_of_a_stream_are_its_messages_in_order,
+  parameters: [],
+  statement: ((Transport::streamOf (cons (prim append (cons 123 (cons 34 (cons 106 (cons 115 (cons 111 (cons 110 (cons 114 (cons 112 (cons 99 (cons 34 (cons 58 (cons 34 (cons 50 (cons 46 (cons 48 (cons 34 (cons 44 (cons 34 (cons 109 (cons 101 (cons 116 (cons 104 (cons 111 (cons 100 (cons 34 (cons 58 (cons 34 (cons 110 (cons 111 (cons 116 (nil Nat))))))))))))))))))))))))))))))) (cons 105 (cons 102 (cons 105 (cons 99 (cons 97 (cons 116 (cons 105 (cons 111 (cons 110 (cons 115 (cons 47 (cons 112 (cons 114 (cons 111 (cons 103 (cons 114 (cons 101 (cons 115 (cons 115 (cons 34 (cons 125 (nil Nat)))))))))))))))))))))) : (List Nat)) (cons (prim append (cons 123 (cons 34 (cons 106 (cons 115 (cons 111 (cons 110 (cons 114 (cons 112 (cons 99 (cons 34 (cons 58 (cons 34 (cons 50 (cons 46 (cons 48 (cons 34 (cons 44 (cons 34 (cons 109 (cons 101 (cons 116 (cons 104 (cons 111 (cons 100 (cons 34 (cons 58 (cons 34 (cons 110 (cons 111 (cons 116 (nil Nat))))))))))))))))))))))))))))))) (prim append (cons 105 (cons 102 (cons 105 (cons 99 (cons 97 (cons 116 (cons 105 (cons 111 (cons 110 (cons 115 (cons 47 (cons 112 (cons 114 (cons 111 (cons 103 (cons 114 (cons 101 (cons 115 (cons 115 (cons 34 (cons 44 (cons 34 (cons 112 (cons 97 (cons 114 (cons 97 (cons 109 (cons 115 (cons 34 (cons 58 (nil Nat))))))))))))))))))))))))))))))) (cons 123 (cons 125 (cons 125 (nil Nat)))) : (List Nat)) : (List Nat)) (cons (prim append (cons 123 (cons 34 (cons 106 (cons 115 (cons 111 (cons 110 (cons 114 (cons 112 (cons 99 (cons 34 (cons 58 (cons 34 (cons 50 (cons 46 (cons 48 (cons 34 (cons 44 (cons 34 (cons 105 (cons 100 (cons 34 (cons 58 (cons 49 (cons 44 (cons 34 (cons 114 (cons 101 (cons 115 (cons 117 (cons 108 (nil Nat))))))))))))))))))))))))))))))) (cons 116 (cons 34 (cons 58 (cons 123 (cons 125 (cons 125 (nil Nat))))))) : (List Nat)) (nil (List Nat)))))) = (prim append (cons 100 (cons 97 (cons 116 (cons 97 (cons 58 (cons 32 (cons 123 (cons 34 (cons 106 (cons 115 (cons 111 (cons 110 (cons 114 (cons 112 (cons 99 (cons 34 (cons 58 (cons 34 (cons 50 (cons 46 (cons 48 (cons 34 (cons 44 (cons 34 (cons 109 (cons 101 (cons 116 (cons 104 (cons 111 (cons 100 (nil Nat))))))))))))))))))))))))))))))) (prim append (cons 34 (cons 58 (cons 34 (cons 110 (cons 111 (cons 116 (cons 105 (cons 102 (cons 105 (cons 99 (cons 97 (cons 116 (cons 105 (cons 111 (cons 110 (cons 115 (cons 47 (cons 112 (cons 114 (cons 111 (cons 103 (cons 114 (cons 101 (cons 115 (cons 115 (cons 34 (cons 125 (cons 10 (cons 10 (cons 100 (nil Nat))))))))))))))))))))))))))))))) (prim append (cons 97 (cons 116 (cons 97 (cons 58 (cons 32 (cons 123 (cons 34 (cons 106 (cons 115 (cons 111 (cons 110 (cons 114 (cons 112 (cons 99 (cons 34 (cons 58 (cons 34 (cons 50 (cons 46 (cons 48 (cons 34 (cons 44 (cons 34 (cons 109 (cons 101 (cons 116 (cons 104 (cons 111 (cons 100 (cons 34 (nil Nat))))))))))))))))))))))))))))))) (prim append (cons 58 (cons 34 (cons 110 (cons 111 (cons 116 (cons 105 (cons 102 (cons 105 (cons 99 (cons 97 (cons 116 (cons 105 (cons 111 (cons 110 (cons 115 (cons 47 (cons 112 (cons 114 (cons 111 (cons 103 (cons 114 (cons 101 (cons 115 (cons 115 (cons 34 (cons 44 (cons 34 (cons 112 (cons 97 (cons 114 (nil Nat))))))))))))))))))))))))))))))) (prim append (cons 97 (cons 109 (cons 115 (cons 34 (cons 58 (cons 123 (cons 125 (cons 125 (cons 10 (cons 10 (cons 100 (cons 97 (cons 116 (cons 97 (cons 58 (cons 32 (cons 123 (cons 34 (cons 106 (cons 115 (cons 111 (cons 110 (cons 114 (cons 112 (cons 99 (cons 34 (cons 58 (cons 34 (cons 50 (cons 46 (nil Nat))))))))))))))))))))))))))))))) (cons 48 (cons 34 (cons 44 (cons 34 (cons 105 (cons 100 (cons 34 (cons 58 (cons 49 (cons 44 (cons 34 (cons 114 (cons 101 (cons 115 (cons 117 (cons 108 (cons 116 (cons 34 (cons 58 (cons 123 (cons 125 (cons 125 (cons 10 (cons 10 (nil Nat))))))))))))))))))))))))) : (List Nat)) : (List Nat)) : (List Nat)) : (List Nat)) : (List Nat))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_stream_response_carries_the_status_and_no_frame_notifications,
+  parameters: [],
+  statement: (((project (Transport::streamResponse 200 (cons (prim append (cons 123 (cons 34 (cons 106 (cons 115 (cons 111 (cons 110 (cons 114 (cons 112 (cons 99 (cons 34 (cons 58 (cons 34 (cons 50 (cons 46 (cons 48 (cons 34 (cons 44 (cons 34 (cons 105 (cons 100 (cons 34 (cons 58 (cons 49 (cons 44 (cons 34 (cons 114 (cons 101 (cons 115 (cons 117 (cons 108 (nil Nat))))))))))))))))))))))))))))))) (cons 116 (cons 34 (cons 58 (cons 123 (cons 125 (cons 125 (nil Nat))))))) : (List Nat)) (nil (List Nat)))) status) = 200) /\ ((project (Transport::streamResponse 200 (cons (prim append (cons 123 (cons 34 (cons 106 (cons 115 (cons 111 (cons 110 (cons 114 (cons 112 (cons 99 (cons 34 (cons 58 (cons 34 (cons 50 (cons 46 (cons 48 (cons 34 (cons 44 (cons 34 (cons 105 (cons 100 (cons 34 (cons 58 (cons 49 (cons 44 (cons 34 (cons 114 (cons 101 (cons 115 (cons 117 (cons 108 (nil Nat))))))))))))))))))))))))))))))) (cons 116 (cons 34 (cons 58 (cons 123 (cons 125 (cons 125 (nil Nat))))))) : (List Nat)) (nil (List Nat)))) notifications) = (nil (List Nat)))),
+  proof: decide{}
+}
+
+theorem{
+  name: a_stream_response_names_the_event_stream_type,
+  parameters: [],
+  statement: ((Http::readField (project (Transport::streamResponse 200 (nil (List Nat))) fields) (Transport::contentTypeName)) = (ctor Http::Reading.value (Transport::eventStreamType))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_stream_response_asks_proxies_not_to_buffer,
+  parameters: [],
+  statement: ((Http::readField (project (Transport::streamResponse 200 (nil (List Nat))) fields) (Transport::bufferingName)) = (ctor Http::Reading.value (Transport::noValue))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_stream_response_forbids_caching,
+  parameters: [],
+  statement: ((Http::readField (project (Transport::streamResponse 200 (nil (List Nat))) fields) (Transport::cacheControlName)) = (ctor Http::Reading.value (Transport::noCacheValue))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: no_messages_are_never_a_stream_for_a_client_that_accepts_one,
+  parameters: [status : Nat],
+  statement: ((Transport::shouldStream true status (nil (List Nat))) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: no_messages_are_never_a_stream_for_a_client_that_does_not,
+  parameters: [status : Nat],
+  statement: ((Transport::shouldStream false status (nil (List Nat))) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_client_that_does_not_accept_a_stream_gets_none,
+  parameters: [status : Nat, messages : (List (List Nat))],
+  statement: ((Transport::shouldStream false status messages) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_answer_with_status_201_is_never_a_stream,
+  parameters: [message : (List Nat), more : (List (List Nat))],
+  statement: ((Transport::shouldStream true 201 (cons message more)) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_answer_with_status_202_is_never_a_stream,
+  parameters: [message : (List Nat), more : (List (List Nat))],
+  statement: ((Transport::shouldStream true 202 (cons message more)) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_answer_with_status_400_is_never_a_stream,
+  parameters: [message : (List Nat), more : (List (List Nat))],
+  statement: ((Transport::shouldStream true 400 (cons message more)) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_answer_with_status_403_is_never_a_stream,
+  parameters: [message : (List Nat), more : (List (List Nat))],
+  statement: ((Transport::shouldStream true 403 (cons message more)) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_answer_with_status_404_is_never_a_stream,
+  parameters: [message : (List Nat), more : (List (List Nat))],
+  statement: ((Transport::shouldStream true 404 (cons message more)) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_answer_with_status_405_is_never_a_stream,
+  parameters: [message : (List Nat), more : (List (List Nat))],
+  statement: ((Transport::shouldStream true 405 (cons message more)) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_answer_with_status_429_is_never_a_stream,
+  parameters: [message : (List Nat), more : (List (List Nat))],
+  statement: ((Transport::shouldStream true 429 (cons message more)) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_answer_with_status_500_is_never_a_stream,
+  parameters: [message : (List Nat), more : (List (List Nat))],
+  statement: ((Transport::shouldStream true 500 (cons message more)) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_200_answer_with_messages_to_a_client_that_accepts_is_a_stream,
+  parameters: [message : (List Nat), more : (List (List Nat))],
+  statement: ((Transport::shouldStream true 200 (cons message more)) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_refused_gate_is_answered_by_the_refusal_alone,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    request : Http::HttpRequest,
+    refusal : Transport::TransportRefusal
+  ],
+  statement: ((Serve::serveGated info answer request (ctor Option.some [Transport::TransportRefusal] refusal)) = (Serve::forbiddenResponse refusal)),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: an_open_gate_serves_the_request_as_before,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    request : Http::HttpRequest
+  ],
+  statement: ((Serve::serveGated info answer request (ctor Option.none [Transport::TransportRefusal])) = (Serve::serveOpen info answer request)),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_refusal_does_not_depend_on_the_provider_or_the_request,
+  parameters: [
+    infoA : Extension::ProviderInfo,
+    answerA : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    requestA : Http::HttpRequest,
+    infoB : Extension::ProviderInfo,
+    answerB : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    requestB : Http::HttpRequest,
+    refusal : Transport::TransportRefusal
+  ],
+  statement: ((Serve::serveGated infoA answerA requestA (ctor Option.some [Transport::TransportRefusal] refusal)) = (Serve::serveGated infoB answerB requestB (ctor Option.some [Transport::TransportRefusal] refusal))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: the_forbidden_code_is_implementation_defined,
+  parameters: [],
+  statement: ((JsonRpc::inImplementationDefinedRange (Transport::forbiddenCode)) = true),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_response_without_notifications_is_unchanged_for_a_client_that_accepts_a_stream,
+  parameters: [response : Http::HttpResponse],
+  statement: ((Serve::streamed true response (nil (List Nat))) = response),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_response_is_unchanged_for_a_client_that_does_not_accept_a_stream,
+  parameters: [response : Http::HttpResponse, notes : (List (List Nat))],
+  statement: ((Serve::streamed false response notes) = response),
+  proof: reflexivity{}
+}
+\end{semanticmodule}
+\end{lexlean}

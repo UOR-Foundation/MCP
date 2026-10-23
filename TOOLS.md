@@ -157,11 +157,12 @@ client identity and the increment; the fixture's limit is 100.
 A tool returns its progress steps with its result: a progress value, an optional total and
 an optional message. If the request's `_meta` has a `progressToken` (text or number) the
 core writes one JSON-RPC `notifications/progress` per step, with the token echoed, in
-order, into the notification list of the response frame; otherwise it writes none. The
-steps must be strictly increasing. The core never encodes SSE: the adapter sends the
-notifications and then the body as a stream (issue #11). The scenario
-`tools-call-with-progress` reads the notifications from that stream, so it cannot pass until
-#11 lands.
+order; otherwise it writes none. The steps must be strictly increasing. The notifications
+reach the client as the first events of an event stream when the client accepts
+`text/event-stream`, with the result as the last event, and are not sent otherwise
+([TRANSPORT.md](TRANSPORT.md)). The scenario `tools-call-with-progress` reads the
+notifications from that stream; its vector asks for the stream and the tests read it back
+with an independent reader of the WHATWG format.
 
 ## The fixture tools
 

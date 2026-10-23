@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-streamable-http-transport"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Transport"
+component = "Transport"
+
+[[form]]
+id = "mcp-streamable-http-transport"
+channel = "text"
+surface = "MCP Streamable HTTP transport"
+canonical_source = true
+features = ["sentence-case", "singular"]

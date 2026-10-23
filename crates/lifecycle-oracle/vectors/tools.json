@@ -364,7 +364,8 @@
     "tools-call-with-progress"
    ],
    "register": [
-    "TL-13"
+    "TL-13",
+    "SH-01"
    ],
    "request": {
     "method": "POST",
@@ -428,9 +429,10 @@
       "total": 100,
       "message": "Completed step 100 of 100"
      }
-    ]
+    ],
+    "content_type": "text/event-stream"
    },
-   "note": "The scenario reads three progress notifications from the response stream, which is the transport's encoding (issue 11). This vector checks what the core produces: the notifications travel beside the body in the response frame."
+   "note": "The scenario reads three progress notifications from the response stream. The client accepts text/event-stream, so the core answers with the stream: three notification events and then the result (issue 11, SH-01); the notifications listed here are read from those events."
   },
   {
    "id": "TS-07",

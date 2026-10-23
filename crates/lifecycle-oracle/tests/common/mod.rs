@@ -8,8 +8,8 @@ use std::sync::OnceLock;
 
 use boon::{Compiler, SchemaIndex, Schemas};
 use lifecycle_oracle::{
-    decode_response, encode_request, exchange_crowd_frame_on, exchange_frame_on, FrameError,
-    Request, Response,
+    decode_response, encode_request, exchange_crowd_frame_on, exchange_frame_on,
+    parse_event_stream, FrameError, Request, Response,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -115,10 +115,20 @@ pub fn tools_vector_file() -> Value {
         .expect("the tools vectors are JSON")
 }
 
-/// Every vector of both files, the lifecycle vectors first, in file order.
+/// The transport vectors file, parsed: the requests of the pinned transport scenarios and
+/// the streaming probes of `server-stateless` (issue 11).
+pub fn transport_vector_file() -> Value {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("vectors")
+        .join("transport.json");
+    serde_json::from_slice(&std::fs::read(path).expect("the transport vectors are committed"))
+        .expect("the transport vectors are JSON")
+}
+
+/// Every vector of the three files, the lifecycle vectors first, in file order.
 pub fn all_vectors() -> Vec<Value> {
     let mut out = Vec::new();
-    for file in [vector_file(), tools_vector_file()] {
+    for file in [vector_file(), tools_vector_file(), transport_vector_file()] {
         out.extend(file["vectors"].as_array().expect("vectors").iter().cloned());
     }
     out
@@ -177,6 +187,67 @@ pub fn request_of(vector: &Value) -> Request {
     }
 }
 
+/// The names the host configured for a vector (`request.allowed_hosts`), none by default.
+pub fn allowed_hosts_of(vector: &Value) -> Vec<Vec<u8>> {
+    vector["request"]
+        .get("allowed_hosts")
+        .and_then(Value::as_array)
+        .map_or_else(Vec::new, |names| {
+            names
+                .iter()
+                .map(|n| n.as_str().expect("a name").as_bytes().to_vec())
+                .collect()
+        })
+}
+
+/// True when the response is an event stream.
+pub fn is_stream(response: &Response) -> bool {
+    header(response, "content-type") == Some(&b"text/event-stream"[..])
+}
+
+/// The events of a stream response, read as a client reads them, after the checks that make
+/// a stream the core's own: status 200, every event of the default type with only a `data`
+/// line, no `id`, `event` or `retry` field (resumption is not supported), and the stream
+/// ending at the end of an event.
+pub fn events_of(response: &Response) -> Vec<Value> {
+    assert!(is_stream(response), "the response is not an event stream");
+    assert_eq!(response.status, 200, "only a 200 answer is a stream");
+    assert!(
+        response.body.ends_with(b"\n\n"),
+        "a stream ends with a blank line"
+    );
+    let parsed = parse_event_stream(&response.body).expect("a stream is UTF-8");
+    assert!(!parsed.dangling, "the stream ends inside an event");
+    let text = String::from_utf8_lossy(&response.body).into_owned();
+    for line in text.split('\n').filter(|l| !l.is_empty()) {
+        assert!(
+            line.starts_with("data: "),
+            "a line that is not a data line: {line:?}"
+        );
+    }
+    parsed
+        .events
+        .iter()
+        .map(|event| {
+            assert_eq!(event.kind, "message");
+            assert!(event.id.is_none() && event.retry.is_none());
+            serde_json::from_str(&event.data)
+                .unwrap_or_else(|e| panic!("an event is not JSON ({e}): {}", event.data))
+        })
+        .collect()
+}
+
+/// The progress notifications a response delivered: every event of a stream but the last,
+/// and none for a single JSON body.
+pub fn notes_of(response: &Response) -> Vec<Value> {
+    if !is_stream(response) {
+        return Vec::new();
+    }
+    let mut events = events_of(response);
+    events.pop();
+    events
+}
+
 /// The value of the first field named `name`, compared without regard to case.
 pub fn header<'a>(response: &'a Response, name: &str) -> Option<&'a [u8]> {
     response
@@ -186,8 +257,14 @@ pub fn header<'a>(response: &'a Response, name: &str) -> Option<&'a [u8]> {
         .map(|(_, v)| v.as_slice())
 }
 
-/// The response body as JSON.
+/// The response body as JSON; for an event stream, the last event, which is the JSON-RPC
+/// response the notifications lead up to.
 pub fn json_of(response: &Response) -> Value {
+    if is_stream(response) {
+        return events_of(response)
+            .pop()
+            .expect("a stream carries the response");
+    }
     serde_json::from_slice(&response.body).unwrap_or_else(|e| {
         panic!(
             "the root's body is not JSON ({e}): {}",
@@ -258,6 +335,9 @@ fn error_def(code: i64) -> Option<&'static str> {
         // (RFC 6585 section 4; `Status.tooManyRequestsStatus`), so the schema has no
         // definition for it: the body is checked as a JSON-RPC response only.
         429 => "JSONRPCErrorResponse",
+        // The refusal of a forbidden Origin or Host: a server-defined code in the
+        // implementation range (-32019 to -32000), which the schema does not type.
+        -32000 => "JSONRPCErrorResponse",
         _ => return None,
     })
 }
@@ -337,15 +417,13 @@ pub fn check_response(method: Option<&str>, response: &Response) {
         assert!(response.body.is_empty(), "a 405 has no body");
         return;
     }
-    for note in &response.notifications {
-        let note: Value = serde_json::from_slice(note).unwrap_or_else(|e| {
-            panic!(
-                "a notification is not JSON ({e}): {}",
-                String::from_utf8_lossy(note)
-            )
-        });
+    assert!(
+        response.notifications.is_empty(),
+        "the notification field of the frame is reserved and empty since issue 11"
+    );
+    for note in &notes_of(response) {
         for def in ["JSONRPCNotification", "ProgressNotification"] {
-            if let Err(why) = validate_against(def, &note) {
+            if let Err(why) = validate_against(def, note) {
                 panic!("the schema refuses the root's notification: {why}\nnotification: {note}");
             }
         }
@@ -365,7 +443,19 @@ pub fn check_response(method: Option<&str>, response: &Response) {
 ///
 /// Returns [`FrameError`] when the root's answer is not a response frame.
 pub fn exchange_checked(request: &Request) -> Result<Response, FrameError> {
-    let response = lifecycle_oracle::exchange(request)?;
+    exchange_checked_allowing(request, &[])
+}
+
+/// [`exchange_checked`] for a host that configured `allowed_hosts`.
+///
+/// # Errors
+///
+/// Returns [`FrameError`] when the root's answer is not a response frame.
+pub fn exchange_checked_allowing(
+    request: &Request,
+    allowed_hosts: &[Vec<u8>],
+) -> Result<Response, FrameError> {
+    let response = lifecycle_oracle::exchange_allowing(request, allowed_hosts)?;
     check_response(method_of(request).as_deref(), &response);
     Ok(response)
 }
@@ -389,6 +479,14 @@ pub fn crowd_checked(request: &Request) -> Response {
     let response = decode_response(&frame).expect("the crowd root writes a response frame");
     check_response(method_of(request).as_deref(), &response);
     response
+}
+
+/// Run the request of a vector, with the allow-list it names, and parse the body.
+pub fn send_vector(vector: &Value) -> (Response, Value) {
+    let response = exchange_checked_allowing(&request_of(vector), &allowed_hosts_of(vector))
+        .expect("the root writes a response frame");
+    let body = json_of(&response);
+    (response, body)
 }
 
 /// Run one request through the generated root and parse the body.
@@ -536,7 +634,7 @@ pub fn run_register(id: &str) -> usize {
         if !tagged && !needed {
             continue;
         }
-        let (response, body) = send(&request_of(vector));
+        let (response, body) = send_vector(vector);
         earlier.insert(vid.to_owned(), body.clone());
         if !tagged {
             continue;
@@ -550,10 +648,14 @@ pub fn run_register(id: &str) -> usize {
             vector["file"],
             vector["line"]
         );
+        let media = vector["expect"]
+            .get("content_type")
+            .and_then(Value::as_str)
+            .unwrap_or("application/json");
         assert_eq!(
             header(&response, "content-type"),
-            Some(&b"application/json"[..]),
-            "{vid}: every body is JSON"
+            Some(media.as_bytes()),
+            "{vid}: the media type of the answer"
         );
         for c in vector["expect"]["checks"].as_array().expect("checks") {
             if let Err(why) = check(vid, c, &body, &earlier) {
@@ -566,11 +668,7 @@ pub fn run_register(id: &str) -> usize {
         // Each expected notification is a subset of the params of the notification
         // the core produced at that position, and there are no others.
         let want = vector["expect"].get("notifications");
-        let got: Vec<Value> = response
-            .notifications
-            .iter()
-            .map(|n| serde_json::from_slice(n).expect("a notification is JSON"))
-            .collect();
+        let got: Vec<Value> = notes_of(&response);
         let want = want.map_or(&[][..], |w| w.as_array().expect("notifications").as_slice());
         assert_eq!(
             got.len(),
