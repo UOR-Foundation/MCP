@@ -1,0 +1,782 @@
+{
+ "spec": "lifecycle-vectors/1",
+ "suite": {
+  "repository": "https://github.com/modelcontextprotocol/conformance",
+  "commit": "232a9014457eaf4c59559916e3d616d2f7f28f05"
+ },
+ "vectors": [
+  {
+   "id": "TS-01",
+   "scenario": "tools-list",
+   "file": "src/scenarios/server/tools.ts",
+   "line": 123,
+   "quote": "conn.request<ListToolsResult>('tools/list')",
+   "suite_checks": [
+    "tools-list",
+    "tools-name-format"
+   ],
+   "register": [
+    "TL-01"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":301,\"method\":\"tools/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/tools",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/tools",
+      "each_has": [
+       "name",
+       "description",
+       "inputSchema"
+      ]
+     },
+     {
+      "at": "/result/tools",
+      "each_name_charset": {
+       "allowed": "A-Za-z0-9_./-",
+       "min": 1,
+       "max": 64
+      }
+     }
+    ]
+   },
+   "note": "The suite sends tools/list with no params of its own; the stateless connection adds _meta."
+  },
+  {
+   "id": "TS-02",
+   "scenario": "tools-call-simple-text",
+   "file": "src/scenarios/server/tools.ts",
+   "line": 214,
+   "quote": "const result = await conn.request<CallToolResult>('tools/call', {",
+   "suite_checks": [
+    "tools-call-simple-text"
+   ],
+   "register": [
+    "TL-03"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ],
+     [
+      "Mcp-Name",
+      "test_simple_text"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":302,\"method\":\"tools/call\",\"params\":{\"name\":\"test_simple_text\",\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/content/0/type",
+      "eq": "text"
+     },
+     {
+      "at": "/result/content/0/text",
+      "eq": "This is a simple text response for testing."
+     },
+     {
+      "at": "/result/isError",
+      "absent": true
+     }
+    ]
+   },
+   "note": "The scenario omits arguments, as the schema does not require them."
+  },
+  {
+   "id": "TS-03",
+   "scenario": "tools-call-image",
+   "file": "src/scenarios/server/tools.ts",
+   "line": 302,
+   "quote": "const result = await conn.request<CallToolResult>('tools/call', {",
+   "suite_checks": [
+    "tools-call-image"
+   ],
+   "register": [
+    "TL-04"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ],
+     [
+      "Mcp-Name",
+      "test_image_content"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":303,\"method\":\"tools/call\",\"params\":{\"name\":\"test_image_content\",\"arguments\":{},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/content/0/type",
+      "eq": "image"
+     },
+     {
+      "at": "/result/content/0/data",
+      "present": true
+     },
+     {
+      "at": "/result/content/0/mimeType",
+      "eq": "image/png"
+     }
+    ]
+   }
+  },
+  {
+   "id": "TS-04",
+   "scenario": "tools-call-mixed-content",
+   "file": "src/scenarios/server/tools.ts",
+   "line": 400,
+   "quote": "const result = await conn.request<CallToolResult>('tools/call', {",
+   "suite_checks": [
+    "tools-call-mixed-content"
+   ],
+   "register": [
+    "TL-07"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ],
+     [
+      "Mcp-Name",
+      "test_multiple_content_types"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":304,\"method\":\"tools/call\",\"params\":{\"name\":\"test_multiple_content_types\",\"arguments\":{},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/content/0/type",
+      "eq": "text"
+     },
+     {
+      "at": "/result/content/0/text",
+      "eq": "Multiple content types test:"
+     },
+     {
+      "at": "/result/content/1/type",
+      "eq": "image"
+     },
+     {
+      "at": "/result/content/1/mimeType",
+      "eq": "image/png"
+     },
+     {
+      "at": "/result/content/2/type",
+      "eq": "resource"
+     },
+     {
+      "at": "/result/content/2/resource/uri",
+      "eq": "test://mixed-content-resource"
+     },
+     {
+      "at": "/result/content/2/resource/mimeType",
+      "eq": "application/json"
+     },
+     {
+      "at": "/result/content/2/resource/text",
+      "eq": "{\"test\":\"data\",\"value\":123}"
+     }
+    ]
+   }
+  },
+  {
+   "id": "TS-05",
+   "scenario": "tools-call-error",
+   "file": "src/scenarios/server/tools.ts",
+   "line": 586,
+   "quote": "const result: any = await conn.request<CallToolResult>('tools/call', {",
+   "suite_checks": [
+    "tools-call-error"
+   ],
+   "register": [
+    "TL-08"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ],
+     [
+      "Mcp-Name",
+      "test_error_handling"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":305,\"method\":\"tools/call\",\"params\":{\"name\":\"test_error_handling\",\"arguments\":{},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/isError",
+      "eq": true
+     },
+     {
+      "at": "/result/content/0/text",
+      "eq": "This tool intentionally returns an error for testing"
+     }
+    ]
+   },
+   "note": "A tool execution error is a result with isError true, never a JSON-RPC error."
+  },
+  {
+   "id": "TS-06",
+   "scenario": "tools-call-with-progress",
+   "file": "src/scenarios/server/tools.ts",
+   "line": 678,
+   "quote": "const result = await conn.request<CallToolResult>('tools/call', {",
+   "suite_checks": [
+    "tools-call-with-progress"
+   ],
+   "register": [
+    "TL-13"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ],
+     [
+      "Mcp-Name",
+      "test_tool_with_progress"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":306,\"method\":\"tools/call\",\"params\":{\"name\":\"test_tool_with_progress\",\"arguments\":{},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}},\"progressToken\":\"progress-test-1\"}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/content/0/type",
+      "eq": "text"
+     }
+    ],
+    "notifications": [
+     {
+      "progressToken": "progress-test-1",
+      "progress": 0,
+      "total": 100,
+      "message": "Completed step 0 of 100"
+     },
+     {
+      "progressToken": "progress-test-1",
+      "progress": 50,
+      "total": 100,
+      "message": "Completed step 50 of 100"
+     },
+     {
+      "progressToken": "progress-test-1",
+      "progress": 100,
+      "total": 100,
+      "message": "Completed step 100 of 100"
+     }
+    ]
+   },
+   "note": "The scenario reads three progress notifications from the response stream, which is the transport's encoding (issue 11). This vector checks what the core produces: the notifications travel beside the body in the response frame."
+  },
+  {
+   "id": "TS-07",
+   "scenario": "tools-call-audio",
+   "file": "src/scenarios/server/tools.ts",
+   "line": 1057,
+   "quote": "const result = await conn.request<CallToolResult>('tools/call', {",
+   "suite_checks": [
+    "tools-call-audio"
+   ],
+   "register": [
+    "TL-05"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ],
+     [
+      "Mcp-Name",
+      "test_audio_content"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":307,\"method\":\"tools/call\",\"params\":{\"name\":\"test_audio_content\",\"arguments\":{},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/content/0/type",
+      "eq": "audio"
+     },
+     {
+      "at": "/result/content/0/data",
+      "present": true
+     },
+     {
+      "at": "/result/content/0/mimeType",
+      "eq": "audio/wav"
+     }
+    ]
+   }
+  },
+  {
+   "id": "TS-08",
+   "scenario": "tools-call-embedded-resource",
+   "file": "src/scenarios/server/tools.ts",
+   "line": 1153,
+   "quote": "const result = await conn.request<CallToolResult>('tools/call', {",
+   "suite_checks": [
+    "tools-call-embedded-resource"
+   ],
+   "register": [
+    "TL-06"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ],
+     [
+      "Mcp-Name",
+      "test_embedded_resource"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":308,\"method\":\"tools/call\",\"params\":{\"name\":\"test_embedded_resource\",\"arguments\":{},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/content/0/type",
+      "eq": "resource"
+     },
+     {
+      "at": "/result/content/0/resource/uri",
+      "eq": "test://embedded-resource"
+     },
+     {
+      "at": "/result/content/0/resource/mimeType",
+      "eq": "text/plain"
+     },
+     {
+      "at": "/result/content/0/resource/text",
+      "eq": "This is an embedded resource content."
+     }
+    ]
+   }
+  },
+  {
+   "id": "TS-09",
+   "scenario": "json-schema-2020-12",
+   "file": "src/scenarios/server/json-schema-2020-12.ts",
+   "line": 131,
+   "quote": "conn.request<ListToolsResult>('tools/list')",
+   "suite_checks": [
+    "json-schema-2020-12-tool-found",
+    "json-schema-2020-12-$schema",
+    "json-schema-2020-12-$defs",
+    "json-schema-2020-12-additionalProperties",
+    "sep-2106-composition-keywords-preserved",
+    "sep-2106-conditional-keywords-preserved",
+    "sep-2106-anchor-keyword-preserved"
+   ],
+   "register": [
+    "TL-02"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":309,\"method\":\"tools/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "tool": "json_schema_2020_12_tool",
+      "at": "/name",
+      "eq": "json_schema_2020_12_tool"
+     },
+     {
+      "tool": "json_schema_2020_12_tool",
+      "at": "/inputSchema/$schema",
+      "eq": "https://json-schema.org/draft/2020-12/schema"
+     },
+     {
+      "tool": "json_schema_2020_12_tool",
+      "at": "/inputSchema/$defs/address/$anchor",
+      "eq": "addressDef"
+     },
+     {
+      "tool": "json_schema_2020_12_tool",
+      "at": "/inputSchema/additionalProperties",
+      "eq": false
+     },
+     {
+      "tool": "json_schema_2020_12_tool",
+      "at": "/inputSchema/allOf/0/anyOf",
+      "nonempty_array": true
+     },
+     {
+      "tool": "json_schema_2020_12_tool",
+      "at": "/inputSchema/if",
+      "is_object": true
+     },
+     {
+      "tool": "json_schema_2020_12_tool",
+      "at": "/inputSchema/then",
+      "is_object": true
+     },
+     {
+      "tool": "json_schema_2020_12_tool",
+      "at": "/inputSchema/else",
+      "is_object": true
+     },
+     {
+      "tool": "json_schema_2020_12_tool",
+      "at": "/inputSchema",
+      "eq": {
+       "$schema": "https://json-schema.org/draft/2020-12/schema",
+       "type": "object",
+       "$defs": {
+        "address": {
+         "$anchor": "addressDef",
+         "type": "object",
+         "properties": {
+          "street": {
+           "type": "string"
+          },
+          "city": {
+           "type": "string"
+          }
+         }
+        }
+       },
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "address": {
+         "$ref": "#/$defs/address"
+        },
+        "contactMethod": {
+         "type": "string",
+         "enum": [
+          "phone",
+          "email"
+         ]
+        },
+        "phone": {
+         "type": "string"
+        },
+        "email": {
+         "type": "string"
+        }
+       },
+       "allOf": [
+        {
+         "anyOf": [
+          {
+           "required": [
+            "phone"
+           ]
+          },
+          {
+           "required": [
+            "email"
+           ]
+          }
+         ]
+        }
+       ],
+       "if": {
+        "properties": {
+         "contactMethod": {
+          "const": "phone"
+         }
+        },
+        "required": [
+         "contactMethod"
+        ]
+       },
+       "then": {
+        "required": [
+         "phone"
+        ]
+       },
+       "else": {
+        "required": [
+         "email"
+        ]
+       },
+       "additionalProperties": false
+      }
+     }
+    ]
+   },
+   "note": "The scenario is listed pending and not scored in requirements/2026-07-28.yaml; the last check is the whole JSON_SCHEMA_2020_12_FIXTURE of the scenario file, member for member."
+  }
+ ],
+ "not_run": [
+  {
+   "file": "src/scenarios/server/tools.ts",
+   "line": 494,
+   "quote": "await connection.client.callTool({",
+   "scenario": "tools-call-with-logging",
+   "checks": [
+    "tools-call-with-logging"
+   ],
+   "reason": "the scenario connects with the SDK client, which initializes a session and sets a log level; the core is stateless and offers neither initialize nor logging/setLevel (LC-06), and the scenario is not in the required list of requirements/2026-07-28.yaml",
+   "owner": "#13"
+  },
+  {
+   "file": "src/scenarios/server/tools.ts",
+   "line": 835,
+   "quote": "const result = await connection.client.callTool({",
+   "scenario": "tools-call-sampling",
+   "checks": [
+    "tools-call-sampling"
+   ],
+   "reason": "sampling during a tool call is an input-required result (issue 10); the scenario is not in the required list of requirements/2026-07-28.yaml",
+   "owner": "#10"
+  },
+  {
+   "file": "src/scenarios/server/tools.ts",
+   "line": 970,
+   "quote": "const result = await connection.client.callTool({",
+   "scenario": "tools-call-elicitation",
+   "checks": [
+    "tools-call-elicitation"
+   ],
+   "reason": "elicitation during a tool call is an input-required result (issue 10); the scenario is not in the required list of requirements/2026-07-28.yaml",
+   "owner": "#10"
+  }
+ ],
+ "unreached": []
+}

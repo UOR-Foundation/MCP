@@ -17,7 +17,7 @@
 
 mod common;
 
-use common::{call, post_owned, rpc, send, standard, META};
+use common::{call, crowd_checked, post_owned, rpc, send, standard, META};
 use lifecycle_oracle::{Request, STACK_BYTES};
 use serde_json::{json, Value};
 
@@ -199,6 +199,119 @@ fn a_long_base64_parameter_header_is_decoded_and_compared_lc_16() {
 fn a_tools_list_with_a_padded_header_set_answers_on_the_default_stack_lc_16() {
     let (status, body) = run(&shapes::padded_tools_list());
     assert_ok(status, &body, "tools/list with many header fields");
+}
+
+// ---- TL-18: the tools layer on the same stack ----
+
+/// A tools/call of `name` with `arguments` (a JSON text).
+fn invoke(name: &str, arguments: &str) -> Request {
+    post_owned(
+        &standard("tools/call", Some(name)),
+        &call(name, arguments, "1"),
+    )
+}
+
+#[test]
+fn a_large_arguments_object_a_schema_refuses_is_one_tool_error_tl_18() {
+    // test_arguments declares additionalProperties false: the first undeclared member
+    // fails, and the validator still has the rest of the object to walk
+    let mut arguments = String::from(r#"{"name":"a""#);
+    for i in 0..sized(ARGUMENT_MEMBERS) {
+        arguments.push_str(&format!(r#","k{i}":{i}"#));
+    }
+    arguments.push('}');
+    let (status, body) = run(&invoke("test_arguments", &arguments));
+    assert_eq!(status, 200, "{body:.300}");
+    assert_eq!(body["result"]["isError"], true);
+    assert_eq!(
+        body["result"]["content"][0]["text"],
+        "Invalid arguments: the arguments object fails additionalProperties"
+    );
+}
+
+#[test]
+fn a_long_array_is_checked_against_its_bounds_tl_18() {
+    let items = vec![r#""x""#; sized(100_000)].join(",");
+    let arguments = format!(r#"{{"name":"a","tags":[{items}]}}"#);
+    let (status, body) = run(&invoke("test_arguments", &arguments));
+    assert_eq!(status, 200, "{body:.300}");
+    assert_eq!(body["result"]["isError"], true);
+    assert_eq!(
+        body["result"]["content"][0]["text"],
+        "Invalid arguments: /tags fails maxItems"
+    );
+}
+
+#[test]
+fn a_quarter_mebibyte_name_is_counted_in_code_points_tl_18() {
+    let name = "\u{e9}".repeat(sized(LONG_TEXT) / 2);
+    let arguments = format!(r#"{{"name":"{name}"}}"#);
+    let (status, body) = run(&invoke("test_arguments", &arguments));
+    assert_eq!(status, 200, "{body:.300}");
+    assert!(body["result"].get("isError").is_none(), "{body:.300}");
+}
+
+#[test]
+fn arguments_nested_to_the_deepest_depth_are_checked_and_accepted_tl_18() {
+    // the request object is level 1, params 2, arguments 3: an array nested
+    // MAX_DEPTH - 3 deep inside the arguments reaches level MAX_DEPTH
+    let levels = MAX_DEPTH - 3;
+    let nested = format!("{}{}", "[".repeat(levels), "]".repeat(levels));
+    let (status, body) = run(&invoke("echo", &format!(r#"{{"deep":{nested}}}"#)));
+    assert_ok(status, &body, "deepest nesting in the arguments");
+}
+
+/// The names of the second root's catalog.
+const CROWD: usize = 60;
+
+fn crowd_run(request: &Request) -> (u32, Value) {
+    let response = crowd_checked(request);
+    let body = serde_json::from_slice(&response.body).expect("a JSON body");
+    (response.status, body)
+}
+
+#[test]
+fn a_catalog_of_sixty_tools_is_listed_in_order_on_the_default_stack_tl_18() {
+    let list = post_owned(
+        &standard("tools/list", None),
+        &rpc("tools/list", &format!(r#"{{"_meta":{META}}}"#), "1"),
+    );
+    let (status, body) = crowd_run(&list);
+    assert_eq!(status, 200);
+    let names: Vec<String> = body["result"]["tools"]
+        .as_array()
+        .expect("tools")
+        .iter()
+        .map(|t| t["name"].as_str().expect("name").to_owned())
+        .collect();
+    let expected: Vec<String> = (0..CROWD).map(|i| format!("crowd_{i}")).collect();
+    assert_eq!(names, expected);
+}
+
+#[test]
+fn the_last_tool_of_the_catalog_is_called_and_the_one_after_it_is_unknown_tl_18() {
+    let (status, body) = crowd_run(&invoke(&format!("crowd_{}", CROWD - 1), "{}"));
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(
+        body["result"]["content"][0]["text"],
+        format!("crowd_{}", CROWD - 1)
+    );
+    let (status, body) = crowd_run(&invoke(&format!("crowd_{CROWD}"), "{}"));
+    assert_eq!((status, &body["error"]["code"]), (400, &json!(-32602)));
+}
+
+#[test]
+fn a_catalog_listing_with_a_padded_header_set_answers_on_the_default_stack_tl_18() {
+    let mut headers = standard("tools/list", None);
+    for i in 0..sized(PAD_HEADERS) {
+        headers.push((format!("X-Pad-{i}"), "v".to_owned()));
+    }
+    let list = post_owned(
+        &headers,
+        &rpc("tools/list", &format!(r#"{{"_meta":{META}}}"#), "1"),
+    );
+    let (status, body) = crowd_run(&list);
+    assert_ok(status, &body, "60 tools with many header fields");
 }
 
 /// How little stack the stress frames need: run with `STACK_PROBE_BYTES=<n>`, for

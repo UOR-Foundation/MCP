@@ -24,4 +24,8 @@ claim = [
   { id = "AUTH-06", level = "some-true", statement = "RFC 4648 defines the Base64 alphabet, padding and canonical form the parameter header decoder implements.", authority = "A-RFC4648" },
   { id = "AUTH-07", level = "some-true", statement = "The pinned conformance suite lists server-stateless as required for 2026-07-28 and the two HTTP header scenarios as pending and not scored.", authority = "A-MCP-CONFORMANCE" },
   { id = "AUTH-08", level = "some-true", statement = "The MCP schema for 2026-07-28 defines the JSON-RPC error response with an optional id of type string or number, and the typed results and errors of server/discover, tools/list, tools/call and the codes the lifecycle uses.", authority = "A-MCP-SCHEMA-2026-07-28" },
+  { id = "AUTH-09", level = "some-true", statement = "RFC 6585 section 4 defines the status 429 for a client that has sent too many requests in a given time.", authority = "A-RFC6585" },
+  { id = "AUTH-10", level = "some-true", statement = "JSON Schema draft 2020-12 defines the validation keywords, the applicators and the reference keywords the tool schema validator implements.", authority = "A-JSON-SCHEMA-2020-12" },
+  { id = "AUTH-11", level = "some-true", statement = "RFC 6901 defines the JSON Pointer syntax and escapes the argument error text uses to name the failing instance.", authority = "A-RFC6901" },
+  { id = "AUTH-12", level = "some-true", statement = "The pinned conformance suite lists tools-list, tools-call-simple-text, tools-call-image, tools-call-audio, tools-call-embedded-resource, tools-call-mixed-content, tools-call-error and tools-call-with-progress as required for 2026-07-28 and json-schema-2020-12 as pending and not scored.", authority = "A-MCP-CONFORMANCE" },
 ]

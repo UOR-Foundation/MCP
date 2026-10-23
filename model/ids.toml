@@ -276,3 +276,111 @@ id = "HH-13"
 level = "build"
 suite = "http-headers"
 statement = "An integer parameter header is compared numerically with the body number within the safe integer range, and a boolean parameter header is exactly true or false."
+
+[[id]]
+id = "TL-01"
+level = "build"
+suite = "tools"
+statement = "tools/list answers with the tool catalog in its fixed declaration order, every tool with a name of 1 to 64 characters from A-Z, a-z, 0-9, underscore, dot and hyphen (the intersection of the specification and of the suite check), a description and an inputSchema, and an outputSchema when it declares one; the catalog is one page, so a request that carries a cursor is refused as invalidParams (-32602); a kernel-checked theorem states the order."
+
+[[id]]
+id = "TL-02"
+level = "build"
+suite = "tools"
+statement = "The inputSchema and outputSchema of every listed tool are JSON Schema 2020-12 objects, and tools/list preserves every keyword the catalog declares, among them $schema, $defs, $anchor, $ref, allOf, anyOf, if, then, else and additionalProperties, as the scenario json-schema-2020-12 requires."
+
+[[id]]
+id = "TL-03"
+level = "build"
+suite = "tools"
+statement = "tools/call of a tool that returns text answers with HTTP status 200 and a result of resultType complete whose content is the text block the tool returned and which carries no isError member."
+
+[[id]]
+id = "TL-04"
+level = "build"
+suite = "tools"
+statement = "tools/call of a tool that returns an image answers with an image content block carrying the Base64 data and its mimeType."
+
+[[id]]
+id = "TL-05"
+level = "build"
+suite = "tools"
+statement = "tools/call of a tool that returns audio answers with an audio content block carrying the Base64 data and its mimeType."
+
+[[id]]
+id = "TL-06"
+level = "build"
+suite = "tools"
+statement = "tools/call of a tool that returns an embedded resource answers with a resource content block whose resource carries a uri, a mimeType and either text or a Base64 blob."
+
+[[id]]
+id = "TL-07"
+level = "build"
+suite = "tools"
+statement = "tools/call of a tool that returns several content types answers with its blocks in the order the tool produced them, text, image and embedded resource among them."
+
+[[id]]
+id = "TL-08"
+level = "build"
+suite = "tools"
+statement = "A tool whose execution fails answers with HTTP status 200 and a result with isError true and its message as content, and never with a JSON-RPC error."
+
+[[id]]
+id = "TL-09"
+level = "build"
+suite = "tools"
+statement = "tools/call of a tool the catalog does not list is refused as invalidParams (-32602) with HTTP status 400, and so is a tools/call whose params lack a text name or whose arguments are not an object; the refusal is a JSON-RPC error that echoes the request id, and a kernel-checked theorem states that an unknown tool is refused as unknownTool."
+
+[[id]]
+id = "TL-10"
+level = "build"
+suite = "tools"
+statement = "A tools/call whose arguments do not satisfy the tool's inputSchema (a missing required member, a member of the wrong type, an undeclared member where additionalProperties is false, a value outside a bound, an enumeration or a length) is answered with HTTP status 200 and a result with isError true whose text names the JSON Pointer of the failing instance and the failing keyword, and the tool does not run; a kernel-checked theorem states this."
+
+[[id]]
+id = "TL-11"
+level = "build"
+suite = "tools"
+statement = "A tool that declares an outputSchema returns structuredContent that conforms to it, and a result whose structuredContent is missing or does not conform, whose Base64 payload is not canonical Base64, or whose progress does not increase is refused as an internal error (-32603) with HTTP status 500 and a fixed message that says nothing of the tool's output."
+
+[[id]]
+id = "TL-12"
+level = "build"
+suite = "tools"
+statement = "The Mcp-Param rules the HTTP layer enforces are derived from the x-mcp-header annotations of the catalog, including an annotation on a nested property, and no rule is supplied by hand: the rules of the fixture catalog are exactly the headers its schemas annotate, and a catalog whose annotation is unreachable, duplicated or of an unsupported type is refused at admission."
+
+[[id]]
+id = "TL-13"
+level = "build"
+suite = "tools"
+statement = "A tools/call whose _meta carries a progressToken is answered with the progress notifications the tool produced, in order, each a JSON-RPC notifications/progress whose progressToken is the request's token and whose progress is strictly greater than the one before; a request without a token gets none; the notifications travel beside the body in the response frame, and their SSE encoding is issue 11."
+
+[[id]]
+id = "TL-14"
+level = "build"
+suite = "tools"
+statement = "The core admits a tools/call if and only if the host's count of tool calls for the client in the current window, which the request frame carries, is below the limit the provider declares in rate.tool_calls, and refuses a call at or over the limit as rateLimited with JSON-RPC code 429 and HTTP status 429 (RFC 6585 section 4), with the limit in data.limit; no other method is limited; a kernel-checked theorem states the decision."
+
+[[id]]
+id = "TL-15"
+level = "build"
+suite = "tools"
+statement = "Every text of a tools/call result and of a progress notification is sanitized before it is written: C0 control characters other than tab, line feed and carriage return, DEL, C1 control characters and the Unicode bidirectional embedding, override and isolate controls (U+202A to U+202E, U+2066 to U+2069) are replaced by U+FFFD, and the other characters are kept."
+
+[[id]]
+id = "TL-16"
+level = "build"
+suite = "tools"
+statement = "Every fault in a tool catalog (an invalid or duplicate name, an unsupported schema dialect, a root schema that is not an object, an unsupported or malformed keyword, an unresolved reference, an x-mcp-header that is not text, empty, not a token, unreachable, of an unsupported type or duplicated) is a typed AdmitFault, and a kernel-checked negative theorem states the refusal of each."
+
+[[id]]
+id = "TL-17"
+level = "build"
+suite = "tools"
+statement = "The tools layer states in kernel-checked theorems the order of tools/list, the refusal of an unknown tool as invalidParams, the isError result for an invalid argument and the rate-limit decision, and the source declares each of them."
+
+[[id]]
+id = "TL-18"
+level = "build"
+suite = "tools"
+statement = "Tool calls with a very large arguments object, a very large text argument and a catalog of many tools are answered on the default 2 MiB thread stack, because no function of the generated package recurses except as a loop."

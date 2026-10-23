@@ -6,7 +6,10 @@ mod common;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use common::{hex, manifest_sha256, root, suite_root, suite_text, vector_file, PIN};
+use common::{
+    all_vectors, hex, manifest_sha256, root, suite_root, suite_text, tools_vector_file,
+    vector_file, PIN,
+};
 use repo_model::Model;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -124,8 +127,10 @@ fn the_generated_package_is_the_recorded_export_of_the_lifecycle_root_lc_13() {
         .expect("request.json"),
     )
     .expect("request.json is JSON");
-    assert_eq!(request["roots"][0]["root"], "UorMcp.Fixture.fixtureRun");
-    assert_eq!(request["roots"][0]["package"]["name"], "mcp_lifecycle");
+    let roots = request["roots"].as_array().expect("roots");
+    assert_eq!(roots.len(), 2, "the stress root and the fixture root");
+    assert_eq!(roots[1]["root"], "UorMcp.Fixture.fixtureRun");
+    assert_eq!(roots[1]["package"]["name"], "mcp_lifecycle");
 
     let source = std::fs::read(dir.join("src").join("lib.rs")).expect("the package source");
     let recorded = provenance["files"]["src/lib.rs"]
@@ -180,7 +185,9 @@ fn call_sites(text: &str) -> BTreeSet<u64> {
             || line.contains("sendStatelessRequest(serverUrl")
             || line.contains("this.testCase(")
             || line.contains("this.testBase64Case(")
-            || line.contains("this.testMissingCustomHeader(");
+            || line.contains("this.testMissingCustomHeader(")
+            || (line.contains("conn.request<") && line.contains("await"))
+            || line.contains("connection.client.callTool(");
         if sends {
             out.insert(index as u64 + 1);
         }
@@ -196,14 +203,20 @@ fn line_of(text: &str, line: u64) -> &str {
 
 #[test]
 fn every_request_a_scenario_sends_is_a_vector_or_a_listed_probe_that_is_not_run_lc_14() {
-    let file = vector_file();
+    let vectors = all_vectors();
+    let mut not_run: Vec<Value> = Vec::new();
+    for file in [vector_file(), tools_vector_file()] {
+        not_run.extend(file["not_run"].as_array().expect("not_run").iter().cloned());
+    }
     for scenario_file in [
         "src/scenarios/server/stateless.ts",
         "src/scenarios/server/http-standard-headers.ts",
+        "src/scenarios/server/tools.ts",
+        "src/scenarios/server/json-schema-2020-12.ts",
     ] {
         let text = suite_text(scenario_file);
         let mut accounted: BTreeSet<u64> = BTreeSet::new();
-        for v in file["vectors"].as_array().expect("vectors") {
+        for v in &vectors {
             if v["file"] == scenario_file {
                 let line = v["line"].as_u64().expect("line");
                 let quote = v["quote"].as_str().expect("quote");
@@ -215,18 +228,25 @@ fn every_request_a_scenario_sends_is_a_vector_or_a_listed_probe_that_is_not_run_
                 accounted.insert(line);
             }
         }
-        if scenario_file.ends_with("stateless.ts") {
-            for n in file["not_run"].as_array().expect("not_run") {
-                let line = n["line"].as_u64().expect("line");
-                let quote = n["quote"].as_str().expect("quote");
-                assert!(
-                    line_of(&text, line).contains(quote),
-                    "line {line} of {scenario_file} does not contain {quote:?}"
-                );
-                assert!(n["owner"].as_str().expect("owner").starts_with('#'));
-                assert!(!n["reason"].as_str().expect("reason").is_empty());
-                accounted.insert(line);
+        // A listed probe names its file; the lifecycle file's older entries are the
+        // probes of `stateless.ts` and name none.
+        for n in &not_run {
+            let file = n.get("file").and_then(Value::as_str);
+            let mine = file.map_or(scenario_file.ends_with("stateless.ts"), |f| {
+                f == scenario_file
+            });
+            if !mine {
+                continue;
             }
+            let line = n["line"].as_u64().expect("line");
+            let quote = n["quote"].as_str().expect("quote");
+            assert!(
+                line_of(&text, line).contains(quote),
+                "line {line} of {scenario_file} does not contain {quote:?}"
+            );
+            assert!(n["owner"].as_str().expect("owner").starts_with('#'));
+            assert!(!n["reason"].as_str().expect("reason").is_empty());
+            accounted.insert(line);
         }
         assert_eq!(
             call_sites(&text),
@@ -293,6 +313,61 @@ fn every_check_id_a_scenario_emits_is_covered_or_listed_lc_14() {
     }
 }
 
+// ---- TL-18: the second root, over a catalog of many tools ----
+
+#[test]
+fn the_crowd_package_is_the_recorded_export_of_the_crowd_root_tl_18() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("generated")
+        .join("mcp_crowd");
+    let provenance: Value =
+        serde_json::from_slice(&std::fs::read(dir.join("provenance.json")).expect("provenance"))
+            .expect("provenance.json is JSON");
+    assert_eq!(provenance["name"], "mcp_crowd");
+    assert_eq!(provenance["profile"], "rust-std");
+    assert_eq!(provenance["exports"].as_array().expect("exports").len(), 1);
+    assert_eq!(provenance["exports"][0]["name"], "run");
+    assert_eq!(
+        provenance["effects"],
+        serde_json::json!(["allocation", "overflow"]),
+        "the export states no recursion effect"
+    );
+    let request: Value = serde_json::from_slice(
+        &std::fs::read(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("generated")
+                .join("request.json"),
+        )
+        .expect("request.json"),
+    )
+    .expect("request.json is JSON");
+    assert_eq!(request["roots"][0]["root"], "UorMcp.Crowd.crowdRun");
+    assert_eq!(request["roots"][0]["package"]["name"], "mcp_crowd");
+    let source = std::fs::read(dir.join("src").join("lib.rs")).expect("the package source");
+    let recorded = provenance["files"]["src/lib.rs"]
+        .as_str()
+        .expect("src/lib.rs is recorded");
+    assert_eq!(recorded, hex(&Sha256::digest(&source)));
+    assert_eq!(
+        recorded,
+        hex(&Sha256::digest(lifecycle_oracle::CROWD_SOURCE.as_bytes())),
+        "the oracle compiled a different file from the one recorded"
+    );
+}
+
+#[test]
+fn no_function_of_the_crowd_package_is_on_a_call_cycle_tl_18() {
+    let graph = call_graph(lifecycle_oracle::CROWD_SOURCE);
+    assert!(
+        graph.len() > 300,
+        "the graph reads the package: {}",
+        graph.len()
+    );
+    if let Some(cycle) = find_cycle(&graph) {
+        panic!("the crowd package recurses: {}", cycle.join(" -> "));
+    }
+}
+
 // ---- LC-16: no call cycle in the generated package ----
 
 /// The functions of the generated package, `f<number>`, and the functions each one
@@ -328,8 +403,9 @@ fn call_graph(source: &str) -> BTreeMap<String, BTreeSet<String>> {
     }
     let mut bodies: BTreeMap<String, String> = BTreeMap::new();
     let mut current: Option<String> = None;
-    let mut applied: BTreeSet<String> = BTreeSet::new();
-    let mut in_apply = false;
+    // the functions each closure type can dispatch to, by the closure type's name
+    let mut applied: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut in_apply: Option<String> = None;
     for line in source.lines() {
         if let Some(name) = name_at(line) {
             current = Some(name.clone());
@@ -341,31 +417,69 @@ fn call_graph(source: &str) -> BTreeMap<String, BTreeSet<String>> {
         if top_level && !line.starts_with('}') {
             current = None;
         }
-        in_apply = if line.contains("pub fn apply(") {
-            true
+        if let Some(kind) = line
+            .strip_prefix("impl ")
+            .and_then(|rest| rest.strip_suffix(" {"))
+        {
+            in_apply = Some(kind.to_owned());
         } else if top_level {
-            false
-        } else {
-            in_apply
-        };
-        if in_apply {
-            applied.extend(callees(line));
+            in_apply = None;
+        }
+        if let Some(kind) = &in_apply {
+            applied
+                .entry(kind.clone())
+                .or_default()
+                .extend(callees(line));
         }
         if let Some(name) = &current {
             bodies.get_mut(name).expect("open").push_str(line);
             bodies.get_mut(name).expect("open").push('\n');
         }
     }
+    let every: BTreeSet<String> = applied.values().flatten().cloned().collect();
     bodies
         .into_iter()
         .map(|(name, body)| {
             let mut out = callees(&body);
-            if body.contains(".apply(") {
-                out.extend(applied.iter().cloned());
-            }
+            out.extend(applied_by(&body, &applied, &every));
             (name, out)
         })
         .collect()
+}
+
+/// The functions a body can reach through closures. Rust types a closure by its enum, and
+/// `let cN: FnK = ..; cN.apply(..)` can reach only the variants of `FnK`; an application
+/// whose receiver is not declared that way is read as reaching every closure of the package.
+fn applied_by(
+    body: &str,
+    applied: &BTreeMap<String, BTreeSet<String>>,
+    every: &BTreeSet<String>,
+) -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    let mut rest = body;
+    while let Some(at) = rest.find(".apply(") {
+        let receiver: String = rest[..at]
+            .chars()
+            .rev()
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect();
+        let declared = format!("let {receiver}: ");
+        let kind = body.find(&declared).map(|i| {
+            body[i + declared.len()..]
+                .chars()
+                .take_while(char::is_ascii_alphanumeric)
+                .collect::<String>()
+        });
+        match kind.and_then(|k| applied.get(&k)) {
+            Some(targets) => out.extend(targets.iter().cloned()),
+            None => out.extend(every.iter().cloned()),
+        }
+        rest = &rest[at + ".apply(".len()..];
+    }
+    out
 }
 
 /// A call cycle of the graph, if there is one: the names along it.
@@ -449,5 +563,11 @@ fn the_call_cycle_check_finds_a_cycle_and_a_self_call_lc_16() {
     assert!(
         find_cycle(&call_graph(through_apply)).is_some(),
         "a cycle through a function value is a cycle"
+    );
+    // an application of a closure of one type does not reach the closures of another
+    let other_type = "pub enum Fn0 {\n    F2,\n}\n\nimpl Fn0 {\n    pub fn apply(&self, p0: u64) -> u64 {\n        match self {\n            Fn0::F2 => f2(p0),\n        }\n    }\n}\n\npub enum Fn1 {\n    F3,\n}\n\nimpl Fn1 {\n    pub fn apply(&self, p0: u64) -> u64 {\n        match self {\n            Fn1::F3 => f3(p0),\n        }\n    }\n}\n\npub fn f2(a: u64) -> u64 {\n    let c: Fn1 = Fn1::F3;\n    c.apply(a)\n}\n\npub fn f3(a: u64) -> u64 {\n    a\n}\n";
+    assert!(
+        find_cycle(&call_graph(other_type)).is_none(),
+        "a closure is applied only to what its own type can hold"
     );
 }

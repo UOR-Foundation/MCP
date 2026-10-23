@@ -10,8 +10,7 @@ mod common;
 use std::path::Path;
 
 use common::{
-    files_under, manifest_of, root, send, spec_root, validate_against, validate_body, vector_file,
-    SPEC_PIN,
+    files_under, manifest_of, root, send, spec_root, validate_against, validate_body, SPEC_PIN,
 };
 use repo_model::Model;
 use serde_json::{json, Value};
@@ -56,10 +55,9 @@ fn the_vendored_schema_is_the_pinned_specification_and_matches_its_recorded_chec
 
 #[test]
 fn every_vector_response_validates_against_the_schema_lc_15() {
-    let file = vector_file();
-    let vectors = file["vectors"].as_array().expect("vectors");
-    assert!(vectors.len() >= 32);
-    for vector in vectors {
+    let vectors = common::all_vectors();
+    assert!(vectors.len() >= 41);
+    for vector in &vectors {
         // `send` checks the response against the schema and panics when it refuses.
         let (response, body) = send(&common::request_of(vector));
         assert!(response.status >= 200, "{}: {body}", vector["id"]);

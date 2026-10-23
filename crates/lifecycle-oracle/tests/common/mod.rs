@@ -7,7 +7,10 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use boon::{Compiler, SchemaIndex, Schemas};
-use lifecycle_oracle::{decode_response, exchange_frame_on, FrameError, Request, Response};
+use lifecycle_oracle::{
+    decode_response, encode_request, exchange_crowd_frame_on, exchange_frame_on, FrameError,
+    Request, Response,
+};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
@@ -103,6 +106,24 @@ pub fn vector_file() -> Value {
         .expect("the vectors are JSON")
 }
 
+/// The tools vectors file, parsed: the requests of the pinned tools scenarios.
+pub fn tools_vector_file() -> Value {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("vectors")
+        .join("tools.json");
+    serde_json::from_slice(&std::fs::read(path).expect("the tools vectors are committed"))
+        .expect("the tools vectors are JSON")
+}
+
+/// Every vector of both files, the lifecycle vectors first, in file order.
+pub fn all_vectors() -> Vec<Value> {
+    let mut out = Vec::new();
+    for file in [vector_file(), tools_vector_file()] {
+        out.extend(file["vectors"].as_array().expect("vectors").iter().cloned());
+    }
+    out
+}
+
 /// A plain POST with the headers a conformant client sends and the given body.
 pub fn post(headers: &[(&str, &str)], body: &str) -> Request {
     Request {
@@ -113,7 +134,15 @@ pub fn post(headers: &[(&str, &str)], body: &str) -> Request {
             .map(|(n, v)| (n.as_bytes().to_vec(), v.as_bytes().to_vec()))
             .collect(),
         body: body.as_bytes().to_vec(),
+        tool_calls: 0,
     }
+}
+
+/// `request`, sent when the host has already counted `tool_calls` tool calls for the
+/// client in the current window.
+pub fn after_calls(mut request: Request, tool_calls: u32) -> Request {
+    request.tool_calls = tool_calls;
+    request
 }
 
 /// The request a vector sends.
@@ -142,6 +171,9 @@ pub fn request_of(vector: &Value) -> Request {
             })
             .collect(),
         body: request["body"].as_str().expect("body").as_bytes().to_vec(),
+        tool_calls: request.get("tool_calls").map_or(0, |n| {
+            u32::try_from(n.as_u64().expect("tool_calls")).expect("u32")
+        }),
     }
 }
 
@@ -222,6 +254,10 @@ fn error_def(code: i64) -> Option<&'static str> {
         -32020 => "HeaderMismatchError",
         -32021 => "MissingRequiredClientCapabilityError",
         -32022 => "UnsupportedProtocolVersionError",
+        // The rate-limit code is outside the JSON-RPC range the MCP schema types
+        // (RFC 6585 section 4; `Status.tooManyRequestsStatus`), so the schema has no
+        // definition for it: the body is checked as a JSON-RPC response only.
+        429 => "JSONRPCErrorResponse",
         _ => return None,
     })
 }
@@ -301,6 +337,19 @@ pub fn check_response(method: Option<&str>, response: &Response) {
         assert!(response.body.is_empty(), "a 405 has no body");
         return;
     }
+    for note in &response.notifications {
+        let note: Value = serde_json::from_slice(note).unwrap_or_else(|e| {
+            panic!(
+                "a notification is not JSON ({e}): {}",
+                String::from_utf8_lossy(note)
+            )
+        });
+        for def in ["JSONRPCNotification", "ProgressNotification"] {
+            if let Err(why) = validate_against(def, &note) {
+                panic!("the schema refuses the root's notification: {why}\nnotification: {note}");
+            }
+        }
+    }
     let body = json_of(response);
     if let Err(why) = validate_body(method, &body) {
         panic!(
@@ -333,6 +382,15 @@ pub fn frame_checked_on(frame: &[u8], stack_bytes: usize) -> Result<Response, Fr
     Ok(response)
 }
 
+/// Run one request through the second generated root, the one over a catalog of many
+/// tools, checking the response against the schema.
+pub fn crowd_checked(request: &Request) -> Response {
+    let frame = exchange_crowd_frame_on(&encode_request(request), lifecycle_oracle::STACK_BYTES);
+    let response = decode_response(&frame).expect("the crowd root writes a response frame");
+    check_response(method_of(request).as_deref(), &response);
+    response
+}
+
 /// Run one request through the generated root and parse the body.
 pub fn send(request: &Request) -> (Response, Value) {
     let response = exchange_checked(request).expect("the root writes a response frame");
@@ -348,7 +406,15 @@ fn check(
     earlier: &std::collections::BTreeMap<String, Value>,
 ) -> Result<(), String> {
     let at = check["at"].as_str().ok_or("a check names its pointer")?;
-    let found = body.pointer(at);
+    // A check with a `tool` member points into that tool of a tools/list result.
+    let base = match check.get("tool").and_then(Value::as_str) {
+        None => Some(body),
+        Some(tool) => body
+            .pointer("/result/tools")
+            .and_then(Value::as_array)
+            .and_then(|tools| tools.iter().find(|t| t["name"] == tool)),
+    };
+    let found = base.and_then(|b| b.pointer(at));
     if check.get("absent").is_some() {
         return match found {
             None => Ok(()),
@@ -381,6 +447,55 @@ fn check(
             Err(format!("{vector}: {at} is {found}, expected an object"))
         };
     }
+    if let Some(keys) = check.get("each_has").and_then(Value::as_array) {
+        let items = found
+            .as_array()
+            .ok_or_else(|| format!("{vector}: {at} is not an array"))?;
+        for item in items {
+            for key in keys {
+                let key = key.as_str().ok_or("each_has names members")?;
+                if item.get(key).is_none() {
+                    return Err(format!("{vector}: {item} lacks {key}"));
+                }
+            }
+        }
+        return Ok(());
+    }
+    if let Some(rule) = check.get("each_name_charset") {
+        let allowed = rule["allowed"].as_str().ok_or("allowed")?;
+        // `allowed` is written as a character class body with ranges, for example
+        // `A-Za-z0-9_./-`; a `-` last or first is a hyphen.
+        let chars: Vec<char> = allowed.chars().collect();
+        let mut ranges: Vec<(char, char)> = Vec::new();
+        let mut i = 0;
+        while i < chars.len() {
+            if i + 2 < chars.len() && chars[i + 1] == '-' {
+                ranges.push((chars[i], chars[i + 2]));
+                i += 3;
+            } else {
+                ranges.push((chars[i], chars[i]));
+                i += 1;
+            }
+        }
+        let min = rule["min"].as_u64().ok_or("min")?;
+        let max = rule["max"].as_u64().ok_or("max")?;
+        let items = found
+            .as_array()
+            .ok_or_else(|| format!("{vector}: {at} is not an array"))?;
+        for item in items {
+            let name = item["name"].as_str().ok_or("a tool has a text name")?;
+            let length = name.chars().count() as u64;
+            let inside = name
+                .chars()
+                .all(|c| ranges.iter().any(|(lo, hi)| *lo <= c && c <= *hi));
+            if !(min..=max).contains(&length) || !inside {
+                return Err(format!(
+                    "{vector}: the tool name {name:?} is outside the format"
+                ));
+            }
+        }
+        return Ok(());
+    }
     if let Some(from) = check.get("each_in_result_of").and_then(Value::as_str) {
         let result_at = check["result_at"].as_str().ok_or("result_at")?;
         let other = earlier
@@ -407,11 +522,10 @@ fn check(
 /// Run every vector tagged with the register id `id`, in file order, against the
 /// generated root; every vector's earlier dependants run first.
 pub fn run_register(id: &str) -> usize {
-    let file = vector_file();
     let mut earlier = std::collections::BTreeMap::new();
     let mut ran = 0;
     // Vectors that other vectors read (ST-05) run whatever their own tags.
-    for vector in file["vectors"].as_array().expect("vectors") {
+    for vector in &all_vectors() {
         let vid = vector["id"].as_str().expect("id");
         let tagged = vector["register"]
             .as_array()
@@ -447,6 +561,27 @@ pub fn run_register(id: &str) -> usize {
                     "{why} (scenario {}, line {})",
                     vector["scenario"], vector["line"]
                 );
+            }
+        }
+        // Each expected notification is a subset of the params of the notification
+        // the core produced at that position, and there are no others.
+        let want = vector["expect"].get("notifications");
+        let got: Vec<Value> = response
+            .notifications
+            .iter()
+            .map(|n| serde_json::from_slice(n).expect("a notification is JSON"))
+            .collect();
+        let want = want.map_or(&[][..], |w| w.as_array().expect("notifications").as_slice());
+        assert_eq!(
+            got.len(),
+            want.len(),
+            "{vid}: the number of notifications; got {got:?}"
+        );
+        for (note, expected) in got.iter().zip(want) {
+            assert_eq!(note["jsonrpc"], "2.0", "{vid}");
+            assert_eq!(note["method"], "notifications/progress", "{vid}");
+            for (key, value) in expected.as_object().expect("an object") {
+                assert_eq!(&note["params"][key], value, "{vid}: params.{key} of {note}");
             }
         }
     }
