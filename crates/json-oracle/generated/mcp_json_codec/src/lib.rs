@@ -7,7 +7,7 @@ use core::sync::atomic::{AtomicU64, Ordering as Memory};
 pub struct Overflow;
 
 pub type R<T> = Result<T, Overflow>;
-
+ // hand edit
 static WORK: AtomicU64 = AtomicU64::new(0);
 
 pub fn tick(units: u64) { WORK.fetch_add(units, Memory::Relaxed); }
