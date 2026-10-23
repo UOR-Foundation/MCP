@@ -162,7 +162,7 @@ definition{
   executable: true
 }
 
-definition{name: templateSuffix, parameters: [], result: String, body: "/data", executable: true}
+definition{name: templateSuffix, parameters: [], result: String, body: "data", executable: true}
 
 definition{
   name: fixtureTemplates,
@@ -218,7 +218,7 @@ definition{
   result: (Option (List Nat)),
   body: (match (dropPrefix (Resources::bytesOfText (templatePrefix)) (Resources::bytesOfText uri))
     | Option.none => (ctor Option.none [(List Nat)])
-    | Option.some rest => (match (dropPrefix (reversed (Resources::bytesOfText (templateSuffix))) (reversed rest))
+    | Option.some rest => (match (dropPrefix (reversed (cons 47 (Resources::bytesOfText (templateSuffix)))) (reversed rest))
       | Option.none => (ctor Option.none [(List Nat)])
       | Option.some inner => (let middle : (List Nat) := (reversed inner); (if ((isNonEmpty middle) && (withoutSlash middle)) then (ctor Option.some [(List Nat)] middle) else (ctor Option.none [(List Nat)]))))),
   axioms: [Quot.sound, propext],
