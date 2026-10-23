@@ -30,7 +30,8 @@
     clippy::manual_unwrap_or,
     clippy::manual_unwrap_or_default,
     clippy::manual_map,
-    clippy::manual_ok_err
+    clippy::manual_ok_err,
+    clippy::collapsible_match
 )]
 #[rustfmt::skip]
 #[path = "../generated/mcp_lifecycle/src/lib.rs"]
@@ -50,7 +51,8 @@ mod lifecycle;
     clippy::manual_unwrap_or,
     clippy::manual_unwrap_or_default,
     clippy::manual_map,
-    clippy::manual_ok_err
+    clippy::manual_ok_err,
+    clippy::collapsible_match
 )]
 #[rustfmt::skip]
 #[path = "../generated/mcp_crowd/src/lib.rs"]
