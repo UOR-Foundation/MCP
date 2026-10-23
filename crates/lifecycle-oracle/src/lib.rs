@@ -106,9 +106,10 @@ pub struct Response {
     pub status: u32,
     /// The header fields the core wrote.
     pub fields: Vec<Field>,
-    /// The JSON-RPC progress notifications the core produced while answering, each the
-    /// bytes of one compact JSON text, in the order they are sent. An adapter that finds
-    /// any sends the exchange as a stream (`text/event-stream`); issue 11 is that encoding.
+    /// Reserved: always empty since issue 11. Progress notifications travel inside the
+    /// body, which is then an event stream (`Content-Type: text/event-stream`) that the
+    /// core encoded; `TRANSPORT.md` states when. The frame keeps the field so that frames
+    /// written before the encoding moved into the core stay readable.
     pub notifications: Vec<Vec<u8>>,
     /// The body bytes.
     pub body: Vec<u8>,
@@ -149,6 +150,20 @@ pub fn encode_request(request: &Request) -> Vec<u8> {
     }
     put_chunk(&mut out, &request.body);
     put_u32(&mut out, request.tool_calls as usize);
+    out
+}
+
+/// [`encode_request`] followed by the host's allow-list of `Origin` and `Host` names: a
+/// four-byte count and each name length-prefixed. An empty list writes nothing, so the
+/// frame is the one [`encode_request`] writes (`TRANSPORT.md`, "The allow-list").
+pub fn encode_request_allowing(request: &Request, allowed_hosts: &[Vec<u8>]) -> Vec<u8> {
+    let mut out = encode_request(request);
+    if !allowed_hosts.is_empty() {
+        put_u32(&mut out, allowed_hosts.len());
+        for name in allowed_hosts {
+            put_chunk(&mut out, name);
+        }
+    }
     out
 }
 
@@ -288,4 +303,113 @@ pub fn exchange_crowd_frame_on(frame: &[u8], stack_bytes: usize) -> Vec<u8> {
 /// Returns [`FrameError`] when the root's answer is not a response frame.
 pub fn exchange(request: &Request) -> Result<Response, FrameError> {
     decode_response(&exchange_frame(&encode_request(request)))
+}
+
+/// [`exchange`] for a host that configured `allowed_hosts` besides the loopback names.
+///
+/// # Errors
+///
+/// Returns [`FrameError`] when the root's answer is not a response frame.
+pub fn exchange_allowing(
+    request: &Request,
+    allowed_hosts: &[Vec<u8>],
+) -> Result<Response, FrameError> {
+    decode_response(&exchange_frame(&encode_request_allowing(
+        request,
+        allowed_hosts,
+    )))
+}
+
+/// One event of an event stream, as the WHATWG HTML Standard (section 9.2, "Server-sent
+/// events") has a client interpret it.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Event {
+    /// The event type; `message` when the stream names none.
+    pub kind: String,
+    /// The data lines joined with a line feed, without the last one.
+    pub data: String,
+    /// The `id` field, when the stream carried one.
+    pub id: Option<String>,
+    /// The `retry` field, when the stream carried one.
+    pub retry: Option<String>,
+}
+
+/// An event stream read the way the WHATWG HTML Standard says a client reads it.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ParsedStream {
+    /// The events the stream dispatched, in order.
+    pub events: Vec<Event>,
+    /// True when the stream ended inside an event (a client discards that event).
+    pub dangling: bool,
+}
+
+/// Read an event stream as a client does (WHATWG HTML Standard, section 9.2.6): UTF-8,
+/// a leading byte order mark removed, lines ended by LF, CR or CRLF, a blank line
+/// dispatching the event, a line starting with a colon a comment, and the fields `event`,
+/// `data`, `id` and `retry` interpreted. This reader is the oracle for the core's framing:
+/// it shares no code with the encoder in `src/Transport.lex.tex`.
+///
+/// # Errors
+///
+/// Returns the reason when the bytes are not UTF-8.
+pub fn parse_event_stream(bytes: &[u8]) -> Result<ParsedStream, String> {
+    let text = std::str::from_utf8(bytes).map_err(|e| format!("not UTF-8: {e}"))?;
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+    let raw = text.as_bytes();
+    let mut lines: Vec<&str> = Vec::new();
+    let mut start = 0;
+    let mut i = 0;
+    while i < raw.len() {
+        if raw[i] == b'\n' || raw[i] == b'\r' {
+            lines.push(&text[start..i]);
+            if raw[i] == b'\r' && raw.get(i + 1) == Some(&b'\n') {
+                i += 1;
+            }
+            start = i + 1;
+        }
+        i += 1;
+    }
+    let dangling_line = start < raw.len();
+    let mut out = ParsedStream::default();
+    let mut event = Event::default();
+    let mut data = String::new();
+    let mut open = false;
+    for line in lines {
+        if line.is_empty() {
+            if data.is_empty() {
+                event = Event::default();
+            } else {
+                data.pop();
+                event.data = std::mem::take(&mut data);
+                if event.kind.is_empty() {
+                    event.kind = "message".to_owned();
+                }
+                out.events.push(std::mem::take(&mut event));
+            }
+            open = false;
+            continue;
+        }
+        open = true;
+        if line.starts_with(':') {
+            continue;
+        }
+        let (field, value) = match line.split_once(':') {
+            Some((f, v)) => (f, v.strip_prefix(' ').unwrap_or(v)),
+            None => (line, ""),
+        };
+        match field {
+            "event" => event.kind = value.to_owned(),
+            "data" => {
+                data.push_str(value);
+                data.push('\n');
+            }
+            "id" if !value.contains('\0') => event.id = Some(value.to_owned()),
+            "retry" if !value.is_empty() && value.bytes().all(|b| b.is_ascii_digit()) => {
+                event.retry = Some(value.to_owned());
+            }
+            _ => {}
+        }
+    }
+    out.dangling = open || dangling_line;
+    Ok(out)
 }

@@ -59,7 +59,7 @@ fn every_vector_response_validates_against_the_schema_lc_15() {
     assert!(vectors.len() >= 41);
     for vector in &vectors {
         // `send` checks the response against the schema and panics when it refuses.
-        let (response, body) = send(&common::request_of(vector));
+        let (response, body) = common::send_vector(vector);
         assert!(response.status >= 200, "{}: {body}", vector["id"]);
     }
 }

@@ -63,20 +63,24 @@ fn invoke(name: &str, arguments: &Value, extra: &[(&str, &str)]) -> Request {
     post_owned(&headers, &call(name, &arguments.to_string(), "7"))
 }
 
-/// A tools/call of `name` whose `_meta` carries `token` as its progressToken.
+/// A tools/call of `name` whose `_meta` carries `token` as its progressToken, from a client
+/// that accepts both a JSON body and an event stream, as the suite's client does.
 fn invoke_with_token(name: &str, arguments: &Value, token: &Value) -> Request {
+    let mut headers = standard("tools/call", Some(name));
+    headers.push((
+        "Accept".to_owned(),
+        "application/json, text/event-stream".to_owned(),
+    ));
     let body = format!(
         r#"{{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{{"name":"{name}","arguments":{arguments},"_meta":{{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{{}},"progressToken":{token}}}}}}}"#
     );
-    post_owned(&standard("tools/call", Some(name)), &body)
+    post_owned(&headers, &body)
 }
 
+/// The progress notifications the answer delivered: the events of the stream before the
+/// result (issue 11; before it they travelled beside the body in the frame).
 fn notes(response: &Response) -> Vec<Value> {
-    response
-        .notifications
-        .iter()
-        .map(|n| serde_json::from_slice(n).expect("a notification is JSON"))
-        .collect()
+    common::notes_of(response)
 }
 
 /// The text of the first content block of a result.
@@ -622,7 +626,7 @@ fn a_tool_that_reports_no_progress_sends_no_notification_even_with_a_token_tl_13
 }
 
 #[test]
-fn the_content_type_stays_json_and_the_body_is_the_result_tl_13() {
+fn the_notifications_and_the_result_are_one_event_stream_for_a_client_that_accepts_it_tl_13() {
     let (response, body) = send(&invoke_with_token(
         "test_tool_with_progress",
         &json!({}),
@@ -630,9 +634,27 @@ fn the_content_type_stays_json_and_the_body_is_the_result_tl_13() {
     ));
     assert_eq!(
         header(&response, "content-type"),
+        Some(&b"text/event-stream"[..])
+    );
+    assert_eq!(notes(&response).len(), 3);
+    assert!(body["result"].is_object(), "the last event is the result");
+}
+
+#[test]
+fn a_client_that_does_not_accept_a_stream_gets_the_result_alone_as_json_tl_13() {
+    // the same call without an Accept header: progress is optional, so it is not sent
+    let body = r#"{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"test_tool_with_progress","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"progressToken":"t"}}}"#.to_owned();
+    let (response, json) = send(&post_owned(
+        &standard("tools/call", Some("test_tool_with_progress")),
+        &body,
+    ));
+    assert_eq!(response.status, 200);
+    assert_eq!(
+        header(&response, "content-type"),
         Some(&b"application/json"[..])
     );
-    assert!(body["result"].is_object());
+    assert!(notes(&response).is_empty());
+    assert!(json["result"].is_object());
 }
 
 // ---- TL-14: the rate limit ----

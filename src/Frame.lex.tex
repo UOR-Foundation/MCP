@@ -71,6 +71,41 @@ definition{
 }
 
 definition{
+  name: readNames,
+  parameters: [source : Bytes, position : Nat, count : Nat, built : (List (List Nat))],
+  result: (Result ((List (List Nat)) * Nat) FrameFault),
+  body: (match count
+    | Nat.zero => (ctor Result.ok [((List (List Nat)) * Nat), FrameFault] ((JsonRead::reverseOnto [(List Nat)] built (nil (List Nat))), position))
+    | Nat.succ below => (match (chunkAt source position)
+      | Option.none => (ctor Result.error [((List (List Nat)) * Nat), FrameFault] (ctor FrameFault.truncated position))
+      | Option.some named => (readNames source (project named next) below (cons (JsonText::bytesToList (project named bytes)) built)))),
+  axioms: [Quot.sound, propext],
+  executable: true,
+  recursive_argument: count
+}
+
+definition{
+  name: withHosts,
+  parameters: [request : Http::HttpRequest, hosts : (List (List Nat))],
+  result: Http::HttpRequest,
+  body: (record Http::HttpRequest {method := (project request method), target := (project request target), fields := (project request fields), body := (project request body), toolCalls := (project request toolCalls), allowedHosts := hosts}),
+  executable: true
+}
+
+definition{
+  name: afterCalls,
+  parameters: [source : Bytes, request : Http::HttpRequest, position : Nat],
+  result: (Result Http::HttpRequest FrameFault),
+  body: (if (position =? (prim length source : Nat)) then (ctor Result.ok [Http::HttpRequest, FrameFault] request) else (match (u32At source position)
+    | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated position))
+    | Option.some total => (match (readNames source (position + 4) total (nil (List Nat)))
+      | Result.error fault => (ctor Result.error [Http::HttpRequest, FrameFault] fault)
+      | Result.ok read => (if ((second read) =? (prim length source : Nat)) then (ctor Result.ok [Http::HttpRequest, FrameFault] (withHosts request (first read))) else (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.trailing (second read))))))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
   name: finishRequest,
   parameters: [source : Bytes, method : Chunk, target : Chunk, read : ((List Http::Field) * Nat)],
   result: (Result Http::HttpRequest FrameFault),
@@ -78,7 +113,7 @@ definition{
     | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated (second read)))
     | Option.some body => (match (u32At source (project body next))
       | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated (project body next)))
-      | Option.some calls => (if (((project body next) + 4) =? (prim length source : Nat)) then (ctor Result.ok [Http::HttpRequest, FrameFault] (record Http::HttpRequest {method := (JsonText::bytesToList (project method bytes)), target := (JsonText::bytesToList (project target bytes)), fields := (first read), body := (project body bytes), toolCalls := calls})) else (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.trailing ((project body next) + 4)))))),
+      | Option.some calls => (afterCalls source (record Http::HttpRequest {method := (JsonText::bytesToList (project method bytes)), target := (JsonText::bytesToList (project target bytes)), fields := (first read), body := (project body bytes), toolCalls := calls, allowedHosts := (nil (List Nat))}) ((project body next) + 4)))),
   axioms: [Quot.sound, propext],
   executable: true
 }

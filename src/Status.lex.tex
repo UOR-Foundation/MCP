@@ -7,6 +7,7 @@
 \importmodule{JsonRpc}
 \importmodule{Refusal}
 \importmodule{RpcWire}
+\importmodule{Transport}
 \title{MCP HTTP status mapping}
 \begin{semanticmodule}
 definition{name: okStatus, parameters: [], result: Nat, body: 200, executable: true}
@@ -20,6 +21,18 @@ definition{name: tooManyRequestsStatus, parameters: [], result: Nat, body: 429, 
 definition{name: methodNotAllowedStatus, parameters: [], result: Nat, body: 405, executable: true}
 
 definition{name: serverErrorStatus, parameters: [], result: Nat, body: 500, executable: true}
+
+definition{name: forbiddenStatus, parameters: [], result: Nat, body: 403, executable: true}
+
+definition{
+  name: transportStatus,
+  parameters: [refusal : Transport::TransportRefusal],
+  result: Nat,
+  body: (match refusal
+    | Transport::TransportRefusal.forbiddenOrigin => (forbiddenStatus)
+    | Transport::TransportRefusal.forbiddenHost => (forbiddenStatus)),
+  executable: true
+}
 
 definition{
   name: providerStatus,
@@ -260,6 +273,20 @@ theorem{
   name: an_invalid_prompt_argument_is_a_bad_request,
   parameters: [reason : String],
   statement: ((statusOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.invalidArguments reason))) = 400),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_forbidden_origin_is_forbidden,
+  parameters: [],
+  statement: ((transportStatus (ctor Transport::TransportRefusal.forbiddenOrigin)) = 403),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_forbidden_host_is_forbidden,
+  parameters: [],
+  statement: ((transportStatus (ctor Transport::TransportRefusal.forbiddenHost)) = 403),
   proof: reflexivity{}
 }
 \end{semanticmodule}

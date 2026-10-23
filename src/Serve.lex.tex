@@ -19,6 +19,7 @@
 \importmodule{Sanitize}
 \importmodule{Status}
 \importmodule{Tools}
+\importmodule{Transport}
 \importmodule{Validation}
 \title{MCP stateless serving}
 \begin{semanticmodule}
@@ -161,23 +162,31 @@ definition{
 }
 
 definition{
+  name: streamed,
+  parameters: [accepts : Bool, response : Http::HttpResponse, notes : (List (List Nat))],
+  result: Http::HttpResponse,
+  body: (if (Transport::shouldStream accepts (project response status) notes) then (Transport::streamResponse (project response status) (prim append notes (cons (project response body) (nil (List Nat))) : (List (List Nat)))) else response),
+  executable: true
+}
+
+definition{
   name: withNotes,
-  parameters: [response : Http::HttpResponse, encoded : (Option (List (List Nat)))],
+  parameters: [accepts : Bool, response : Http::HttpResponse, encoded : (Option (List (List Nat)))],
   result: Http::HttpResponse,
   body: (match encoded
     | Option.none => (internalResponse)
-    | Option.some built => (record Http::HttpResponse {status := (project response status), fields := (project response fields), notifications := (JsonRead::reverseOnto [(List Nat)] built (nil (List Nat))), body := (project response body)})),
+    | Option.some built => (streamed accepts response (JsonRead::reverseOnto [(List Nat)] built (nil (List Nat))))),
   executable: true
 }
 
 definition{
   name: respond,
-  parameters: [handled : Dispatch::Handled],
+  parameters: [accepts : Bool, handled : Dispatch::Handled],
   result: Http::HttpResponse,
   body: (match (project handled outcome)
     | Result.ok reply => (match (ResultJson::resultObject reply)
       | Option.none => (internalResponse)
-      | Option.some found => (withNotes (jsonResponse (Status::okStatus) (RpcWire::resultResponse (project handled id) found)) (notesOnto (project reply notes) (nil (List Nat)))))
+      | Option.some found => (withNotes accepts (jsonResponse (Status::okStatus) (RpcWire::resultResponse (project handled id) found)) (notesOnto (project reply notes) (nil (List Nat)))))
     | Result.error refusal => (jsonResponse (Status::statusOf refusal) (RpcWire::errorResponse (ctor Option.some [JsonRpc::RequestId] (project handled id)) (Refusal::errorObjectOf refusal)))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
@@ -193,7 +202,7 @@ definition{
     rpc : JsonRpc::Request
   ],
   result: Http::HttpResponse,
-  body: (respond (Dispatch::handleWith info answer used (ctor Option.some [Validation::Headers] (Http::headersOf fields (project info paramRules) (toolNameOf rpc) (project rpc method))) (Validation::supportedVersions) rpc)),
+  body: (respond (Transport::acceptsStream fields) (Dispatch::handleWith info answer used (ctor Option.some [Validation::Headers] (Http::headersOf fields (project info paramRules) (toolNameOf rpc) (project rpc method))) (Validation::supportedVersions) rpc)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -233,7 +242,16 @@ definition{
 }
 
 definition{
-  name: serveRequest,
+  name: forbiddenResponse,
+  parameters: [refusal : Transport::TransportRefusal],
+  result: Http::HttpResponse,
+  body: (jsonResponse (Status::transportStatus refusal) (RpcWire::errorResponse (ctor Option.none [JsonRpc::RequestId]) (Transport::refusalObject refusal))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: serveOpen,
   parameters: [
     info : Extension::ProviderInfo,
     answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
@@ -241,6 +259,35 @@ definition{
   ],
   result: Http::HttpResponse,
   body: (if (Http::isPost (project request method)) then (afterParse info answer (project request toolCalls) (project request fields) (JsonRead::readJson (project request body))) else (notAllowedResponse)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: serveGated,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    request : Http::HttpRequest,
+    gate : (Option Transport::TransportRefusal)
+  ],
+  result: Http::HttpResponse,
+  body: (match gate
+    | Option.some refusal => (forbiddenResponse refusal)
+    | Option.none => (serveOpen info answer request)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: serveRequest,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    request : Http::HttpRequest
+  ],
+  result: Http::HttpResponse,
+  body: (serveGated info answer request (Transport::gateOf (project request fields) (project request allowedHosts))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }

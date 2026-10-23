@@ -1,0 +1,470 @@
+\begin{lexlean}{Transport}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Http}
+\importmodule{Json}
+\importmodule{JsonRead}
+\importmodule{JsonRpc}
+\title{MCP Streamable HTTP transport}
+\begin{semanticmodule}
+inductive{
+  name: TransportRefusal,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: forbiddenOrigin, fields: []}, {name: forbiddenHost, fields: []}]
+}
+
+definition{
+  name: eventStreamType,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 116 (cons 101 (cons 120 (cons 116 (cons 47 (cons 101 (cons 118 (cons 101 (cons 110 (cons 116 (cons 45 (cons 115 (cons 116 (cons 114 (cons 101 (cons 97 (cons 109 (nil Nat)))))))))))))))))),
+  executable: true
+}
+
+definition{
+  name: acceptName,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 65 (cons 99 (cons 99 (cons 101 (cons 112 (cons 116 (nil Nat))))))),
+  executable: true
+}
+
+definition{
+  name: originName,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 79 (cons 114 (cons 105 (cons 103 (cons 105 (cons 110 (nil Nat))))))),
+  executable: true
+}
+
+definition{
+  name: hostName,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 72 (cons 111 (cons 115 (cons 116 (nil Nat))))),
+  executable: true
+}
+
+definition{
+  name: localhostName,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 108 (cons 111 (cons 99 (cons 97 (cons 108 (cons 104 (cons 111 (cons 115 (cons 116 (nil Nat)))))))))),
+  executable: true
+}
+
+definition{
+  name: loopbackFour,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 49 (cons 50 (cons 55 (cons 46 (cons 48 (cons 46 (cons 48 (cons 46 (cons 49 (nil Nat)))))))))),
+  executable: true
+}
+
+definition{
+  name: loopbackSix,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 91 (cons 58 (cons 58 (cons 49 (cons 93 (nil Nat)))))),
+  executable: true
+}
+
+definition{
+  name: dataPrefix,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 100 (cons 97 (cons 116 (cons 97 (cons 58 (cons 32 (nil Nat))))))),
+  executable: true
+}
+
+definition{
+  name: eventEnd,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 10 (cons 10 (nil Nat))),
+  executable: true
+}
+
+definition{
+  name: contentTypeName,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 67 (cons 111 (cons 110 (cons 116 (cons 101 (cons 110 (cons 116 (cons 45 (cons 84 (cons 121 (cons 112 (cons 101 (nil Nat))))))))))))),
+  executable: true
+}
+
+definition{
+  name: cacheControlName,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 67 (cons 97 (cons 99 (cons 104 (cons 101 (cons 45 (cons 67 (cons 111 (cons 110 (cons 116 (cons 114 (cons 111 (cons 108 (nil Nat)))))))))))))),
+  executable: true
+}
+
+definition{
+  name: noCacheValue,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 110 (cons 111 (cons 45 (cons 99 (cons 97 (cons 99 (cons 104 (cons 101 (nil Nat))))))))),
+  executable: true
+}
+
+definition{
+  name: bufferingName,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 88 (cons 45 (cons 65 (cons 99 (cons 99 (cons 101 (cons 108 (cons 45 (cons 66 (cons 117 (cons 102 (cons 102 (cons 101 (cons 114 (cons 105 (cons 110 (cons 103 (nil Nat)))))))))))))))))),
+  executable: true
+}
+
+definition{
+  name: noValue,
+  parameters: [],
+  result: (List Nat),
+  body: (cons 110 (cons 111 (nil Nat))),
+  executable: true
+}
+
+definition{name: forbiddenCode, parameters: [], result: Int, body: (-32000 : Int), executable: true}
+
+definition{
+  name: refusalMessage,
+  parameters: [refusal : TransportRefusal],
+  result: String,
+  body: (match refusal
+    | TransportRefusal.forbiddenOrigin => "Forbidden: invalid Origin"
+    | TransportRefusal.forbiddenHost => "Forbidden: invalid Host"),
+  executable: true
+}
+
+definition{
+  name: refusalObject,
+  parameters: [refusal : TransportRefusal],
+  result: JsonRpc::ErrorObject,
+  body: (record JsonRpc::ErrorObject {code := (forbiddenCode), message := (refusalMessage refusal), data := (ctor Option.none [Json::Json])}),
+  executable: true
+}
+
+definition{
+  name: isDigit,
+  parameters: [byte : Nat],
+  result: Bool,
+  body: ((47 <? byte) && (byte <? 58)),
+  executable: true
+}
+
+definition{
+  name: allDigits,
+  parameters: [bytes : (List Nat)],
+  result: Bool,
+  body: (match bytes
+    | List.nil => true
+    | List.cons head tail => (if (isDigit head) then (allDigits tail) else false)),
+  executable: true,
+  recursive_argument: bytes
+}
+
+definition{
+  name: portOk,
+  parameters: [rest : (List Nat)],
+  result: Bool,
+  body: (match rest
+    | List.nil => true
+    | List.cons colon digits => (if (colon =? 58) then (match digits
+      | List.nil => false
+      | List.cons digit more => (allDigits digits)) else false)),
+  executable: true
+}
+
+definition{
+  name: closeBracket,
+  parameters: [bytes : (List Nat), built : (List Nat)],
+  result: (Option ((List Nat) * (List Nat))),
+  body: (match bytes
+    | List.nil => (ctor Option.none [((List Nat) * (List Nat))])
+    | List.cons head tail => (if (head =? 93) then (ctor Option.some [((List Nat) * (List Nat))] ((Http::reverseOnto (cons head built) (nil Nat)), tail)) else (closeBracket tail (cons head built)))),
+  executable: true,
+  recursive_argument: bytes
+}
+
+definition{
+  name: plainHost,
+  parameters: [bytes : (List Nat), built : (List Nat)],
+  result: (Option ((List Nat) * (List Nat))),
+  body: (match bytes
+    | List.nil => (ctor Option.some [((List Nat) * (List Nat))] ((Http::reverseOnto built (nil Nat)), (nil Nat)))
+    | List.cons head tail => (if (head =? 58) then (ctor Option.some [((List Nat) * (List Nat))] ((Http::reverseOnto built (nil Nat)), (cons head tail))) else (plainHost tail (cons head built)))),
+  executable: true,
+  recursive_argument: bytes
+}
+
+definition{
+  name: finishHost,
+  parameters: [split : (Option ((List Nat) * (List Nat)))],
+  result: (Option (List Nat)),
+  body: (match split
+    | Option.none => (ctor Option.none [(List Nat)])
+    | Option.some pair => (if (portOk (second pair)) then (ctor Option.some [(List Nat)] (first pair)) else (ctor Option.none [(List Nat)]))),
+  executable: true
+}
+
+definition{
+  name: hostOf,
+  parameters: [authority : (List Nat)],
+  result: (Option (List Nat)),
+  body: (match authority
+    | List.nil => (ctor Option.none [(List Nat)])
+    | List.cons head tail => (if (head =? 91) then (finishHost (closeBracket tail (cons head (nil Nat)))) else (finishHost (plainHost authority (nil Nat))))),
+  executable: true
+}
+
+definition{
+  name: slashes,
+  parameters: [bytes : (List Nat)],
+  result: (Option (List Nat)),
+  body: (match bytes
+    | List.nil => (ctor Option.none [(List Nat)])
+    | List.cons one tail => (match tail
+      | List.nil => (ctor Option.none [(List Nat)])
+      | List.cons two rest => (if ((one =? 47) && (two =? 47)) then (ctor Option.some [(List Nat)] rest) else (ctor Option.none [(List Nat)])))),
+  executable: true
+}
+
+definition{
+  name: skipScheme,
+  parameters: [bytes : (List Nat)],
+  result: (Option (List Nat)),
+  body: (match bytes
+    | List.nil => (ctor Option.none [(List Nat)])
+    | List.cons head tail => (if (head =? 58) then (slashes tail) else (skipScheme tail))),
+  executable: true,
+  recursive_argument: bytes
+}
+
+definition{
+  name: originHost,
+  parameters: [value : (List Nat)],
+  result: (Option (List Nat)),
+  body: (match (skipScheme value)
+    | Option.none => (ctor Option.none [(List Nat)])
+    | Option.some authority => (hostOf authority)),
+  executable: true
+}
+
+definition{
+  name: anyName,
+  parameters: [host : (List Nat), names : (List (List Nat))],
+  result: Bool,
+  body: (match names
+    | List.nil => false
+    | List.cons candidate rest => (if (Http::sameName host candidate) then true else (anyName host rest))),
+  executable: true,
+  recursive_argument: names
+}
+
+definition{
+  name: hostAllowed,
+  parameters: [host : (List Nat), extra : (List (List Nat))],
+  result: Bool,
+  body: (if (Http::sameName host (localhostName)) then true else (if (Http::sameName host (loopbackFour)) then true else (if (Http::sameName host (loopbackSix)) then true else (anyName host extra)))),
+  executable: true
+}
+
+definition{
+  name: judge,
+  parameters: [host : (Option (List Nat)), extra : (List (List Nat)), refusal : TransportRefusal],
+  result: (Option TransportRefusal),
+  body: (match host
+    | Option.none => (ctor Option.some [TransportRefusal] refusal)
+    | Option.some candidate => (if (hostAllowed candidate extra) then (ctor Option.none [TransportRefusal]) else (ctor Option.some [TransportRefusal] refusal))),
+  executable: true
+}
+
+definition{
+  name: originProblem,
+  parameters: [fields : (List Http::Field), extra : (List (List Nat))],
+  result: (Option TransportRefusal),
+  body: (match (Http::readField fields (originName))
+    | Http::Reading.absent => (ctor Option.none [TransportRefusal])
+    | Http::Reading.malformed => (ctor Option.some [TransportRefusal] (ctor TransportRefusal.forbiddenOrigin))
+    | Http::Reading.repeated => (ctor Option.some [TransportRefusal] (ctor TransportRefusal.forbiddenOrigin))
+    | Http::Reading.value content => (judge (originHost content) extra (ctor TransportRefusal.forbiddenOrigin))),
+  executable: true
+}
+
+definition{
+  name: hostProblem,
+  parameters: [fields : (List Http::Field), extra : (List (List Nat))],
+  result: (Option TransportRefusal),
+  body: (match (Http::readField fields (hostName))
+    | Http::Reading.absent => (ctor Option.none [TransportRefusal])
+    | Http::Reading.malformed => (ctor Option.some [TransportRefusal] (ctor TransportRefusal.forbiddenHost))
+    | Http::Reading.repeated => (ctor Option.some [TransportRefusal] (ctor TransportRefusal.forbiddenHost))
+    | Http::Reading.value content => (judge (hostOf content) extra (ctor TransportRefusal.forbiddenHost))),
+  executable: true
+}
+
+definition{
+  name: gateOf,
+  parameters: [fields : (List Http::Field), extra : (List (List Nat))],
+  result: (Option TransportRefusal),
+  body: (match (originProblem fields extra)
+    | Option.some refusal => (ctor Option.some [TransportRefusal] refusal)
+    | Option.none => (hostProblem fields extra)),
+  executable: true
+}
+
+definition{
+  name: splitOn,
+  parameters: [
+    separator : Nat,
+    bytes : (List Nat),
+    current : (List Nat),
+    parts : (List (List Nat))
+  ],
+  result: (List (List Nat)),
+  body: (match bytes
+    | List.nil => (JsonRead::reverseOnto [(List Nat)] (cons (Http::reverseOnto current (nil Nat)) parts) (nil (List Nat)))
+    | List.cons head tail => (if (head =? separator) then (splitOn separator tail (nil Nat) (cons (Http::reverseOnto current (nil Nat)) parts)) else (splitOn separator tail (cons head current) parts))),
+  executable: true,
+  recursive_argument: bytes
+}
+
+definition{
+  name: onlyZeroOrDot,
+  parameters: [bytes : (List Nat)],
+  result: Bool,
+  body: (match bytes
+    | List.nil => true
+    | List.cons head tail => (if ((head =? 48) || (head =? 46)) then (onlyZeroOrDot tail) else false)),
+  executable: true,
+  recursive_argument: bytes
+}
+
+definition{
+  name: qIsZero,
+  parameters: [rest : (List Nat)],
+  result: Bool,
+  body: (match rest
+    | List.nil => false
+    | List.cons head tail => (if (head =? 48) then (onlyZeroOrDot tail) else false)),
+  executable: true
+}
+
+definition{
+  name: weightIsZero,
+  parameters: [parameter : (List Nat)],
+  result: Bool,
+  body: (match parameter
+    | List.nil => false
+    | List.cons letter tail => (match tail
+      | List.nil => false
+      | List.cons equals rest => (if (((Http::lowerByte letter) =? 113) && (equals =? 61)) then (qIsZero rest) else false))),
+  executable: true
+}
+
+definition{
+  name: anyZeroWeight,
+  parameters: [params : (List (List Nat))],
+  result: Bool,
+  body: (match params
+    | List.nil => false
+    | List.cons parameter more => (if (weightIsZero (Http::trimOws parameter)) then true else (anyZeroWeight more))),
+  executable: true,
+  recursive_argument: params
+}
+
+definition{
+  name: elementAccepts,
+  parameters: [element : (List Nat)],
+  result: Bool,
+  body: (match (splitOn 59 element (nil Nat) (nil (List Nat)))
+    | List.nil => false
+    | List.cons media params => (if (anyZeroWeight params) then false else (Http::sameName (Http::trimOws media) (eventStreamType)))),
+  executable: true
+}
+
+definition{
+  name: elementsAccept,
+  parameters: [elements : (List (List Nat))],
+  result: Bool,
+  body: (match elements
+    | List.nil => false
+    | List.cons element rest => (if (elementAccepts element) then true else (elementsAccept rest))),
+  executable: true,
+  recursive_argument: elements
+}
+
+definition{
+  name: acceptsStream,
+  parameters: [fields : (List Http::Field)],
+  result: Bool,
+  body: (match fields
+    | List.nil => false
+    | List.cons entry rest => (if (Http::sameName (project entry name) (acceptName)) then (if (elementsAccept (splitOn 44 (project entry value) (nil Nat) (nil (List Nat)))) then true else (acceptsStream rest)) else (acceptsStream rest))),
+  executable: true,
+  recursive_argument: fields
+}
+
+definition{
+  name: eventOf,
+  parameters: [message : (List Nat)],
+  result: (List Nat),
+  body: (prim append (dataPrefix) (prim append message (eventEnd) : (List Nat)) : (List Nat)),
+  executable: true
+}
+
+definition{
+  name: streamOnto,
+  parameters: [reversed : (List (List Nat)), built : (List Nat)],
+  result: (List Nat),
+  body: (match reversed
+    | List.nil => built
+    | List.cons head tail => (streamOnto tail (prim append (eventOf head) built : (List Nat)))),
+  executable: true,
+  recursive_argument: reversed
+}
+
+definition{
+  name: streamOf,
+  parameters: [messages : (List (List Nat))],
+  result: (List Nat),
+  body: (streamOnto (JsonRead::reverseOnto [(List Nat)] messages (nil (List Nat))) (nil Nat)),
+  executable: true
+}
+
+definition{
+  name: streamFields,
+  parameters: [],
+  result: (List Http::Field),
+  body: (cons (record Http::Field {name := (contentTypeName), value := (eventStreamType)}) (cons (record Http::Field {name := (cacheControlName), value := (noCacheValue)}) (cons (record Http::Field {name := (bufferingName), value := (noValue)}) (nil Http::Field)))),
+  executable: true
+}
+
+definition{
+  name: hasMessages,
+  parameters: [messages : (List (List Nat))],
+  result: Bool,
+  body: (match messages | List.nil => false | List.cons head tail => true),
+  executable: true
+}
+
+definition{
+  name: shouldStream,
+  parameters: [accepts : Bool, status : Nat, messages : (List (List Nat))],
+  result: Bool,
+  body: (if accepts then (if (hasMessages messages) then (status =? 200) else false) else false),
+  executable: true
+}
+
+definition{
+  name: streamResponse,
+  parameters: [status : Nat, messages : (List (List Nat))],
+  result: Http::HttpResponse,
+  body: (record Http::HttpResponse {status := status, fields := (streamFields), notifications := (nil (List Nat)), body := (streamOf messages)}),
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

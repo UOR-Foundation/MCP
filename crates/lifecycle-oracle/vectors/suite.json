@@ -2113,8 +2113,8 @@
    "checks": [
     "sep-2575-http-server-no-independent-requests-on-stream"
    ],
-   "reason": "a response stream the connection holds open; the core answers one body per request and streams belong to the transport (issue 11)",
-   "owner": "#11"
+   "reason": "the probe calls the diagnostic tool test_streaming_elicitation, which the fixture does not list, so the suite itself reports the stream as not testable; the tool answers with an input-required result (issue 10). The event-stream framing the probe reads is covered by SH-01",
+   "owner": "#10"
   },
   {
    "line": 947,
@@ -2123,89 +2123,7 @@
    "checks": [
     "sep-2575-server-no-log-without-loglevel"
    ],
-   "reason": "a response stream the connection holds open; the core answers one body per request and streams belong to the transport; the fixture declares no logging capability (issue 11)",
-   "owner": "#11"
-  },
-  {
-   "line": 1037,
-   "quote": "streamFrames = await listenToStream(",
-   "scenario": "server-stateless",
-   "checks": [
-    "sep-2575-server-sends-subscription-ack",
-    "sep-2575-server-tags-subscription-id"
-   ],
-   "reason": "a response stream the connection holds open; the core answers one body per request and streams belong to the transport and the subscriptions/listen method, which the core does not register (issue 11)",
-   "owner": "#11"
-  },
-  {
-   "line": 1043,
-   "quote": "await sendRpc('tools/call', {",
-   "scenario": "server-stateless",
-   "checks": [
-    "sep-2575-server-sends-subscription-ack",
-    "sep-2575-server-tags-subscription-id"
-   ],
-   "reason": "the trigger the stream at line 1037 observes (issue 11)",
-   "owner": "#11"
-  },
-  {
-   "line": 1144,
-   "quote": "const narrowFrames = await listenToStream(",
-   "scenario": "server-stateless",
-   "checks": [
-    "sep-2575-server-honors-notification-filter"
-   ],
-   "reason": "a response stream the connection holds open; the core answers one body per request and streams belong to the transport (issue 11)",
-   "owner": "#11"
-  },
-  {
-   "line": 1150,
-   "quote": "await sendRpc('tools/call', {",
-   "scenario": "server-stateless",
-   "checks": [
-    "sep-2575-server-honors-notification-filter"
-   ],
-   "reason": "the trigger the stream at line 1144 observes (issue 11)",
-   "owner": "#11"
-  },
-  {
-   "line": 1209,
-   "quote": "const frames = await listenToStream(",
-   "scenario": "server-stateless",
-   "checks": [
-    "sep-2575-server-sends-prompts-list-changed-on-subscription"
-   ],
-   "reason": "a response stream the connection holds open; the core answers one body per request and streams belong to the transport and a trigger that changes the prompt list (issues 9 and 11)",
-   "owner": "#11"
-  },
-  {
-   "line": 1215,
-   "quote": "trigger = await sendRpc('tools/call', {",
-   "scenario": "server-stateless",
-   "checks": [
-    "sep-2575-server-sends-prompts-list-changed-on-subscription"
-   ],
-   "reason": "the trigger the stream at line 1209 observes (issues 9 and 11)",
-   "owner": "#11"
-  },
-  {
-   "line": 1279,
-   "quote": "const frames = await listenToStream(",
-   "scenario": "server-stateless",
-   "checks": [
-    "sep-2575-server-sends-tools-list-changed-on-subscription"
-   ],
-   "reason": "a response stream the connection holds open; the core answers one body per request and streams belong to the transport and a trigger that changes the tool list (issues 8 and 11)",
-   "owner": "#11"
-  },
-  {
-   "line": 1285,
-   "quote": "trigger = await sendRpc('tools/call', {",
-   "scenario": "server-stateless",
-   "checks": [
-    "sep-2575-server-sends-tools-list-changed-on-subscription"
-   ],
-   "reason": "the trigger the stream at line 1279 observes (issues 8 and 11)",
+   "reason": "the probe calls the diagnostic tool test_logging_tool, which the fixture does not list (it declares no logging capability), so the suite itself reports it as not testable. The event-stream framing the probe reads is covered by SH-01",
    "owner": "#11"
   }
  ],

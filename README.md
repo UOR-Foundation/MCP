@@ -43,16 +43,19 @@ MCP's own oracles, so this repository makes no conformance claim.
 | `Serve`, `Fixture`, `Crowd` | the pipeline from an encoded request to an encoded response, and its production roots `fixtureRun` over the tool catalog of the conformance fixture and `crowdRun` over a catalog of 60 tools ([LIFECYCLE.md](LIFECYCLE.md), [TOOLS.md](TOOLS.md)) |
 | `Numeric`, `JsonEq`, `Schema`, `Admission`, `Sanitize`, `Tools`, `ToolLaws` | the tools layer: number comparison, JSON equality, a JSON Schema 2020-12 validator, catalog admission and the parameter rules derived from `x-mcp-header`, output sanitization, `tools/list` and `tools/call`, the rate-limit decision, and their theorems ([TOOLS.md](TOOLS.md)) |
 | `Resources`, `ResourceFixture`, `ResourceLaws` | the resources layer: `resources/list`, `resources/read`, `resources/templates/list`, `prompts/list`, `prompts/get` and `completion/complete`, their refusals and cache hints, the catalogs of the conformance fixture, and their theorems ([RESOURCES.md](RESOURCES.md)) |
+| `Transport`, `TransportLaws` | the Streamable HTTP transport: the response event stream and its framing, the `Accept` negotiation, the `Origin` and `Host` allow-list against DNS rebinding, and their theorems ([TRANSPORT.md](TRANSPORT.md)) |
 
 What is not modeled: the JSON encoding of the result bodies of `tasks/get`, `tasks/update`,
 `tasks/cancel` and of the interim `input_required` and `task` results,
 the `subscriptions/listen` stream (its params and result types are declared,
-but the method is not dispatched), server notifications, and host effects.
+but the method is not dispatched), server notifications other than progress, and host effects
+(sockets, the loopback binding, closing a stream).
 
 - The claim registers in `model/` hold the JSON text codec (JC-01 to JC-14) and the
   stateless lifecycle and HTTP header capabilities of #7 (LC-01 to LC-16, HH-01 to HH-13),
-  the tools of #8 (TL-01 to TL-18), and the resources, resource templates, prompts,
-  completion and caching capabilities of #9 (RP-01 to RP-19).
+  the tools of #8 (TL-01 to TL-18), the resources, resource templates, prompts,
+  completion and caching capabilities of #9 (RP-01 to RP-19) and the Streamable HTTP
+  transport of #11 (SH-01 to SH-10).
   No other protocol capability is registered and none is claimed, and the conformance
   scenarios have not been run against a conformance build (#13).
 - The repository is not bound to a PrismPM SDK release (#4): `prismpm.lock` and

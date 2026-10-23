@@ -366,7 +366,7 @@ statement = "The Mcp-Param rules the HTTP layer enforces are derived from the x-
 id = "TL-13"
 level = "build"
 suite = "tools"
-statement = "A tools/call whose _meta carries a progressToken is answered with the progress notifications the tool produced, in order, each a JSON-RPC notifications/progress whose progressToken is the request's token and whose progress is strictly greater than the one before; a request without a token gets none; the notifications travel beside the body in the response frame, and their SSE encoding is issue 11."
+statement = "A tools/call whose _meta carries a progressToken is answered with the progress notifications the tool produced, in order, each a JSON-RPC notifications/progress whose progressToken is the request's token and whose progress is strictly greater than the one before; a request without a token gets none; when the client accepts text/event-stream they are the first events of the response stream and the result is the last (SH-01), and otherwise the answer is the result alone."
 
 [[id]]
 id = "TL-14"
@@ -511,3 +511,65 @@ id = "RP-19"
 level = "build"
 suite = "resources"
 statement = "Every text of a prompts/get result is sanitized before it is written, as the text of a tools/call result is (TL-15), because a prompt echoes the arguments a client sent; the contents of resources/read are written as the catalog stores them."
+
+# Streamable HTTP transport (issue 11): SH-01..SH-10.
+
+[[id]]
+id = "SH-01"
+level = "build"
+suite = "transport"
+statement = "A request that accepts text/event-stream and is answered with HTTP status 200 and progress notifications is answered as an event stream with Content-Type text/event-stream, Cache-Control no-cache and X-Accel-Buffering no; the body is the notifications in the order the tool produced them and then the result, each message one event of a single data line holding the compact JSON-RPC message and ending in a blank line, with no id, event or retry field because resumption is not supported, so that a client following the WHATWG event stream format reads the messages in order with the result last; a kernel-checked theorem states the framing."
+
+[[id]]
+id = "SH-02"
+level = "build"
+suite = "transport"
+statement = "An answer that is not an event stream is the single JSON object with Content-Type application/json: when the request does not accept text/event-stream (no Accept field, a media range other than the event stream itself, or a weight of zero), when the answer carries no notification, and for every status other than 200; a client that does not accept the stream receives the result alone, without the progress notifications; kernel-checked theorems state the cases of the Accept field."
+
+[[id]]
+id = "SH-03"
+level = "build"
+suite = "transport"
+statement = "Every POST is its own exchange and its own response stream: the answer to a request is a function of its frame alone, so the concurrent POSTs of server-sse-multiple-streams are independent, each stream carries only its own request id and progress token, and the core keeps nothing between them; one stream per connection and the closing of a stream as cancellation belong to the host adapter (PrismPM#216)."
+
+[[id]]
+id = "SH-04"
+level = "build"
+suite = "transport"
+statement = "A request whose Origin is present and names a host outside the allow-list (the loopback names localhost, 127.0.0.1 and [::1] with any port, and the names the host adds to the frame) is refused as forbiddenOrigin with HTTP status 403 and a JSON-RPC error with code -32000 and no id member, before the method, the body or the provider is read; a request whose Origin and Host both name an allowed host is served as before; a kernel-checked theorem states that a refused request is answered by the refusal alone."
+
+[[id]]
+id = "SH-05"
+level = "build"
+suite = "transport"
+statement = "A request whose Host is present and names a host outside the allow-list is refused as forbiddenHost with HTTP status 403 and the same body shape; the Origin is judged before the Host; a request with no Origin, or with no Host, is not refused for its absence, because a browser sends both on a rebinding request and a client that is not a browser sends neither."
+
+[[id]]
+id = "SH-06"
+level = "build"
+suite = "transport"
+statement = "The streaming probes of server-stateless that issue 7 left to this issue: server/discover advertises no listChanged and no subscribe capability and subscriptions/listen is answered as methodNotFound (-32601, HTTP status 404), which the scenario reads as a feature that is absent, so the probes at lines 1037 and 1144 are vectors and those at 1209 and 1279 are not reached; the probes at lines 887 and 947 need diagnostic tools the fixture does not list and are listed as not run."
+
+[[id]]
+id = "SH-07"
+level = "build"
+suite = "transport"
+statement = "An Origin or Host the core cannot judge is refused like a foreign one: the opaque origin null, a value with a path or user information, a port that is not digits or is empty, an Origin without a scheme, an unclosed bracket, an empty value, a repeated field and a value with a control byte; a name that only starts like an allowed one (localhost.evil.example) is refused; names compare without regard to case and optional whitespace is not part of a value."
+
+[[id]]
+id = "SH-08"
+level = "build"
+suite = "transport"
+statement = "The host's allow-list rides in the request frame after the tool-call count as a count and length-prefixed names: a frame that ends after the count carries none, a name in the list is allowed, a name not in it is refused, and a frame cut inside the list or followed by bytes after it is a frame the core cannot read (HTTP status 500)."
+
+[[id]]
+id = "SH-09"
+level = "build"
+suite = "transport"
+statement = "No function of the transport recurses except as a loop: an Accept field of two hundred thousand media ranges and an allow-list of one hundred thousand names are judged on the default 2 MiB stack."
+
+[[id]]
+id = "SH-10"
+level = "build"
+suite = "transport"
+statement = "The transport scenarios and the streaming probes are accounted for: every request the vendored sse-multiple-streams.ts and dns-rebinding.ts send is a vector, every check id they emit is a vector's or is listed, and each probe of server-stateless that issue 7 left to this issue is a vector or is listed with a reason and an owner."

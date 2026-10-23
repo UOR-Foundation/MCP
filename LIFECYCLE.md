@@ -30,7 +30,7 @@ then params.
 | `crates/lifecycle-oracle/tests/schema.rs`, `tests/common/mod.rs` | LC-15: every response a test produces is validated against the specification's JSON Schema |
 | `crates/lifecycle-oracle/tests/stress.rs` | LC-16: the largest frames the tests build, on a 2 MiB stack |
 | `crates/lifecycle-oracle/suite/mcp-spec-80041ab0a139a8f4fb3adbc99f7ae9113ea59671` | the vendored `schema/2026-07-28/schema.json` and the licence |
-| `crates/lifecycle-oracle/suite/conformance-232a9014457eaf4c59559916e3d616d2f7f28f05` | the eight vendored suite files |
+| `crates/lifecycle-oracle/suite/conformance-232a9014457eaf4c59559916e3d616d2f7f28f05` | the vendored suite files: eight of #7 and #8, and the two scenarios of [TRANSPORT.md](TRANSPORT.md) |
 
 Regenerate the pins and the package in the same commit as any change to the sources, the
 lock or the pinned compiler (it verifies the project first, which takes about ten minutes
@@ -76,16 +76,18 @@ u32 field_count
   u32 value_length    value
 u32 body_length       body
 u32 tool_calls                          the host's count of tool calls for this client in the current window
+[u32 name_count, then name_count times u32 name_length and name]   the host's allow-list of Origin and Host names, optional
 ```
 
-and nothing after the count. A response frame:
+and nothing after the allow-list. A frame that ends after the count carries no allow-list, so a
+frame written before issue #11 is still read ([TRANSPORT.md](TRANSPORT.md#the-allow-list)). A response frame:
 
 ```
 u32 status
 u32 field_count
   u32 name_length     name              repeated field_count times
   u32 value_length    value
-u32 notification_count
+u32 notification_count                  always 0 since issue #11 (reserved)
   u32 length          notification      one compact JSON-RPC notification, repeated notification_count times
 u32 body_length       body
 ```
@@ -97,11 +99,11 @@ identity (the connection, a token subject or an address); the core only compares
 with `rate.tool_calls`, the limit the provider declares ([TOOLS.md](TOOLS.md#the-rate-limit)).
 An adapter with no limit sends 0.
 
-The notifications are the progress notifications the core produced while answering a
-`tools/call` whose `_meta` carries a `progressToken`. They are not part of the body: the
-`Content-Type` of the response stays `application/json`, and an adapter that finds
-notifications sends the exchange as a stream, the notifications first and the body last
-(`text/event-stream`, issue #11). The core never encodes SSE.
+Progress notifications are in the body. When the request accepts `text/event-stream` and the
+core answers 200 with notifications, the body is an event stream the core encoded (the
+notifications first and the result last) and the `Content-Type` is `text/event-stream`;
+otherwise the body is the single JSON object and no notification is sent
+([TRANSPORT.md](TRANSPORT.md)). The adapter writes the body as it is.
 
 The core decides every status and every field of the response. The adapter:
 
@@ -109,15 +111,18 @@ The core decides every status and every field of the response. The adapter:
   order received, repeated fields as repeated entries) and body unchanged, and writes the
   response status, fields and body unchanged;
 * does not parse, trim, fold, join or reorder a header field;
-* answers 403 for a bad `Origin` and checks `Accept` and `Content-Type` itself (issue
-  #11); the core reads neither;
+* passes `Origin`, `Host` and `Accept` like any other field: the core refuses a forbidden
+  `Origin` or `Host` with 403 and chooses the event stream from `Accept`
+  ([TRANSPORT.md](TRANSPORT.md)). The adapter checks `Content-Type` itself, which the core does
+  not read, and binds the loopback interface;
 * bounds the header count and the body size, for memory (the heap the root uses is linear
   in the frame), and gives the root a stack of 2 MiB, the default of a spawned Rust thread.
   The stack the root needs does not depend on the frame ([The stack](#the-stack)): the
   export states no `recursion` effect and no function of the package calls itself except
   as a loop;
 * counts the tool calls it admits per client and window and passes the count in
-  `tool_calls`, and sends the response as a stream when `notification_count` is not 0;
+  `tool_calls`, passes the host names it was configured with after the count, and writes the
+  response body as it is, closing an event stream after its last event;
 * treats a response with status 500 and the fixed internal-error body as the core's
   answer to a frame it could not read (a truncated frame or trailing bytes).
 
@@ -144,6 +149,7 @@ horizontal tab; any other byte makes the field malformed, which is `headerMismat
 | a `tools/call` when the host's count is at or over the limit | 429, `data.limit` | 429 |
 | a method the server does not offer | -32601 | 404 |
 | a request method other than POST | none; `Allow: POST` | 405 |
+| an `Origin` or `Host` outside the allow-list, judged before anything else | -32000, no `id` member | 403 |
 | a frame the core cannot read, or a message it cannot encode | -32603, no `id` member | 500 |
 
 A kernel-checked theorem in `Status` states that the status follows the code
@@ -219,13 +225,16 @@ absent at the commit that bumped the package to 0.2.0-alpha.10 (`468e535`); the 
 own comment names alpha.10 as its anchor, and between those two commits only lines
 889 to 900 of `stateless.ts` changed, inside a streaming probe that is not run here.
 The authority row `A-MCP-CONFORMANCE` records the commit and a manifest checksum over
-the eight vendored files.
+the ten vendored files.
 
-Not run, with the owning issue (listed in the vectors file as `not_run`): the six
-`listenToStream` probes of `server-stateless` (lines 887, 947, 1037, 1144, 1209 and
-1279) and the four `tools/call` requests that trigger them (lines 1043, 1150, 1215 and
-1285): streams, `subscriptions/listen` and list-changed notifications belong to the
-transport (#11), and their triggers to #8 and #9. In the pinned requirements,
+Not run, with the owning issue (listed in the vectors files as `not_run`): the probes at
+lines 887 and 947 of `server-stateless`, which call the diagnostic tools
+`test_streaming_elicitation` and `test_logging_tool` that the fixture does not list. The other
+streaming probes that #7 left to the transport are accounted for in `vectors/transport.json`
+([TRANSPORT.md](TRANSPORT.md#the-streaming-probes-of-server-stateless)): lines 1037 and 1144 are
+vectors, because `subscriptions/listen` is answered -32601 while `server/discover` advertises no
+subscription capability, which the scenario reads as a feature that is absent, and lines 1043,
+1150, 1209, 1215, 1279 and 1285 are not reached. In the pinned requirements,
 `server-stateless` is a required scenario; `http-header-validation` and
 `http-custom-header-server-validation` are `not_scored`, reason `pending` (SEP-2243).
 
@@ -368,8 +377,9 @@ and `cargo clippy --workspace --all-targets -- -D warnings` pass.
 * The acceptance of #7 is that the scenarios `server-stateless`, `http-header-validation`
   and `http-custom-header-server-validation` pass against the conformance build (#13).
   That build does not exist yet and the scenarios have not been run. Not met.
-* `server-stateless` cannot pass without the streaming probes: `subscriptions/listen`,
-  notifications and logging are not registered (#11).
+* `server-stateless`: the probes at lines 887 and 947 call diagnostic tools the fixture does
+  not list, and `subscriptions/listen`, list-changed notifications and logging are not
+  registered ([TRANSPORT.md](TRANSPORT.md#not-met)).
 * The suite validates each response against its own wire schema before the scenario
   sees it. Here every response is validated against the specification's JSON Schema
   (LC-15) by another validator, which is falsifying evidence; the suite's validator has

@@ -1,0 +1,648 @@
+{
+ "spec": "lifecycle-vectors/1",
+ "suite": {
+  "repository": "https://github.com/modelcontextprotocol/conformance",
+  "commit": "232a9014457eaf4c59559916e3d616d2f7f28f05"
+ },
+ "vectors": [
+  {
+   "id": "SS-01",
+   "scenario": "server-sse-multiple-streams",
+   "file": "src/scenarios/server/sse-multiple-streams.ts",
+   "line": 126,
+   "quote": "const promise = fetch(serverUrl, {",
+   "suite_checks": [
+    "server-accepts-multiple-post-streams",
+    "server-sse-streams-functional"
+   ],
+   "register": [
+    "SH-02",
+    "SH-03"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "text/event-stream, application/json"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":1000,\"method\":\"tools/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/id",
+      "eq": 1000
+     },
+     {
+      "at": "/result/tools",
+      "nonempty_array": true
+     }
+    ]
+   },
+   "note": "Accept lists text/event-stream first. The answer has no notification to deliver, so it is the single JSON object the scenario accepts ('Server returned JSON for all requests - SSE streaming is optional'); the three requests are independent exchanges."
+  },
+  {
+   "id": "SS-02",
+   "scenario": "server-sse-multiple-streams",
+   "file": "src/scenarios/server/sse-multiple-streams.ts",
+   "line": 126,
+   "quote": "const promise = fetch(serverUrl, {",
+   "suite_checks": [
+    "server-accepts-multiple-post-streams",
+    "server-sse-streams-functional"
+   ],
+   "register": [
+    "SH-02",
+    "SH-03"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "text/event-stream, application/json"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":1001,\"method\":\"tools/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/id",
+      "eq": 1001
+     },
+     {
+      "at": "/result/tools",
+      "nonempty_array": true
+     }
+    ]
+   },
+   "note": "Accept lists text/event-stream first. The answer has no notification to deliver, so it is the single JSON object the scenario accepts ('Server returned JSON for all requests - SSE streaming is optional'); the three requests are independent exchanges."
+  },
+  {
+   "id": "SS-03",
+   "scenario": "server-sse-multiple-streams",
+   "file": "src/scenarios/server/sse-multiple-streams.ts",
+   "line": 126,
+   "quote": "const promise = fetch(serverUrl, {",
+   "suite_checks": [
+    "server-accepts-multiple-post-streams",
+    "server-sse-streams-functional"
+   ],
+   "register": [
+    "SH-02",
+    "SH-03"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "text/event-stream, application/json"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":1002,\"method\":\"tools/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/id",
+      "eq": 1002
+     },
+     {
+      "at": "/result/tools",
+      "nonempty_array": true
+     }
+    ]
+   },
+   "note": "Accept lists text/event-stream first. The answer has no notification to deliver, so it is the single JSON object the scenario accepts ('Server returned JSON for all requests - SSE streaming is optional'); the three requests are independent exchanges."
+  },
+  {
+   "id": "SP-01",
+   "scenario": "tools-call-with-progress",
+   "file": "src/scenarios/server/tools.ts",
+   "line": 678,
+   "quote": "const result = await conn.request<CallToolResult>('tools/call', {",
+   "suite_checks": [
+    "tools-call-with-progress"
+   ],
+   "register": [
+    "SH-01"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ],
+     [
+      "Mcp-Name",
+      "test_tool_with_progress"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":306,\"method\":\"tools/call\",\"params\":{\"name\":\"test_tool_with_progress\",\"arguments\":{},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{},\"progressToken\":\"progress-test-1\"}}}"
+   },
+   "expect": {
+    "status": 200,
+    "content_type": "text/event-stream",
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/id",
+      "eq": 306
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     }
+    ],
+    "notifications": [
+     {
+      "progressToken": "progress-test-1",
+      "progress": 0,
+      "total": 100,
+      "message": "Completed step 0 of 100"
+     },
+     {
+      "progressToken": "progress-test-1",
+      "progress": 50,
+      "total": 100,
+      "message": "Completed step 50 of 100"
+     },
+     {
+      "progressToken": "progress-test-1",
+      "progress": 100,
+      "total": 100,
+      "message": "Completed step 100 of 100"
+     }
+    ],
+    "stream_notifications": [
+     "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/progress\",\"params\":{\"progressToken\":\"progress-test-1\",\"progress\":0,\"total\":100,\"message\":\"Completed step 0 of 100\"}}",
+     "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/progress\",\"params\":{\"progressToken\":\"progress-test-1\",\"progress\":50,\"total\":100,\"message\":\"Completed step 50 of 100\"}}",
+     "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/progress\",\"params\":{\"progressToken\":\"progress-test-1\",\"progress\":100,\"total\":100,\"message\":\"Completed step 100 of 100\"}}"
+    ]
+   },
+   "note": "The request accepts the event stream only. The expected notifications are the scenario's; stream_notifications are the exact data lines of the first three events, and the fourth event is the result the same request gets as JSON."
+  },
+  {
+   "id": "DR-01",
+   "scenario": "dns-rebinding-protection",
+   "file": "src/scenarios/server/dns-rebinding.ts",
+   "line": 206,
+   "quote": "const response = await sendRequestWithHostAndOrigin(",
+   "suite_checks": [
+    "localhost-host-rebinding-rejected"
+   ],
+   "register": [
+    "SH-04",
+    "SH-05"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "Mcp-Method",
+      "server/discover"
+     ],
+     [
+      "Host",
+      "evil.example.com"
+     ],
+     [
+      "Origin",
+      "http://evil.example.com"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"server/discover\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-dns-rebinding-test\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 403,
+    "checks": [
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/id",
+      "absent": true
+     },
+     {
+      "at": "/jsonrpc",
+      "eq": "2.0"
+     },
+     {
+      "at": "/error/code",
+      "eq": -32000
+     },
+     {
+      "at": "/error/message",
+      "eq": "Forbidden: invalid Origin"
+     }
+    ]
+   },
+   "note": "Host and Origin both name the attacker. The scenario expects a 4xx; the specification requires 403 for an Origin that is present and invalid, with a body that MAY be a JSON-RPC error that has no id."
+  },
+  {
+   "id": "DR-02",
+   "scenario": "dns-rebinding-protection",
+   "file": "src/scenarios/server/dns-rebinding.ts",
+   "line": 249,
+   "quote": "const response = await sendRequestWithHostAndOrigin(",
+   "suite_checks": [
+    "localhost-host-valid-accepted"
+   ],
+   "register": [
+    "SH-04"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "Mcp-Method",
+      "server/discover"
+     ],
+     [
+      "Host",
+      "127.0.0.1:3000"
+     ],
+     [
+      "Origin",
+      "http://127.0.0.1:3000"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"server/discover\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-dns-rebinding-test\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/id",
+      "eq": 1
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     }
+    ]
+   },
+   "note": "Host and Origin both name the server's own loopback address and port, as the scenario takes them from the server URL."
+  },
+  {
+   "id": "PL-01",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 451,
+   "quote": "const { data } = await sendRpc(",
+   "suite_checks": [
+    "sep-2575-server-implements-discover"
+   ],
+   "register": [
+    "SH-06"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "server/discover"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":201,\"method\":\"server/discover\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/id",
+      "eq": 201
+     },
+     {
+      "at": "/result/capabilities/tools",
+      "is_object": true
+     },
+     {
+      "at": "/result/capabilities/tools/listChanged",
+      "absent": true
+     },
+     {
+      "at": "/result/capabilities/prompts/listChanged",
+      "absent": true
+     },
+     {
+      "at": "/result/capabilities/resources/listChanged",
+      "absent": true
+     },
+     {
+      "at": "/result/capabilities/resources/subscribe",
+      "absent": true
+     }
+    ]
+   },
+   "note": "The scenario reads the capabilities from this answer (advertisesSubscriptions, line 997). The fixture advertises no listChanged and no subscribe, so the scenario treats a -32601 on subscriptions/listen as a feature that is absent and skips the probes at lines 1037, 1144, 1209 and 1279."
+  },
+  {
+   "id": "PL-02",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 1037,
+   "quote": "streamFrames = await listenToStream(",
+   "suite_checks": [
+    "sep-2575-server-sends-subscription-ack",
+    "sep-2575-server-tags-subscription-id"
+   ],
+   "register": [
+    "SH-06"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "subscriptions/listen"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":1760000000001,\"method\":\"subscriptions/listen\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}},\"notifications\":{\"toolsListChanged\":true}}}"
+   },
+   "expect": {
+    "status": 404,
+    "checks": [
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/id",
+      "eq": 1760000000001
+     },
+     {
+      "at": "/error/code",
+      "eq": -32601
+     }
+    ]
+   },
+   "note": "The stream is opened with subscriptions/listen. The core does not register the method, so it answers a 404 with -32601, which listenRejected (line 1007) reads as 'not applicable' because PL-01 shows no subscription capability is advertised."
+  },
+  {
+   "id": "PL-03",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 1144,
+   "quote": "const narrowFrames = await listenToStream(",
+   "suite_checks": [
+    "sep-2575-server-honors-notification-filter"
+   ],
+   "register": [
+    "SH-06"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "subscriptions/listen"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":1760000000002,\"method\":\"subscriptions/listen\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}},\"notifications\":{\"promptsListChanged\":true}}}"
+   },
+   "expect": {
+    "status": 404,
+    "checks": [
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/id",
+      "eq": 1760000000002
+     },
+     {
+      "at": "/error/code",
+      "eq": -32601
+     }
+    ]
+   },
+   "note": "The stream is opened with subscriptions/listen. The core does not register the method, so it answers a 404 with -32601, which listenRejected (line 1007) reads as 'not applicable' because PL-01 shows no subscription capability is advertised."
+  }
+ ],
+ "not_run": [
+  {
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 1043,
+   "quote": "await sendRpc('tools/call', {",
+   "scenario": "server-stateless",
+   "checks": [
+    "sep-2575-server-sends-subscription-ack",
+    "sep-2575-server-tags-subscription-id"
+   ],
+   "reason": "the trigger runs only after the stream at line 1037 delivers a first frame (onFirstFrame); the stream is answered with -32601 (PL-02), so no frame arrives and the callback never runs; subscriptions/listen and list-changed notifications are not registered (a stream the host holds open belongs to the host adapter, PrismPM#216)",
+   "owner": "#11"
+  },
+  {
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 1150,
+   "quote": "await sendRpc('tools/call', {",
+   "scenario": "server-stateless",
+   "checks": [
+    "sep-2575-server-honors-notification-filter"
+   ],
+   "reason": "the trigger runs only after the stream at line 1144 delivers a first frame; the stream is answered with -32601 (PL-03), so the callback never runs; subscriptions/listen and list-changed notifications are not registered (a stream the host holds open belongs to the host adapter, PrismPM#216)",
+   "owner": "#11"
+  },
+  {
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 1209,
+   "quote": "const frames = await listenToStream(",
+   "scenario": "server-stateless",
+   "checks": [
+    "sep-2575-server-sends-prompts-list-changed-on-subscription"
+   ],
+   "reason": "the scenario returns skipped at line 1193, before this line, because server/discover declares no prompts.listChanged (PL-01); subscriptions/listen and list-changed notifications are not registered (a stream the host holds open belongs to the host adapter, PrismPM#216)",
+   "owner": "#11"
+  },
+  {
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 1215,
+   "quote": "trigger = await sendRpc('tools/call', {",
+   "scenario": "server-stateless",
+   "checks": [
+    "sep-2575-server-sends-prompts-list-changed-on-subscription"
+   ],
+   "reason": "the trigger of the stream at line 1209, which the scenario never opens (PL-01); subscriptions/listen and list-changed notifications are not registered (a stream the host holds open belongs to the host adapter, PrismPM#216)",
+   "owner": "#11"
+  },
+  {
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 1279,
+   "quote": "const frames = await listenToStream(",
+   "scenario": "server-stateless",
+   "checks": [
+    "sep-2575-server-sends-tools-list-changed-on-subscription"
+   ],
+   "reason": "the scenario returns skipped at line 1263, before this line, because server/discover declares no tools.listChanged (PL-01); subscriptions/listen and list-changed notifications are not registered (a stream the host holds open belongs to the host adapter, PrismPM#216)",
+   "owner": "#11"
+  },
+  {
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 1285,
+   "quote": "trigger = await sendRpc('tools/call', {",
+   "scenario": "server-stateless",
+   "checks": [
+    "sep-2575-server-sends-tools-list-changed-on-subscription"
+   ],
+   "reason": "the trigger of the stream at line 1279, which the scenario never opens (PL-01); subscriptions/listen and list-changed notifications are not registered (a stream the host holds open belongs to the host adapter, PrismPM#216)",
+   "owner": "#11"
+  }
+ ],
+ "unreached": [
+  {
+   "id": "server-sse-multiple-streams-session",
+   "reason": "emitted only by the stateful lifecycle, which initializes a session first; the stateless revision (2026-07-28) has no sessions, so the scenario never reaches it"
+  },
+  {
+   "id": "server-sse-multiple-streams-error",
+   "reason": "emitted only when the scenario itself throws, for instance when a connection fails"
+  }
+ ]
+}

@@ -8,7 +8,7 @@ use std::path::Path;
 
 use common::{
     all_vectors, hex, manifest_sha256, resources_vector_file, root, suite_root, suite_text,
-    tools_vector_file, vector_file, PIN,
+    tools_vector_file, transport_vector_file, vector_file, PIN,
 };
 use repo_model::Model;
 use serde_json::Value;
@@ -216,7 +216,12 @@ fn line_of(text: &str, line: u64) -> &str {
 fn every_request_a_scenario_sends_is_a_vector_or_a_listed_probe_that_is_not_run_lc_14() {
     let vectors = all_vectors();
     let mut not_run: Vec<Value> = Vec::new();
-    for file in [vector_file(), tools_vector_file(), resources_vector_file()] {
+    for file in [
+        vector_file(),
+        tools_vector_file(),
+        resources_vector_file(),
+        transport_vector_file(),
+    ] {
         not_run.extend(file["not_run"].as_array().expect("not_run").iter().cloned());
     }
     for scenario_file in [
@@ -288,6 +293,19 @@ fn every_check_id_a_scenario_emits_is_covered_or_listed_lc_14() {
     for u in file["unreached"].as_array().expect("unreached") {
         known.insert(u["id"].as_str().expect("id").to_owned());
         assert!(!u["reason"].as_str().expect("reason").is_empty());
+    }
+    // The streaming probes of stateless.ts that issue 11 took over are in the transport
+    // vectors, listed with the suite file they cite.
+    let transport = transport_vector_file();
+    for (key, checks) in [("vectors", "suite_checks"), ("not_run", "checks")] {
+        for entry in transport[key].as_array().expect(key) {
+            let cited = entry["file"].as_str().expect("file");
+            if cited.ends_with("stateless.ts") || cited.ends_with("http-standard-headers.ts") {
+                for c in entry[checks].as_array().expect(checks) {
+                    known.insert(c.as_str().expect("id").to_owned());
+                }
+            }
+        }
     }
     let mut emitted: BTreeSet<String> = BTreeSet::new();
     for scenario_file in [
