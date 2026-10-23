@@ -73,3 +73,15 @@ Feature: JSON text codec
     Given the committed generated package and the vendored corpus
     When their recorded digests are recomputed
     Then they equal the digests in the model and the pinned commit is the one named
+
+  @JC-13 @build
+  Scenario: Reading a JSON string, as a value or as a member name, takes time at most proportional to its length up to a logarithmic factor: at 256 KiB, 1 MiB and 2 MiB, through the codec root and through the lifecycle root, the read finishes within a bound linear in the length and its time grows no more than twice as fast as the length does.
+    Given texts that hold one string, plain or with escapes and multi-byte characters, or one member name, of 256 KiB, 1 MiB and 2 MiB
+    When each is read through the exported codec root and the exported lifecycle root
+    Then each read finishes within the stated linear bound, its canonical text is the expected one, and the time grows no more than twice as fast as the length
+
+  @JC-14 @build
+  Scenario: The Unicode byte validator accepts every well-formed complete three-byte and four-byte sequence and refuses every ill-formed one as RFC 3629 and Table 3-7 state, naming the first byte the table does not admit, by kernel-checked theorems over all byte values with exact axiom policies.
+    Given the lead-byte classes of Table 3-7 for three-byte and four-byte sequences
+    When the theorems of the Utf8 module are checked by the kernel and the validator judges every such sequence
+    Then the validator accepts exactly the well-formed ones, refuses each ill-formed one at the byte the table first refuses, and agrees with the standard library on every sequence

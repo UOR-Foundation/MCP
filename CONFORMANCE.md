@@ -52,6 +52,8 @@ model does not sanction.
 | `JC-10` | `build` | The encoder writes compact RFC 8259 text, escapes quotation mark, reverse solidus and control characters, and refuses a number or nesting outside the declared bounds with encodeNumberOutOfRange or encodeTooDeep. |
 | `JC-11` | `build` | For every text of the pinned JSONTestSuite the parser accepts, encoding the parsed value and parsing the result gives the same canonical bytes; the universal statement over all values is not claimed here. |
 | `JC-12` | `build` | The oracle executes the package generated from the LexLean codec root, whose recorded digest and provenance match the committed files, over the corpus whose pin and checksum match the recorded authority. |
+| `JC-13` | `build` | Reading a JSON string, as a value or as a member name, takes time at most proportional to its length up to a logarithmic factor: at 256 KiB, 1 MiB and 2 MiB, through the codec root and through the lifecycle root, the read finishes within a bound linear in the length and its time grows no more than twice as fast as the length does. |
+| `JC-14` | `build` | The Unicode byte validator accepts every well-formed complete three-byte and four-byte sequence and refuses every ill-formed one as RFC 3629 and Table 3-7 state, naming the first byte the table does not admit, by kernel-checked theorems over all byte values with exact axiom policies. |
 
 ## lifecycle
 
@@ -81,7 +83,7 @@ Never re-derived, vendored, or gated on.
 | Authority | Citation | Evidence here |
 | --- | --- | --- |
 | `A-RFC8259` | T. Bray (ed.), RFC 8259 (STD 90), December 2017, https://www.rfc-editor.org/rfc/rfc8259 | `JC-03`, `JC-04`, `JC-06`, `JC-07` |
-| `A-RFC3629` | F. Yergeau, RFC 3629 (STD 63), November 2003, section 4 syntax and Table 3-7 of the Unicode Standard, https://www.rfc-editor.org/rfc/rfc3629 | `JC-01`, `JC-02` |
+| `A-RFC3629` | F. Yergeau, RFC 3629 (STD 63), November 2003, section 4 syntax and Table 3-7 of the Unicode Standard, https://www.rfc-editor.org/rfc/rfc3629 | `JC-01`, `JC-02`, `JC-14` |
 | `A-JSONTESTSUITE` | N. Seriot, https://github.com/nst/JSONTestSuite at commit 1ef36fa01286573e846ac449e8683f8833c5b26a, directory test_parsing (git tree b936f9acdd24b9f5fefe68b90b9beab2c681137a), MIT licence | `JC-03`, `JC-04`, `JC-05`, `JC-12` |
 | `A-MCP-SPEC-2026-07-28` | https://github.com/modelcontextprotocol/modelcontextprotocol at commit 80041ab0a139a8f4fb3adbc99f7ae9113ea59671, docs/specification/2026-07-28 (basic/lifecycle, basic/transports/streamable-http, server/tools) | `LC-01`, `LC-02`, `LC-03`, `LC-04`, `LC-05`, `LC-06`, `LC-07`, `LC-08`, `LC-09`, `LC-10`, `HH-01`, `HH-02`, `HH-03`, `HH-04`, `HH-06`, `HH-09`, `HH-10`, `HH-11`, `HH-12`, `HH-13` |
 | `A-RFC9110` | R. Fielding, M. Nottingham, J. Reschke (eds.), RFC 9110 (STD 97), June 2022, sections 5.1 (field names are case-insensitive), 5.3 (repeated fields), 5.5 (field values) and 15.5.6 (405 requires Allow), https://www.rfc-editor.org/rfc/rfc9110 | `LC-09`, `HH-05`, `HH-07` |

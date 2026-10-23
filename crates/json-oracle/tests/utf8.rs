@@ -207,3 +207,145 @@ fn a_surrogate_in_the_input_bytes_is_never_a_character_jc_02() {
         }
     }
 }
+
+/// The byte at which Table 3-7 first refuses a complete sequence of `lead`, as an
+/// offset in the sequence, or `None` when it admits all of it. Written from the
+/// table's columns, not from `reference`.
+fn first_refused(sequence: &[u8]) -> Option<u64> {
+    let (lo, hi) = match sequence[0] {
+        0xE0 => (0xA0, 0xBF),
+        0xED => (0x80, 0x9F),
+        0xF0 => (0x90, 0xBF),
+        0xF4 => (0x80, 0x8F),
+        _ => (0x80, 0xBF),
+    };
+    if !(lo..=hi).contains(&sequence[1]) {
+        return Some(1);
+    }
+    (2..sequence.len())
+        .find(|at| !(0x80..=0xBF).contains(&sequence[*at]))
+        .map(|at| at as u64)
+}
+
+#[test]
+fn every_complete_three_byte_sequence_is_judged_as_table_3_7_judges_it_jc_14() {
+    // The space is exhaustive: 16 leads, 256 second bytes and 256 third bytes.
+    let mut accepted = 0usize;
+    for b1 in 0xE0u8..=0xEF {
+        for b2 in 0..=255u8 {
+            for b3 in 0..=255u8 {
+                let sequence = [b1, b2, b3];
+                let got = utf8(&sequence);
+                assert_eq!(class(&got), standard(&sequence), "class of {sequence:02x?}");
+                match first_refused(&sequence) {
+                    None => {
+                        assert_eq!(got, Verdict::Valid, "{sequence:02x?} is well-formed");
+                        accepted += 1;
+                    }
+                    Some(at) => {
+                        assert_eq!(got, Verdict::Invalid(at), "{sequence:02x?}");
+                    }
+                }
+            }
+        }
+    }
+    // U+0800..U+FFFF without the 2048 surrogates.
+    assert_eq!(
+        accepted,
+        0x1_0000 - 0x800 - 0x800,
+        "well-formed three-byte sequences"
+    );
+}
+
+/// The bytes that stand for every class of byte the fourth and third places tell apart.
+const EDGE: [u8; 6] = [0x00, 0x7F, 0x80, 0xBF, 0xC0, 0xFF];
+
+#[test]
+fn every_complete_four_byte_sequence_is_judged_as_table_3_7_judges_it_jc_14() {
+    // Exhaustive over the lead, the second byte and the third byte with six
+    // fourth bytes, and over the lead, the second byte and the fourth byte with six
+    // third bytes; the 2^32 sequences themselves are the theorems' work.
+    let mut accepted = 0usize;
+    let judge = |sequence: [u8; 4]| {
+        let got = utf8(&sequence);
+        assert_eq!(class(&got), standard(&sequence), "class of {sequence:02x?}");
+        match first_refused(&sequence) {
+            None => {
+                assert_eq!(got, Verdict::Valid, "{sequence:02x?} is well-formed");
+                1
+            }
+            Some(at) => {
+                assert_eq!(got, Verdict::Invalid(at), "{sequence:02x?}");
+                0
+            }
+        }
+    };
+    for b1 in 0xF0u8..=0xF4 {
+        for b2 in 0..=255u8 {
+            for b3 in 0..=255u8 {
+                for b4 in EDGE {
+                    let one = judge([b1, b2, b3, b4]);
+                    if b4 == 0x80 {
+                        accepted += one;
+                    }
+                }
+            }
+            for b4 in 0..=255u8 {
+                for b3 in EDGE {
+                    judge([b1, b2, b3, b4]);
+                }
+            }
+        }
+    }
+    // U+10000..U+10FFFF is 2^20 code points; fixing the fourth byte leaves 2^14.
+    assert_eq!(accepted, 0x10_0000 / 64, "well-formed four-byte prefixes");
+}
+
+/// The theorems that state the verdict on complete three- and four-byte sequences,
+/// by the lead-byte classes of Table 3-7: for each class the equation that gives the
+/// scan of the sequence followed by anything, then the same for the sequence alone,
+/// and the two facts that tell when the value of the equation is zero.
+const TABLE_3_7_THEOREMS: [&str; 23] = [
+    "lead_e0_step",
+    "lead_mid3_step",
+    "lead_ed_step",
+    "lead_hi3_step",
+    "lead_f0_step",
+    "lead_mid4_step",
+    "lead_f4_step",
+    "three_byte_e0_sequence",
+    "three_byte_mid3_sequence",
+    "three_byte_ed_sequence",
+    "three_byte_hi3_sequence",
+    "four_byte_f0_sequence",
+    "four_byte_mid4_sequence",
+    "four_byte_f4_sequence",
+    "three_byte_e0_complete",
+    "three_byte_mid3_complete",
+    "three_byte_ed_complete",
+    "three_byte_hi3_complete",
+    "four_byte_f0_complete",
+    "four_byte_mid4_complete",
+    "four_byte_f4_complete",
+    "three_byte_complete_zero_iff",
+    "four_byte_complete_zero_iff",
+];
+
+#[test]
+fn the_table_3_7_theorems_are_declared_in_the_validator_module_jc_14() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../src/Utf8.lex.tex");
+    let source = std::fs::read_to_string(&path).expect("the validator module is readable");
+    for name in TABLE_3_7_THEOREMS {
+        let header = format!("theorem{{\n  name: {name},\n");
+        assert!(
+            source.contains(&header),
+            "src/Utf8.lex.tex declares no theorem `{name}`"
+        );
+    }
+    // A theorem is checked only if it carries a proof the kernel replays: no
+    // placeholder stands in for one.
+    assert!(
+        !source.contains("sorry"),
+        "a placeholder proof in the validator module"
+    );
+}

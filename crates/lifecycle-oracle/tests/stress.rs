@@ -6,10 +6,10 @@
 //! standard headers, a body object with four hundred thousand members, a long
 //! string, JSON nested as deep as the codec admits, and a long Base64 parameter
 //! header. A stack overflow aborts the process, so a passing run is the evidence;
-//! `LIFECYCLE.md` gives the argument that it must pass. The long strings are a
-//! quarter of a mebibyte and less because reading a JSON string is quadratic in its
-//! length in the codec of #20 (`JsonText.listToBytes`): a two-mebibyte string took
-//! five minutes, and `LIFECYCLE.md` records it as a finding.
+//! `LIFECYCLE.md` gives the argument that it must pass. The long strings here are a
+//! quarter of a mebibyte: that they are read in time that grows linearly with their
+//! length, up to two mebibytes, is JC-13, checked in `linear.rs` (reading a string was
+//! quadratic in the codec of #20 until #23 replaced `JsonText.listToBytes`).
 //!
 //! The argument is a property of the package, checked in `provenance.rs`: no function
 //! of it calls itself except as a loop, and its recorded effects do not include
