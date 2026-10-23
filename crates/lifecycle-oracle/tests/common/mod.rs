@@ -115,10 +115,20 @@ pub fn tools_vector_file() -> Value {
         .expect("the tools vectors are JSON")
 }
 
-/// Every vector of both files, the lifecycle vectors first, in file order.
+/// The resources vectors file, parsed: the requests of the pinned resources, prompts,
+/// completion and caching scenarios.
+pub fn resources_vector_file() -> Value {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("vectors")
+        .join("resources.json");
+    serde_json::from_slice(&std::fs::read(path).expect("the resources vectors are committed"))
+        .expect("the resources vectors are JSON")
+}
+
+/// Every vector of the three files, the lifecycle vectors first, in file order.
 pub fn all_vectors() -> Vec<Value> {
     let mut out = Vec::new();
-    for file in [vector_file(), tools_vector_file()] {
+    for file in [vector_file(), tools_vector_file(), resources_vector_file()] {
         out.extend(file["vectors"].as_array().expect("vectors").iter().cloned());
     }
     out
@@ -269,6 +279,12 @@ fn result_def(method: &str) -> Option<&'static str> {
         "server/discover" => "DiscoverResultResponse",
         "tools/list" => "ListToolsResultResponse",
         "tools/call" => "CallToolResultResponse",
+        "resources/list" => "ListResourcesResultResponse",
+        "resources/read" => "ReadResourceResultResponse",
+        "resources/templates/list" => "ListResourceTemplatesResultResponse",
+        "prompts/list" => "ListPromptsResultResponse",
+        "prompts/get" => "GetPromptResultResponse",
+        "completion/complete" => "CompleteResultResponse",
         _ => return None,
     })
 }
@@ -431,6 +447,24 @@ fn check(
     }
     if check.get("present").is_some() {
         return Ok(());
+    }
+    if check.get("non_negative_integer").is_some() {
+        return if found.is_u64() {
+            Ok(())
+        } else {
+            Err(format!(
+                "{vector}: {at} is {found}, expected a non-negative integer"
+            ))
+        };
+    }
+    if let Some(allowed) = check.get("one_of").and_then(Value::as_array) {
+        return if allowed.contains(found) {
+            Ok(())
+        } else {
+            Err(format!(
+                "{vector}: {at} is {found}, expected one of {allowed:?}"
+            ))
+        };
     }
     if check.get("nonempty_array").is_some() {
         return match found.as_array() {
@@ -635,4 +669,112 @@ pub fn outcome(request: &Request) -> (u32, Option<i64>) {
         response.status,
         body.pointer("/error/code").and_then(Value::as_i64),
     )
+}
+
+/// A request for `method` whose params are `params` (an object) with a conformant
+/// `_meta`, carrying `name` in `Mcp-Name` when given.
+pub fn request_with(method: &str, params: &Value, name: Option<&str>, id: &str) -> Request {
+    let mut object = params.as_object().cloned().unwrap_or_default();
+    object.insert(
+        "_meta".to_owned(),
+        serde_json::from_str(META).expect("META is JSON"),
+    );
+    post_owned(
+        &standard(method, name),
+        &rpc(method, &Value::Object(object).to_string(), id),
+    )
+}
+
+/// A paginated list request, with `cursor` when given.
+pub fn list_request(method: &str, cursor: Option<&str>) -> Request {
+    let params = cursor.map_or_else(
+        || serde_json::json!({}),
+        |c| serde_json::json!({ "cursor": c }),
+    );
+    request_with(method, &params, None, "1")
+}
+
+/// Standard Base64 with padding.
+pub fn base64(bytes: &[u8]) -> String {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::new();
+    for chunk in bytes.chunks(3) {
+        let n = chunk.iter().fold(0u32, |a, b| (a << 8) | u32::from(*b)) << (8 * (3 - chunk.len()));
+        for k in 0..=chunk.len() {
+            out.push(ALPHABET[((n >> (18 - 6 * k)) & 63) as usize] as char);
+        }
+        for _ in chunk.len()..3 {
+            out.push('=');
+        }
+    }
+    out
+}
+
+/// The value a client writes in `Mcp-Name` for `name`: the name itself when it is visible
+/// ASCII, otherwise the Base64 wrapping the specification defines.
+pub fn name_header(name: &str) -> String {
+    let plain = !name.is_empty()
+        && name.bytes().all(|b| (0x21..=0x7e).contains(&b))
+        && !name.starts_with("=?base64?");
+    if plain {
+        name.to_owned()
+    } else {
+        format!("=?base64?{}?=", base64(name.as_bytes()))
+    }
+}
+
+/// A resources/read of `uri`, with the `Mcp-Name` the specification requires.
+pub fn read_request(uri: &str) -> Request {
+    request_with(
+        "resources/read",
+        &serde_json::json!({ "uri": uri }),
+        Some(&name_header(uri)),
+        "5",
+    )
+}
+
+/// A prompts/get of `name` with `arguments` when given.
+pub fn prompt_request(name: &str, arguments: Option<&Value>) -> Request {
+    let params = arguments.map_or_else(
+        || serde_json::json!({ "name": name }),
+        |a| serde_json::json!({ "name": name, "arguments": a }),
+    );
+    request_with("prompts/get", &params, Some(name), "6")
+}
+
+/// A completion/complete with the given params.
+pub fn complete_request(params: &Value) -> Request {
+    request_with("completion/complete", params, None, "7")
+}
+
+/// The text of `src/<name>.lex.tex`.
+pub fn source(name: &str) -> String {
+    std::fs::read_to_string(root().join("src").join(format!("{name}.lex.tex")))
+        .unwrap_or_else(|e| panic!("src/{name}.lex.tex reads: {e}"))
+}
+
+/// The constructors the inductive `inductive` of `module` declares, in order.
+pub fn constructors_of(module: &str, inductive: &str) -> Vec<String> {
+    let text = source(module);
+    let at = text
+        .find(&format!("name: {inductive},"))
+        .unwrap_or_else(|| panic!("{inductive} is declared in {module}"));
+    let block = &text[at..];
+    let end = block.find("\n}").expect("the declaration ends");
+    block[..end]
+        .split("{name: ")
+        .skip(1)
+        .map(|c| c.split(',').next().expect("a name").to_owned())
+        .collect()
+}
+
+/// Every name in `names` is declared as a theorem or definition of one of `modules`.
+pub fn assert_declared(modules: &[&str], names: &[&str]) {
+    let text: String = modules.iter().map(|m| source(m)).collect();
+    for name in names {
+        assert!(
+            text.contains(&format!("name: {name},")),
+            "{modules:?} declare no {name}"
+        );
+    }
 }

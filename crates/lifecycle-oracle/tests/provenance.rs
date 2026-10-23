@@ -7,8 +7,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use common::{
-    all_vectors, hex, manifest_sha256, root, suite_root, suite_text, tools_vector_file,
-    vector_file, PIN,
+    all_vectors, hex, manifest_sha256, resources_vector_file, root, suite_root, suite_text,
+    tools_vector_file, vector_file, PIN,
 };
 use repo_model::Model;
 use serde_json::Value;
@@ -205,7 +205,7 @@ fn line_of(text: &str, line: u64) -> &str {
 fn every_request_a_scenario_sends_is_a_vector_or_a_listed_probe_that_is_not_run_lc_14() {
     let vectors = all_vectors();
     let mut not_run: Vec<Value> = Vec::new();
-    for file in [vector_file(), tools_vector_file()] {
+    for file in [vector_file(), tools_vector_file(), resources_vector_file()] {
         not_run.extend(file["not_run"].as_array().expect("not_run").iter().cloned());
     }
     for scenario_file in [
@@ -213,6 +213,10 @@ fn every_request_a_scenario_sends_is_a_vector_or_a_listed_probe_that_is_not_run_
         "src/scenarios/server/http-standard-headers.ts",
         "src/scenarios/server/tools.ts",
         "src/scenarios/server/json-schema-2020-12.ts",
+        "src/scenarios/server/resources.ts",
+        "src/scenarios/server/prompts.ts",
+        "src/scenarios/server/caching.ts",
+        "src/scenarios/server/utils.ts",
     ] {
         let text = suite_text(scenario_file);
         let mut accounted: BTreeSet<u64> = BTreeSet::new();
@@ -311,6 +315,65 @@ fn every_check_id_a_scenario_emits_is_covered_or_listed_lc_14() {
             "{id} is not an id the scenarios emit"
         );
     }
+}
+
+#[test]
+fn every_check_id_of_the_resources_scenarios_is_covered_or_listed_lc_14() {
+    let file = resources_vector_file();
+    let mut known: BTreeSet<String> = BTreeSet::new();
+    for v in file["vectors"].as_array().expect("vectors") {
+        for c in v["suite_checks"].as_array().expect("suite_checks") {
+            known.insert(c.as_str().expect("id").to_owned());
+        }
+    }
+    for n in file["not_run"].as_array().expect("not_run") {
+        for c in n["checks"].as_array().expect("checks") {
+            known.insert(c.as_str().expect("id").to_owned());
+        }
+    }
+    for u in file["unreached"].as_array().expect("unreached") {
+        known.insert(u["id"].as_str().expect("id").to_owned());
+        assert!(!u["reason"].as_str().expect("reason").is_empty());
+    }
+    // A check id is the text after `id: '` in a scenario of these four files, or a
+    // `sep-` token the caching scenario passes to its endpoint helper.
+    let mut emitted: BTreeSet<String> = BTreeSet::new();
+    for scenario_file in [
+        "src/scenarios/server/resources.ts",
+        "src/scenarios/server/prompts.ts",
+        "src/scenarios/server/caching.ts",
+        "src/scenarios/server/utils.ts",
+    ] {
+        let text = suite_text(scenario_file);
+        for piece in text.split("id: '").skip(1) {
+            let id = piece.split('\'').next().expect("a closing quote");
+            // `id: 'MCP-Prompts-List'` names a specification reference, not a check.
+            if id
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+            {
+                emitted.insert(id.to_owned());
+            }
+        }
+        for token in text.split('\'') {
+            if token.starts_with("sep-2549-")
+                && token
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+            {
+                emitted.insert(token.to_owned());
+            }
+        }
+    }
+    // The scenarios of utils.ts that belong to the removed methods are listed in
+    // `not_run` with their check ids; `ping` and `logging-set-level` are among them.
+    let missing: Vec<&String> = emitted.difference(&known).collect();
+    assert!(
+        missing.is_empty(),
+        "check ids no vector covers: {missing:?}"
+    );
+    let stray: Vec<&String> = known.difference(&emitted).collect();
+    assert!(stray.is_empty(), "ids the scenarios do not emit: {stray:?}");
 }
 
 // ---- TL-18: the second root, over a catalog of many tools ----

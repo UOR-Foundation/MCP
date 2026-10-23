@@ -396,3 +396,185 @@ id = "TL-18"
 level = "build"
 suite = "tools"
 statement = "Tool calls with a very large arguments object, a very large text argument and a catalog of many tools are answered on the default 2 MiB thread stack, because no function of the generated package recurses except as a loop."
+
+# ---- resources, prompts, completion and caching (issue 9) ----
+
+[[id]]
+id = "RS-01"
+level = "build"
+suite = "resources"
+statement = "resources/list answers with the direct resources of the provider's catalog in their fixed declaration order, each with a uri and a name and, where the catalog declares them, a title, a description and a mimeType; the catalog is one page, so a request that carries a cursor is refused as invalidParams (-32602); a kernel-checked theorem states the order."
+
+[[id]]
+id = "RS-02"
+level = "build"
+suite = "resources"
+statement = "resources/read of a text resource answers with HTTP status 200 and a result of resultType complete whose contents holds one entry with the requested uri, its mimeType and its text."
+
+[[id]]
+id = "RS-03"
+level = "build"
+suite = "resources"
+statement = "resources/read of a binary resource answers with a contents entry that carries the uri, the mimeType and the Base64 data in a blob member and has no text member."
+
+[[id]]
+id = "RS-04"
+level = "build"
+suite = "resources"
+statement = "resources/templates/list answers with the resource templates of the provider's catalog in their fixed declaration order, each with a name and a uriTemplate and, where the catalog declares them, a title, a description and a mimeType; the catalog is one page, so a request that carries a cursor is refused as invalidParams (-32602); a kernel-checked theorem states the order."
+
+[[id]]
+id = "RS-05"
+level = "build"
+suite = "resources"
+statement = "resources/read of a uri that matches a resource template is answered by the provider with the variables the match bound, and the contents entry carries the requested uri; the template syntax is RFC 6570 level 1, a name between braces, and each variable takes the non-empty text between its neighbouring literals."
+
+[[id]]
+id = "RS-06"
+level = "build"
+suite = "resources"
+statement = "resources/read of a uri that no resource of the catalog and no template of the catalog matches is refused as invalidParams (-32602) with HTTP status 400 and the requested uri in data.uri, never with a result and never with an empty contents array, and so is a resources/read whose params lack a text uri; the refusal echoes the request id, and a kernel-checked theorem states that an unknown resource is refused as resourceNotFound."
+
+[[id]]
+id = "RS-07"
+level = "build"
+suite = "resources"
+statement = "A uri is matched against a template in one pass without backtracking: an expression is an opening brace, a name of ASCII letters, digits and underscore, and a closing brace; each variable takes at least one byte, up to the first occurrence of the byte that follows it in the template, or the rest of the uri when it ends the template; the other bytes of the template must equal the bytes of the uri; kernel-checked theorems state the rule on byte lists."
+
+[[id]]
+id = "RS-08"
+level = "build"
+suite = "resources"
+statement = "Every fault in a resource or template catalog (an empty uri or name, a duplicate uri, a duplicate template, an empty template, an unclosed or a stray brace, an empty or malformed variable name, or two variables with no literal between them) is a typed CatalogFault, a kernel-checked negative theorem states the refusal of each, and a provider with a faulty catalog answers every request with an internal error (-32603)."
+
+[[id]]
+id = "RS-09"
+level = "build"
+suite = "resources"
+statement = "A provider result for resources/read with no contents entry, or with a blob that is not canonical Base64 (RFC 4648 section 4), is refused as badResourceOutput: JSON-RPC code -32603 with HTTP status 500 and a fixed message that says nothing of the content."
+
+[[id]]
+id = "RS-10"
+level = "build"
+suite = "resources"
+statement = "The resources layer states in kernel-checked theorems the order of resources/list and resources/templates/list, the refusal of an unknown resource as resourceNotFound with its uri in data, the refusal of an empty read result and the one-pass template rule, and the source declares each of them."
+
+[[id]]
+id = "RS-11"
+level = "build"
+suite = "resources"
+statement = "server/discover declares the resources, prompts and completions capabilities beside tools when the provider offers them, and resources/list, resources/read, resources/templates/list, prompts/list, prompts/get and completion/complete are offered only to a provider that declares the capability."
+
+[[id]]
+id = "RS-12"
+level = "build"
+suite = "resources"
+statement = "Reads of a very long uri, of a template with many variables and of a resource with a very large blob, and listings of a catalog of many resources, templates and prompts are answered on the default 2 MiB thread stack, because no function of the generated package recurses except as a loop."
+
+[[id]]
+id = "PM-01"
+level = "build"
+suite = "prompts"
+statement = "prompts/list answers with the prompts of the provider's catalog in their fixed declaration order, each with a name, a description and, where it declares arguments, the name, description and required flag of each; the catalog is one page, so a request that carries a cursor is refused as invalidParams (-32602); a kernel-checked theorem states the order."
+
+[[id]]
+id = "PM-02"
+level = "build"
+suite = "prompts"
+statement = "prompts/get of a prompt without arguments answers with HTTP status 200 and a result of resultType complete whose messages are the prompt's, each with a role and a content block."
+
+[[id]]
+id = "PM-03"
+level = "build"
+suite = "prompts"
+statement = "prompts/get of a prompt with arguments binds the supplied arguments in the order the prompt declares them and hands every one of them to the prompt, so that each appears in the messages the prompt builds; a kernel-checked theorem states that the binding keeps every supplied argument."
+
+[[id]]
+id = "PM-04"
+level = "build"
+suite = "prompts"
+statement = "prompts/get answers a message whose content is an embedded resource carrying a uri, a mimeType and its text or a Base64 blob, in the order the prompt builds its messages."
+
+[[id]]
+id = "PM-05"
+level = "build"
+suite = "prompts"
+statement = "prompts/get answers a message whose content is an image block carrying Base64 data and a mimeType, in the order the prompt builds its messages."
+
+[[id]]
+id = "PM-06"
+level = "build"
+suite = "prompts"
+statement = "prompts/get of a prompt the catalog does not list, with a required argument missing, or with an argument the prompt does not declare is refused as invalidParams (-32602) with HTTP status 400 and the prompt does not run; the refusal echoes the request id, and kernel-checked theorems state each."
+
+[[id]]
+id = "PM-07"
+level = "build"
+suite = "prompts"
+statement = "A provider result for prompts/get with a message whose image, audio or embedded blob payload is not canonical Base64 is refused as badPromptOutput: JSON-RPC code -32603 with HTTP status 500 and a fixed message that says nothing of the content."
+
+[[id]]
+id = "PM-08"
+level = "build"
+suite = "prompts"
+statement = "Every fault in a prompt catalog (an empty or duplicate prompt name, an empty or duplicate argument name) is a typed CatalogFault, a kernel-checked negative theorem states the refusal of each, and a provider with a faulty catalog answers every request with an internal error (-32603)."
+
+[[id]]
+id = "PM-09"
+level = "build"
+suite = "prompts"
+statement = "The prompts layer states in kernel-checked theorems the order of prompts/list, the refusal of an unknown prompt, of a missing required argument and of an undeclared argument as invalidParams, and that the argument binding keeps every supplied argument, and the source declares each of them."
+
+[[id]]
+id = "CO-01"
+level = "build"
+suite = "completion"
+statement = "completion/complete of an argument of a prompt (ref/prompt) or of a resource template (ref/resource) answers with HTTP status 200 and a result of resultType complete whose completion holds values, total and hasMore, where values are the provider's candidates that begin with the argument's current value, in the provider's order."
+
+[[id]]
+id = "CO-02"
+level = "build"
+suite = "completion"
+statement = "A completion holds at most 100 values; total is the number of candidates that match, and hasMore is true exactly when more candidates match than values are returned; kernel-checked theorems state the bound, the total and hasMore."
+
+[[id]]
+id = "CO-03"
+level = "build"
+suite = "completion"
+statement = "The arguments already resolved, which a completion/complete request carries in context.arguments, reach the provider, so that its candidates may depend on them."
+
+[[id]]
+id = "CO-04"
+level = "build"
+suite = "completion"
+statement = "completion/complete whose reference names a prompt the catalog does not list or a template the catalog does not list, or whose argument the prompt or the template does not declare, is refused as invalidParams (-32602) with HTTP status 400 and the provider is not asked; kernel-checked theorems state each."
+
+[[id]]
+id = "CO-05"
+level = "build"
+suite = "completion"
+statement = "The completion layer states in kernel-checked theorems the bound of 100 values, the total and hasMore of a page, the prefix rule and the refusals of an unknown reference and of an undeclared argument, and the source declares each of them."
+
+[[id]]
+id = "CH-01"
+level = "build"
+suite = "caching"
+statement = "Every cacheable result, that of server/discover, tools/list, resources/list, resources/templates/list, resources/read and prompts/list, carries a ttlMs that is a non-negative integer and a cacheScope that is public or private, as the scenario caching requires of five of them; a kernel-checked theorem states that a result is cacheable if and only if it has a cache hint."
+
+[[id]]
+id = "CH-02"
+level = "build"
+suite = "caching"
+statement = "The ttlMs and cacheScope of a result are the provider's own for that result: two reads of different resources may carry different hints, and the core writes them as given."
+
+[[id]]
+id = "CH-03"
+level = "build"
+suite = "caching"
+statement = "A result that is not cacheable, that of tools/call, prompts/get, completion/complete, a task or an input-required result, carries neither ttlMs nor cacheScope."
+
+[[id]]
+id = "CH-04"
+level = "build"
+suite = "caching"
+statement = "The caching layer states in kernel-checked theorems that cacheability and the cache hint agree for every result and that the members written for a hint are ttlMs and cacheScope, and the source declares each of them."

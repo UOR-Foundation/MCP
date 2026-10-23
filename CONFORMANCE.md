@@ -18,6 +18,25 @@ The three honesty levels (R2):
 `cargo xtask audit-limits` fails if any code path returns an error the
 model does not sanction.
 
+## caching
+
+| ID | Level | Statement |
+| --- | --- | --- |
+| `CH-01` | `build` | Every cacheable result, that of server/discover, tools/list, resources/list, resources/templates/list, resources/read and prompts/list, carries a ttlMs that is a non-negative integer and a cacheScope that is public or private, as the scenario caching requires of five of them; a kernel-checked theorem states that a result is cacheable if and only if it has a cache hint. |
+| `CH-02` | `build` | The ttlMs and cacheScope of a result are the provider's own for that result: two reads of different resources may carry different hints, and the core writes them as given. |
+| `CH-03` | `build` | A result that is not cacheable, that of tools/call, prompts/get, completion/complete, a task or an input-required result, carries neither ttlMs nor cacheScope. |
+| `CH-04` | `build` | The caching layer states in kernel-checked theorems that cacheability and the cache hint agree for every result and that the members written for a hint are ttlMs and cacheScope, and the source declares each of them. |
+
+## completion
+
+| ID | Level | Statement |
+| --- | --- | --- |
+| `CO-01` | `build` | completion/complete of an argument of a prompt (ref/prompt) or of a resource template (ref/resource) answers with HTTP status 200 and a result of resultType complete whose completion holds values, total and hasMore, where values are the provider's candidates that begin with the argument's current value, in the provider's order. |
+| `CO-02` | `build` | A completion holds at most 100 values; total is the number of candidates that match, and hasMore is true exactly when more candidates match than values are returned; kernel-checked theorems state the bound, the total and hasMore. |
+| `CO-03` | `build` | The arguments already resolved, which a completion/complete request carries in context.arguments, reach the provider, so that its candidates may depend on them. |
+| `CO-04` | `build` | completion/complete whose reference names a prompt the catalog does not list or a template the catalog does not list, or whose argument the prompt or the template does not declare, is refused as invalidParams (-32602) with HTTP status 400 and the provider is not asked; kernel-checked theorems state each. |
+| `CO-05` | `build` | The completion layer states in kernel-checked theorems the bound of 100 values, the total and hasMore of a page, the prefix rule and the refusals of an unknown reference and of an undeclared argument, and the source declares each of them. |
+
 ## http-headers
 
 | ID | Level | Statement |
@@ -78,6 +97,37 @@ model does not sanction.
 | `LC-15` | `build` | The response bodies the root writes in the vector and boundary tests validate against the MCP 2026-07-28 JSON Schema at the pinned specification commit, whose vendored file has the recorded checksum: as a JSON-RPC response, as the typed result response of the request's method, and as the typed error of its code. A validator is falsifying evidence and not the oracle for the protocol, which MCP#6 binds. |
 | `LC-16` | `build` | The exported root needs no stack that grows with its input: its recorded effects do not include recursion, no function of the generated package is on a call cycle, and frames with two hundred thousand header fields, four hundred thousand arguments, a quarter-mebibyte string, the deepest admitted JSON nesting and a long Base64 parameter header complete on a 2 MiB stack. |
 
+## prompts
+
+| ID | Level | Statement |
+| --- | --- | --- |
+| `PM-01` | `build` | prompts/list answers with the prompts of the provider's catalog in their fixed declaration order, each with a name, a description and, where it declares arguments, the name, description and required flag of each; the catalog is one page, so a request that carries a cursor is refused as invalidParams (-32602); a kernel-checked theorem states the order. |
+| `PM-02` | `build` | prompts/get of a prompt without arguments answers with HTTP status 200 and a result of resultType complete whose messages are the prompt's, each with a role and a content block. |
+| `PM-03` | `build` | prompts/get of a prompt with arguments binds the supplied arguments in the order the prompt declares them and hands every one of them to the prompt, so that each appears in the messages the prompt builds; a kernel-checked theorem states that the binding keeps every supplied argument. |
+| `PM-04` | `build` | prompts/get answers a message whose content is an embedded resource carrying a uri, a mimeType and its text or a Base64 blob, in the order the prompt builds its messages. |
+| `PM-05` | `build` | prompts/get answers a message whose content is an image block carrying Base64 data and a mimeType, in the order the prompt builds its messages. |
+| `PM-06` | `build` | prompts/get of a prompt the catalog does not list, with a required argument missing, or with an argument the prompt does not declare is refused as invalidParams (-32602) with HTTP status 400 and the prompt does not run; the refusal echoes the request id, and kernel-checked theorems state each. |
+| `PM-07` | `build` | A provider result for prompts/get with a message whose image, audio or embedded blob payload is not canonical Base64 is refused as badPromptOutput: JSON-RPC code -32603 with HTTP status 500 and a fixed message that says nothing of the content. |
+| `PM-08` | `build` | Every fault in a prompt catalog (an empty or duplicate prompt name, an empty or duplicate argument name) is a typed CatalogFault, a kernel-checked negative theorem states the refusal of each, and a provider with a faulty catalog answers every request with an internal error (-32603). |
+| `PM-09` | `build` | The prompts layer states in kernel-checked theorems the order of prompts/list, the refusal of an unknown prompt, of a missing required argument and of an undeclared argument as invalidParams, and that the argument binding keeps every supplied argument, and the source declares each of them. |
+
+## resources
+
+| ID | Level | Statement |
+| --- | --- | --- |
+| `RS-01` | `build` | resources/list answers with the direct resources of the provider's catalog in their fixed declaration order, each with a uri and a name and, where the catalog declares them, a title, a description and a mimeType; the catalog is one page, so a request that carries a cursor is refused as invalidParams (-32602); a kernel-checked theorem states the order. |
+| `RS-02` | `build` | resources/read of a text resource answers with HTTP status 200 and a result of resultType complete whose contents holds one entry with the requested uri, its mimeType and its text. |
+| `RS-03` | `build` | resources/read of a binary resource answers with a contents entry that carries the uri, the mimeType and the Base64 data in a blob member and has no text member. |
+| `RS-04` | `build` | resources/templates/list answers with the resource templates of the provider's catalog in their fixed declaration order, each with a name and a uriTemplate and, where the catalog declares them, a title, a description and a mimeType; the catalog is one page, so a request that carries a cursor is refused as invalidParams (-32602); a kernel-checked theorem states the order. |
+| `RS-05` | `build` | resources/read of a uri that matches a resource template is answered by the provider with the variables the match bound, and the contents entry carries the requested uri; the template syntax is RFC 6570 level 1, a name between braces, and each variable takes the non-empty text between its neighbouring literals. |
+| `RS-06` | `build` | resources/read of a uri that no resource of the catalog and no template of the catalog matches is refused as invalidParams (-32602) with HTTP status 400 and the requested uri in data.uri, never with a result and never with an empty contents array, and so is a resources/read whose params lack a text uri; the refusal echoes the request id, and a kernel-checked theorem states that an unknown resource is refused as resourceNotFound. |
+| `RS-07` | `build` | A uri is matched against a template in one pass without backtracking: an expression is an opening brace, a name of ASCII letters, digits and underscore, and a closing brace; each variable takes at least one byte, up to the first occurrence of the byte that follows it in the template, or the rest of the uri when it ends the template; the other bytes of the template must equal the bytes of the uri; kernel-checked theorems state the rule on byte lists. |
+| `RS-08` | `build` | Every fault in a resource or template catalog (an empty uri or name, a duplicate uri, a duplicate template, an empty template, an unclosed or a stray brace, an empty or malformed variable name, or two variables with no literal between them) is a typed CatalogFault, a kernel-checked negative theorem states the refusal of each, and a provider with a faulty catalog answers every request with an internal error (-32603). |
+| `RS-09` | `build` | A provider result for resources/read with no contents entry, or with a blob that is not canonical Base64 (RFC 4648 section 4), is refused as badResourceOutput: JSON-RPC code -32603 with HTTP status 500 and a fixed message that says nothing of the content. |
+| `RS-10` | `build` | The resources layer states in kernel-checked theorems the order of resources/list and resources/templates/list, the refusal of an unknown resource as resourceNotFound with its uri in data, the refusal of an empty read result and the one-pass template rule, and the source declares each of them. |
+| `RS-11` | `build` | server/discover declares the resources, prompts and completions capabilities beside tools when the provider offers them, and resources/list, resources/read, resources/templates/list, prompts/list, prompts/get and completion/complete are offered only to a provider that declares the capability. |
+| `RS-12` | `build` | Reads of a very long uri, of a template with many variables and of a resource with a very large blob, and listings of a catalog of many resources, templates and prompts are answered on the default 2 MiB thread stack, because no function of the generated package recurses except as a loop. |
+
 ## tools
 
 | ID | Level | Statement |
@@ -110,13 +160,14 @@ Never re-derived, vendored, or gated on.
 | `A-RFC8259` | T. Bray (ed.), RFC 8259 (STD 90), December 2017, https://www.rfc-editor.org/rfc/rfc8259 | `JC-03`, `JC-04`, `JC-06`, `JC-07` |
 | `A-RFC3629` | F. Yergeau, RFC 3629 (STD 63), November 2003, section 4 syntax and Table 3-7 of the Unicode Standard, https://www.rfc-editor.org/rfc/rfc3629 | `JC-01`, `JC-02`, `JC-14` |
 | `A-JSONTESTSUITE` | N. Seriot, https://github.com/nst/JSONTestSuite at commit 1ef36fa01286573e846ac449e8683f8833c5b26a, directory test_parsing (git tree b936f9acdd24b9f5fefe68b90b9beab2c681137a), MIT licence | `JC-03`, `JC-04`, `JC-05`, `JC-12` |
-| `A-MCP-SPEC-2026-07-28` | https://github.com/modelcontextprotocol/modelcontextprotocol at commit 80041ab0a139a8f4fb3adbc99f7ae9113ea59671, docs/specification/2026-07-28 (basic/lifecycle, basic/transports/streamable-http, server/tools) | `LC-01`, `LC-02`, `LC-03`, `LC-04`, `LC-05`, `LC-06`, `LC-07`, `LC-08`, `LC-09`, `LC-10`, `HH-01`, `HH-02`, `HH-03`, `HH-04`, `HH-06`, `HH-09`, `HH-10`, `HH-11`, `HH-12`, `HH-13`, `TL-01`, `TL-03`, `TL-08`, `TL-09`, `TL-10`, `TL-11`, `TL-13`, `TL-14`, `TL-15` |
+| `A-MCP-SPEC-2026-07-28` | https://github.com/modelcontextprotocol/modelcontextprotocol at commit 80041ab0a139a8f4fb3adbc99f7ae9113ea59671, docs/specification/2026-07-28 (basic/lifecycle, basic/transports/streamable-http, server/tools, server/resources, server/prompts, server/utilities/completion, server/utilities/caching) | `LC-01`, `LC-02`, `LC-03`, `LC-04`, `LC-05`, `LC-06`, `LC-07`, `LC-08`, `LC-09`, `LC-10`, `HH-01`, `HH-02`, `HH-03`, `HH-04`, `HH-06`, `HH-09`, `HH-10`, `HH-11`, `HH-12`, `HH-13`, `TL-01`, `TL-03`, `TL-08`, `TL-09`, `TL-10`, `TL-11`, `TL-13`, `TL-14`, `TL-15`, `RS-01`, `RS-02`, `RS-03`, `RS-04`, `RS-05`, `RS-06`, `RS-09`, `PM-01`, `PM-02`, `PM-03`, `PM-06`, `CO-01`, `CO-02`, `CO-04`, `CH-01`, `CH-03` |
 | `A-RFC9110` | R. Fielding, M. Nottingham, J. Reschke (eds.), RFC 9110 (STD 97), June 2022, sections 5.1 (field names are case-insensitive), 5.3 (repeated fields), 5.5 (field values) and 15.5.6 (405 requires Allow), https://www.rfc-editor.org/rfc/rfc9110 | `LC-09`, `HH-05`, `HH-07` |
 | `A-RFC4648` | S. Josefsson, RFC 4648, October 2006, section 4 (Base 64 Encoding) and section 3.5 (canonical encoding), https://www.rfc-editor.org/rfc/rfc4648 | `HH-09`, `HH-10` |
-| `A-MCP-CONFORMANCE` | https://github.com/modelcontextprotocol/conformance at commit 232a9014457eaf4c59559916e3d616d2f7f28f05 (2026-08-07): src/scenarios/server/stateless.ts, src/scenarios/server/http-standard-headers.ts, src/connection/stateless.ts, src/scenarios/server/tools.ts, src/scenarios/server/json-schema-2020-12.ts, examples/servers/typescript/everything-server.ts, requirements/2026-07-28.yaml and LICENSE, vendored under crates/lifecycle-oracle/suite | `LC-12`, `LC-14`, `TL-01`, `TL-02`, `TL-03`, `TL-04`, `TL-05`, `TL-06`, `TL-07`, `TL-08`, `TL-13` |
-| `A-MCP-SCHEMA-2026-07-28` | https://github.com/modelcontextprotocol/modelcontextprotocol at commit 80041ab0a139a8f4fb3adbc99f7ae9113ea59671: schema/2026-07-28/schema.json (git blob 213c58f6d9a1c2ce6ad055afe90bbdb095a29ee8, JSON Schema 2020-12) and LICENSE, vendored under crates/lifecycle-oracle/suite | `LC-08`, `LC-15` |
+| `A-MCP-CONFORMANCE` | https://github.com/modelcontextprotocol/conformance at commit 232a9014457eaf4c59559916e3d616d2f7f28f05 (2026-08-07): src/scenarios/server/stateless.ts, src/scenarios/server/http-standard-headers.ts, src/connection/stateless.ts, src/scenarios/server/tools.ts, src/scenarios/server/json-schema-2020-12.ts, src/scenarios/server/resources.ts, src/scenarios/server/prompts.ts, src/scenarios/server/caching.ts, src/scenarios/server/utils.ts, src/seps/sep-2164.yaml, examples/servers/typescript/everything-server.ts, requirements/2026-07-28.yaml and LICENSE, vendored under crates/lifecycle-oracle/suite | `LC-12`, `LC-14`, `TL-01`, `TL-02`, `TL-03`, `TL-04`, `TL-05`, `TL-06`, `TL-07`, `TL-08`, `TL-13`, `RS-01`, `RS-02`, `RS-03`, `RS-04`, `RS-05`, `RS-06`, `PM-01`, `PM-02`, `PM-03`, `PM-04`, `PM-05`, `CO-01`, `CH-01` |
+| `A-MCP-SCHEMA-2026-07-28` | https://github.com/modelcontextprotocol/modelcontextprotocol at commit 80041ab0a139a8f4fb3adbc99f7ae9113ea59671: schema/2026-07-28/schema.json (git blob 213c58f6d9a1c2ce6ad055afe90bbdb095a29ee8, JSON Schema 2020-12) and LICENSE, vendored under crates/lifecycle-oracle/suite | `LC-08`, `LC-15`, `RS-01`, `RS-02`, `RS-03`, `RS-04`, `PM-01`, `PM-02`, `CO-01`, `CO-02`, `CH-01` |
 | `A-RFC6585` | M. Nottingham, R. Fielding, RFC 6585, April 2012, section 4 (429 Too Many Requests), https://www.rfc-editor.org/rfc/rfc6585 | `TL-14` |
 | `A-JSON-SCHEMA-2020-12` | https://json-schema.org/draft/2020-12/json-schema-core and https://json-schema.org/draft/2020-12/json-schema-validation, sections 8 (the schema, $ref, $anchor, $defs), 10 (applicators), and 6 (validation keywords) | `TL-02`, `TL-10`, `TL-11`, `TL-16` |
+| `A-RFC6570` | J. Gregorio, R. Fielding, M. Hadley, M. Nottingham, D. Orchard, RFC 6570, March 2012, section 2 (expressions and variable names) and section 3.2.2 (simple string expansion), https://www.rfc-editor.org/rfc/rfc6570 | `RS-05`, `RS-07`, `RS-08` |
 | `A-RFC6901` | P. Bryan, K. Zyp, M. Nottingham (eds.), RFC 6901, April 2013, section 3 (syntax) and section 5 (the escapes ~0 and ~1), https://www.rfc-editor.org/rfc/rfc6901 | `TL-10` |
 
 ## Claims that are not conformance IDs
@@ -135,3 +186,6 @@ Never re-derived, vendored, or gated on.
 | `AUTH-10` | `some-true` | JSON Schema draft 2020-12 defines the validation keywords, the applicators and the reference keywords the tool schema validator implements. |
 | `AUTH-11` | `some-true` | RFC 6901 defines the JSON Pointer syntax and escapes the argument error text uses to name the failing instance. |
 | `AUTH-12` | `some-true` | The pinned conformance suite lists tools-list, tools-call-simple-text, tools-call-image, tools-call-audio, tools-call-embedded-resource, tools-call-mixed-content, tools-call-error and tools-call-with-progress as required for 2026-07-28 and json-schema-2020-12 as pending and not scored. |
+| `AUTH-13` | `some-true` | The pinned conformance suite lists completion-complete, resources-list, resources-read-text, resources-read-binary, resources-templates-read, sep-2164-resource-not-found, prompts-list, prompts-get-simple, prompts-get-with-args, prompts-get-embedded-resource, prompts-get-with-image and caching as required for 2026-07-28, and its caching scenario reads five of the six cacheable results. |
+| `AUTH-14` | `some-true` | RFC 6570 defines the URI template expression whose level 1 form, a variable name in braces, the resource template matcher implements. |
+| `AUTH-15` | `some-true` | The MCP schema for 2026-07-28 types the results of resources/list, resources/read, resources/templates/list, prompts/list, prompts/get and completion/complete, requires ttlMs and cacheScope on the cacheable ones and limits a completion to 100 values. |
