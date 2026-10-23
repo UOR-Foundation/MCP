@@ -115,10 +115,20 @@ pub fn tools_vector_file() -> Value {
         .expect("the tools vectors are JSON")
 }
 
-/// Every vector of both files, the lifecycle vectors first, in file order.
+/// The resources vectors file, parsed: the requests of the pinned resource, prompt,
+/// completion and caching scenarios.
+pub fn resources_vector_file() -> Value {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("vectors")
+        .join("resources.json");
+    serde_json::from_slice(&std::fs::read(path).expect("the resources vectors are committed"))
+        .expect("the resources vectors are JSON")
+}
+
+/// Every vector of all the files, the lifecycle vectors first, in file order.
 pub fn all_vectors() -> Vec<Value> {
     let mut out = Vec::new();
-    for file in [vector_file(), tools_vector_file()] {
+    for file in [vector_file(), tools_vector_file(), resources_vector_file()] {
         out.extend(file["vectors"].as_array().expect("vectors").iter().cloned());
     }
     out
@@ -269,6 +279,12 @@ fn result_def(method: &str) -> Option<&'static str> {
         "server/discover" => "DiscoverResultResponse",
         "tools/list" => "ListToolsResultResponse",
         "tools/call" => "CallToolResultResponse",
+        "resources/list" => "ListResourcesResultResponse",
+        "resources/read" => "ReadResourceResultResponse",
+        "resources/templates/list" => "ListResourceTemplatesResultResponse",
+        "prompts/list" => "ListPromptsResultResponse",
+        "prompts/get" => "GetPromptResultResponse",
+        "completion/complete" => "CompleteResultResponse",
         _ => return None,
     })
 }
@@ -431,6 +447,43 @@ fn check(
     }
     if check.get("present").is_some() {
         return Ok(());
+    }
+    if check.get("is_array").is_some() {
+        return if found.is_array() {
+            Ok(())
+        } else {
+            Err(format!("{vector}: {at} is {found}, expected an array"))
+        };
+    }
+    if check.get("nonempty_string").is_some() {
+        return match found.as_str() {
+            Some(text) if !text.is_empty() => Ok(()),
+            _ => Err(format!(
+                "{vector}: {at} is {found}, expected a non-empty string"
+            )),
+        };
+    }
+    if let Some(part) = check.get("contains").and_then(Value::as_str) {
+        return match found.as_str() {
+            Some(text) if text.contains(part) => Ok(()),
+            _ => Err(format!("{vector}: {at} is {found}, expected text with {part:?}")),
+        };
+    }
+    if check.get("non_negative_integer").is_some() {
+        return if found.is_u64() {
+            Ok(())
+        } else {
+            Err(format!(
+                "{vector}: {at} is {found}, expected a non-negative integer"
+            ))
+        };
+    }
+    if let Some(allowed) = check.get("one_of").and_then(Value::as_array) {
+        return if allowed.contains(found) {
+            Ok(())
+        } else {
+            Err(format!("{vector}: {at} is {found}, expected one of {allowed:?}"))
+        };
     }
     if check.get("nonempty_array").is_some() {
         return match found.as_array() {

@@ -263,29 +263,30 @@ fn the_version_is_checked_before_the_route_and_the_params_lc_10() {
 
 #[test]
 fn the_route_is_checked_before_the_params_lc_10() {
-    // prompts/get is a known method the fixture does not offer; its params are invalid.
+    // tasks/get is a known method the fixture does not offer; its params are invalid.
+    let body = rpc("tasks/get", &format!(r#"{{"_meta":{META}}}"#), "1");
+    let headers = standard("tasks/get", Some("anything"));
+    assert_eq!(outcome(&post_owned(&headers, &body)), (404, Some(-32601)));
+    // prompts/get is offered, so the same fault in its params is reached and refused
     let body = rpc("prompts/get", &format!(r#"{{"_meta":{META}}}"#), "1");
     let headers = standard("prompts/get", Some("anything"));
-    assert_eq!(outcome(&post_owned(&headers, &body)), (404, Some(-32601)));
+    assert_eq!(outcome(&post_owned(&headers, &body)), (400, Some(-32602)));
 }
 
 #[test]
 fn a_header_check_runs_even_for_a_method_the_server_does_not_offer_lc_10() {
-    // resources/read is not offered, but a missing Mcp-Name is still a header mismatch.
+    // tasks/get is not offered, but a missing Mcp-Name is still a header mismatch.
     let body = rpc(
-        "resources/read",
-        &format!(r#"{{"uri":"file:///a","_meta":{META}}}"#),
+        "tasks/get",
+        &format!(r#"{{"taskId":"t-1","_meta":{META}}}"#),
         "1",
     );
     assert_eq!(
-        outcome(&post_owned(&standard("resources/read", None), &body)),
+        outcome(&post_owned(&standard("tasks/get", None), &body)),
         (400, Some(-32020))
     );
     assert_eq!(
-        outcome(&post_owned(
-            &standard("resources/read", Some("file:///a")),
-            &body
-        )),
+        outcome(&post_owned(&standard("tasks/get", Some("t-1")), &body)),
         (404, Some(-32601))
     );
 }

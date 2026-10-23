@@ -1,0 +1,267 @@
+\begin{lexlean}{Resources}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Common}
+\importmodule{Content}
+\importmodule{Json}
+\importmodule{JsonRead}
+\importmodule{JsonText}
+\importmodule{Methods}
+\importmodule{Refusal}
+\title{MCP resource answers}
+\begin{semanticmodule}
+definition{
+  name: answerListResources,
+  parameters: [
+    cache : Common::CacheHint,
+    resources : (List Content::Resource),
+    params : Methods::PaginatedParams
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match (project params cursor)
+    | Option.some cursor => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidCursor cursor))
+    | Option.none => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.listResources (record Methods::ListResourcesResult {cache := cache, nextCursor := (ctor Option.none [String]), resources := resources})))),
+  executable: true
+}
+
+definition{
+  name: answerListTemplates,
+  parameters: [
+    cache : Common::CacheHint,
+    templates : (List Content::ResourceTemplate),
+    params : Methods::PaginatedParams
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match (project params cursor)
+    | Option.some cursor => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidCursor cursor))
+    | Option.none => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.listResourceTemplates (record Methods::ListResourceTemplatesResult {cache := cache, nextCursor := (ctor Option.none [String]), resourceTemplates := templates})))),
+  executable: true
+}
+
+definition{
+  name: answerListPrompts,
+  parameters: [
+    cache : Common::CacheHint,
+    prompts : (List Content::Prompt),
+    params : Methods::PaginatedParams
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match (project params cursor)
+    | Option.some cursor => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidCursor cursor))
+    | Option.none => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.listPrompts (record Methods::ListPromptsResult {cache := cache, nextCursor := (ctor Option.none [String]), prompts := prompts})))),
+  executable: true
+}
+
+definition{
+  name: readOutcome,
+  parameters: [
+    cache : Common::CacheHint,
+    uri : String,
+    found : (Option (List Content::ResourceContents))
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match found
+    | Option.none => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.resourceNotFound uri))
+    | Option.some contents => (match contents
+      | List.nil => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "a listed resource has no contents"))
+      | List.cons head rest => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.readResource (record Methods::ReadResourceResult {cache := cache, contents := contents}))))),
+  executable: true
+}
+
+definition{
+  name: answerRead,
+  parameters: [
+    cache : Common::CacheHint,
+    lookup : (Fn (String) (Option (List Content::ResourceContents))),
+    params : Methods::ReadResourceParams
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (readOutcome cache (project params uri) (apply lookup (project params uri))),
+  executable: true
+}
+
+definition{
+  name: argumentOf,
+  parameters: [name : String, given : (List (String * String))],
+  result: (Option String),
+  body: (match given
+    | List.nil => (ctor Option.none [String])
+    | List.cons head rest => (if (prim equal (first head) name : Bool) then (ctor Option.some [String] (second head)) else (argumentOf name rest))),
+  executable: true,
+  recursive_argument: given
+}
+
+definition{
+  name: isRequired,
+  parameters: [declared : Content::PromptArgument],
+  result: Bool,
+  body: (match (project declared required) | Option.none => false | Option.some flag => flag),
+  executable: true
+}
+
+definition{
+  name: missingRequired,
+  parameters: [declared : (List Content::PromptArgument), given : (List (String * String))],
+  result: (Option String),
+  body: (match declared
+    | List.nil => (ctor Option.none [String])
+    | List.cons head rest => (if (isRequired head) then (match (argumentOf (project head name) given)
+      | Option.none => (ctor Option.some [String] (project head name))
+      | Option.some value => (missingRequired rest given)) else (missingRequired rest given))),
+  executable: true,
+  recursive_argument: declared
+}
+
+definition{
+  name: findPrompt,
+  parameters: [name : String, prompts : (List Content::Prompt)],
+  result: (Option Content::Prompt),
+  body: (match prompts
+    | List.nil => (ctor Option.none [Content::Prompt])
+    | List.cons head rest => (if (prim equal (project head name) name : Bool) then (ctor Option.some [Content::Prompt] head) else (findPrompt name rest))),
+  executable: true,
+  recursive_argument: prompts
+}
+
+definition{
+  name: declaredArguments,
+  parameters: [prompt : Content::Prompt],
+  result: (List Content::PromptArgument),
+  body: (match (project prompt arguments)
+    | Option.none => (nil Content::PromptArgument)
+    | Option.some declared => declared),
+  executable: true
+}
+
+definition{
+  name: givenArguments,
+  parameters: [given : (Option (List (String * String)))],
+  result: (List (String * String)),
+  body: (match given | Option.none => (nil (String * String)) | Option.some pairs => pairs),
+  executable: true
+}
+
+definition{
+  name: promptOutcome,
+  parameters: [
+    prompts : (List Content::Prompt),
+    render : (Fn (String (List (String * String))) Methods::GetPromptResult),
+    params : Methods::GetPromptParams
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match (findPrompt (project params name) prompts)
+    | Option.none => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.unknownPrompt (project params name)))
+    | Option.some prompt => (match (missingRequired (declaredArguments prompt) (givenArguments (project params arguments)))
+      | Option.some missing => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidArguments (prim join (cons "missing required argument:" (cons missing (nil String))) " " : String)))
+      | Option.none => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.getPrompt (apply render (project params name) (givenArguments (project params arguments))))))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{name: completionLimit, parameters: [], result: Nat, body: 100, executable: true}
+
+definition{
+  name: startsWith,
+  parameters: [typed : (List Nat), candidate : (List Nat)],
+  result: Bool,
+  body: (match typed
+    | List.nil => true
+    | List.cons wanted rest => (match candidate
+      | List.nil => false
+      | List.cons seen tail => (if (wanted =? seen) then (startsWith rest tail) else false))),
+  executable: true,
+  recursive_argument: typed
+}
+
+definition{
+  name: bytesOfText,
+  parameters: [text : String],
+  result: (List Nat),
+  body: (JsonText::bytesToList (prim utf8_encode text : Bytes)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: completes,
+  parameters: [typed : String, candidate : String],
+  result: Bool,
+  body: (startsWith (bytesOfText typed) (bytesOfText candidate)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: matchingOnto,
+  parameters: [typed : String, candidates : (List String), built : (List String)],
+  result: (List String),
+  body: (match candidates
+    | List.nil => built
+    | List.cons head rest => (if (completes typed head) then (matchingOnto typed rest (cons head built)) else (matchingOnto typed rest built))),
+  axioms: [Quot.sound, propext],
+  executable: true,
+  recursive_argument: candidates
+}
+
+definition{
+  name: matching,
+  parameters: [typed : String, candidates : (List String)],
+  result: (List String),
+  body: (JsonRead::reverseOnto [String] (matchingOnto typed candidates (nil String)) (nil String)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: countOnto,
+  parameters: [items : (List String), counted : Nat],
+  result: Nat,
+  body: (match items | List.nil => counted | List.cons head rest => (countOnto rest (counted + 1))),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: takeOnto,
+  parameters: [items : (List String), room : Nat, built : (List String)],
+  result: (List String),
+  body: (match items
+    | List.nil => built
+    | List.cons head rest => (match room
+      | Nat.zero => built
+      | Nat.succ below => (takeOnto rest below (cons head built)))),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: firstValues,
+  parameters: [values : (List String)],
+  result: (List String),
+  body: (JsonRead::reverseOnto [String] (takeOnto values (completionLimit) (nil String)) (nil String)),
+  executable: true
+}
+
+definition{
+  name: completionOf,
+  parameters: [values : (List String)],
+  result: Methods::CompleteResult,
+  body: (let counted : Nat := (countOnto values 0); (record Methods::CompleteResult {completion := (record Methods::Completion {values := (firstValues values), total := (ctor Option.some [Nat] counted), hasMore := (ctor Option.some [Bool] ((completionLimit) <? counted))})})),
+  executable: true
+}
+
+definition{
+  name: answerComplete,
+  parameters: [
+    candidates : (Fn (Methods::CompleteParams) (Result (List String) Refusal::ProviderRefusal)),
+    params : Methods::CompleteParams
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match (apply candidates params)
+    | Result.error refusal => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] refusal)
+    | Result.ok values => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.complete (completionOf values)))),
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

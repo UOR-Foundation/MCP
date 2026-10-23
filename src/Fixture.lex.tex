@@ -12,6 +12,7 @@
 \importmodule{Methods}
 \importmodule{Numeric}
 \importmodule{Refusal}
+\importmodule{ResourceFixture}
 \importmodule{ResultJson}
 \importmodule{Serve}
 \importmodule{Tools}
@@ -26,10 +27,18 @@ definition{
 }
 
 definition{
-  name: fixtureCapabilities,
+  name: toolsCapabilities,
   parameters: [],
   result: Capabilities::ServerCapabilities,
   body: (record Capabilities::ServerCapabilities {experimental := (ctor Option.none [Json::JsonObject]), logging := (ctor Option.none [Json::JsonObject]), completions := (ctor Option.none [Json::JsonObject]), prompts := (ctor Option.none [Capabilities::ListChangedCapability]), resources := (ctor Option.none [Capabilities::ResourcesCapability]), tools := (ctor Option.some [Capabilities::ListChangedCapability] (record Capabilities::ListChangedCapability {listChanged := (ctor Option.none [Bool])})), extensions := (ctor Option.none [Json::JsonObject])}),
+  executable: true
+}
+
+definition{
+  name: fixtureCapabilities,
+  parameters: [],
+  result: Capabilities::ServerCapabilities,
+  body: (record Capabilities::ServerCapabilities {experimental := (ctor Option.none [Json::JsonObject]), logging := (ctor Option.none [Json::JsonObject]), completions := (ctor Option.some [Json::JsonObject] (Capabilities::noObject)), prompts := (ctor Option.some [Capabilities::ListChangedCapability] (record Capabilities::ListChangedCapability {listChanged := (ctor Option.none [Bool])})), resources := (ctor Option.some [Capabilities::ResourcesCapability] (record Capabilities::ResourcesCapability {subscribe := (ctor Option.none [Bool]), listChanged := (ctor Option.none [Bool])})), tools := (ctor Option.some [Capabilities::ListChangedCapability] (record Capabilities::ListChangedCapability {listChanged := (ctor Option.none [Bool])})), extensions := (ctor Option.none [Json::JsonObject])}),
   executable: true
 }
 
@@ -333,12 +342,12 @@ definition{
     | Methods::ClientRequest.toolsList params => (Tools::answerList (fixtureCache) (fixtureTools) params)
     | Methods::ClientRequest.toolsCall params => (Tools::answerCall (fixtureTools) (ref fixtureBehaviour) params)
     | Methods::ClientRequest.serverDiscover params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
-    | Methods::ClientRequest.resourcesList params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
-    | Methods::ClientRequest.resourcesRead params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
-    | Methods::ClientRequest.resourcesTemplatesList params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
-    | Methods::ClientRequest.promptsList params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
-    | Methods::ClientRequest.promptsGet params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
-    | Methods::ClientRequest.completionComplete params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
+    | Methods::ClientRequest.resourcesList params => (ResourceFixture::answerResourcesList params)
+    | Methods::ClientRequest.resourcesRead params => (ResourceFixture::answerResourcesRead params)
+    | Methods::ClientRequest.resourcesTemplatesList params => (ResourceFixture::answerTemplatesList params)
+    | Methods::ClientRequest.promptsList params => (ResourceFixture::answerPromptsList params)
+    | Methods::ClientRequest.promptsGet params => (ResourceFixture::answerPromptsGet params)
+    | Methods::ClientRequest.completionComplete params => (ResourceFixture::answerCompletion params)
     | Methods::ClientRequest.tasksGet params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
     | Methods::ClientRequest.tasksUpdate params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
     | Methods::ClientRequest.tasksCancel params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))),

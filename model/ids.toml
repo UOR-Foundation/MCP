@@ -16,6 +16,7 @@
 # file is built.
 #
 # The JSON text codec (issue #18) is the first capability registered: JC-01..JC-12, extended by JC-13 to JC-16.
+# Resources, templates, prompts, completion and caching (issue #9) are RP-01..RP-19.
 
 spec = "template/1"
 
@@ -396,3 +397,117 @@ id = "TL-18"
 level = "build"
 suite = "tools"
 statement = "Tool calls with a very large arguments object, a very large text argument and a catalog of many tools are answered on the default 2 MiB thread stack, because no function of the generated package recurses except as a loop."
+
+[[id]]
+id = "RP-01"
+level = "build"
+suite = "resources"
+statement = "resources/list answers the direct resources of the catalog in their declared order, each with a uri and a name and, when the catalog declares them, a title, a description and a mimeType; resource templates are not among them; the catalog is one page, so the answer carries no nextCursor; a kernel-checked theorem states the order."
+
+[[id]]
+id = "RP-02"
+level = "build"
+suite = "resources"
+statement = "resources/read of a text resource answers HTTP status 200 with a result of resultType complete whose contents hold one text entry carrying the uri that was read, its mimeType and its text."
+
+[[id]]
+id = "RP-03"
+level = "build"
+suite = "resources"
+statement = "resources/read of a binary resource answers one blob entry carrying the uri that was read, its mimeType and its content as canonical Base64, and the entry holds no text member."
+
+[[id]]
+id = "RP-04"
+level = "build"
+suite = "resources"
+statement = "resources/templates/list answers the resource templates of the catalog in their declared order, each with a name and a uriTemplate, and the catalog is one page."
+
+[[id]]
+id = "RP-05"
+level = "build"
+suite = "resources"
+statement = "resources/read of a uri that a listed template matches substitutes the variable of the template into the uri and the text of the entry it answers, and a uri that matches the template with an empty variable or one that contains a solidus is not found."
+
+[[id]]
+id = "RP-06"
+level = "build"
+suite = "resources"
+statement = "resources/read of a uri that no resource and no template matches is refused as invalid params (-32602) with HTTP status 400, the message Invalid params: resource not found and the requested uri in data.uri, and it is never answered with a result whose contents array is empty; a kernel-checked theorem states the refusal."
+
+[[id]]
+id = "RP-07"
+level = "build"
+suite = "resources"
+statement = "prompts/list answers the prompts of the catalog in their declared order, each with a name, a description and, when it declares arguments, the arguments with their names, descriptions and required flags; the catalog is one page."
+
+[[id]]
+id = "RP-08"
+level = "build"
+suite = "resources"
+statement = "prompts/get of a prompt without arguments answers its messages: one user message of text content for the simple prompt."
+
+[[id]]
+id = "RP-09"
+level = "build"
+suite = "resources"
+statement = "prompts/get of a prompt with arguments substitutes the arguments that were given into its messages."
+
+[[id]]
+id = "RP-10"
+level = "build"
+suite = "resources"
+statement = "prompts/get of a prompt with an embedded resource answers a user message of resource content whose resource carries the uri that was given as the argument, a mimeType and a text, followed by a user message of text content."
+
+[[id]]
+id = "RP-11"
+level = "build"
+suite = "resources"
+statement = "prompts/get of a prompt with an image answers a user message of image content carrying canonical Base64 data and a mimeType, followed by a user message of text content."
+
+[[id]]
+id = "RP-12"
+level = "build"
+suite = "resources"
+statement = "prompts/get of a prompt the catalog does not list, and prompts/get of a prompt that is missing one of its required arguments, are each refused as invalid params (-32602) with HTTP status 400, the request id echoed and no result; the second refusal names the missing argument in data.reason; a kernel-checked theorem states both refusals."
+
+[[id]]
+id = "RP-13"
+level = "build"
+suite = "resources"
+statement = "completion/complete answers a completion object whose values are the candidates of the referenced argument that begin with the text typed so far, in the order of the candidates and at most 100 of them, with total the number of matching candidates and hasMore true exactly when there are more than 100; a reference whose argument has no candidates gets an empty list; a kernel-checked theorem states the cut at 100."
+
+[[id]]
+id = "RP-14"
+level = "build"
+suite = "resources"
+statement = "completion/complete is refused as invalid params (-32602) with HTTP status 400 when it references a prompt the catalog does not list, a resource template it does not list, or an argument the referenced prompt or template does not declare, and when its ref or argument is malformed."
+
+[[id]]
+id = "RP-15"
+level = "build"
+suite = "resources"
+statement = "tools/list, prompts/list, resources/list, resources/templates/list and resources/read each answer with ttlMs, an integer that is not negative, and cacheScope, public or private, as the caching scenario requires; the lists are public and the reads are private; a refusal carries neither."
+
+[[id]]
+id = "RP-16"
+level = "build"
+suite = "resources"
+statement = "A cursor on resources/list, resources/templates/list or prompts/list is refused as invalid params (-32602) with HTTP status 400, because each catalog is one page."
+
+[[id]]
+id = "RP-17"
+level = "build"
+suite = "resources"
+statement = "The resources layer states in kernel-checked theorems the order of resources/list, resources/templates/list and prompts/list, the refusal of an unknown resource, of an unknown prompt and of a missing required argument as invalid params, the cache hints of the four new cacheable results, the cut of a completion at 100 values, and the capabilities the fixture declares, and the source declares each of them."
+
+[[id]]
+id = "RP-18"
+level = "build"
+suite = "resources"
+statement = "server/discover declares the resources, prompts and completions capabilities exactly when the provider offers them, and a provider that does not declare one answers its methods as method not found (-32601) with HTTP status 404, so that the capabilities a discover result declares are the methods the root serves."
+
+[[id]]
+id = "RP-19"
+level = "build"
+suite = "resources"
+statement = "Every text of a prompts/get result is sanitized before it is written, as the text of a tools/call result is (TL-15), because a prompt echoes the arguments a client sent; the contents of resources/read are written as the catalog stores them."

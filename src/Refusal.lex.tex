@@ -209,9 +209,9 @@ definition{
     | Refusal.provider inner => (match inner
       | ProviderRefusal.unknownTool name => (ctor Option.none [Json::Json])
       | ProviderRefusal.unknownPrompt name => (ctor Option.none [Json::Json])
-      | ProviderRefusal.resourceNotFound uri => (ctor Option.none [Json::Json])
+      | ProviderRefusal.resourceNotFound uri => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("uri", (ctor Json::Json.text uri)) (nil (String * Json::Json)))))
       | ProviderRefusal.unknownTask taskId => (ctor Option.none [Json::Json])
-      | ProviderRefusal.invalidArguments reason => (ctor Option.none [Json::Json])
+      | ProviderRefusal.invalidArguments reason => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("reason", (ctor Json::Json.text reason)) (nil (String * Json::Json)))))
       | ProviderRefusal.invalidCursor cursor => (ctor Option.none [Json::Json])
       | ProviderRefusal.badToolOutput reason => (ctor Option.none [Json::Json])
       | ProviderRefusal.rateLimited limit => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("limit", (ctor Json::Json.number (record Json::Decimal {mantissa := (Numeric::natToInt limit (0 : Int)), exponent := (0 : Int)}))) (nil (String * Json::Json)))))
@@ -318,6 +318,41 @@ theorem{
   name: a_refused_tool_output_has_the_internal_error_code,
   parameters: [reason : String],
   statement: ((codeOf (ctor Refusal.provider (ctor ProviderRefusal.badToolOutput reason))) = (-32603 : Int)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_missing_resource_has_the_invalid_params_code,
+  parameters: [uri : String],
+  statement: ((codeOf (ctor Refusal.provider (ctor ProviderRefusal.resourceNotFound uri))) = (-32602 : Int)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_missing_resource_names_its_uri,
+  parameters: [uri : String],
+  statement: ((dataOf (ctor Refusal.provider (ctor ProviderRefusal.resourceNotFound uri))) = (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("uri", (ctor Json::Json.text uri)) (nil (String * Json::Json)))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_unknown_prompt_has_the_invalid_params_code,
+  parameters: [name : String],
+  statement: ((codeOf (ctor Refusal.provider (ctor ProviderRefusal.unknownPrompt name))) = (-32602 : Int)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_invalid_prompt_argument_has_the_invalid_params_code,
+  parameters: [reason : String],
+  statement: ((codeOf (ctor Refusal.provider (ctor ProviderRefusal.invalidArguments reason))) = (-32602 : Int)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_invalid_prompt_argument_names_its_reason,
+  parameters: [reason : String],
+  statement: ((dataOf (ctor Refusal.provider (ctor ProviderRefusal.invalidArguments reason))) = (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("reason", (ctor Json::Json.text reason)) (nil (String * Json::Json)))))),
   proof: reflexivity{}
 }
 \end{semanticmodule}

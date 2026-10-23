@@ -1,0 +1,477 @@
+\begin{lexlean}{ResourceLaws}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Capabilities}
+\importmodule{Common}
+\importmodule{Content}
+\importmodule{Dispatch}
+\importmodule{Fixture}
+\importmodule{Json}
+\importmodule{Meta}
+\importmodule{Methods}
+\importmodule{Refusal}
+\importmodule{ResourceFixture}
+\importmodule{ResultJson}
+\importmodule{Resources}
+\title{MCP resource laws}
+\begin{semanticmodule}
+definition{
+  name: lawMeta,
+  parameters: [],
+  result: Meta::RequestMeta,
+  body: (record Meta::RequestMeta {protocolVersion := "2026-07-28", clientCapabilities := (Capabilities::noClientCapabilities), clientInfo := (ctor Option.none [Json::JsonObject]), logLevel := (ctor Option.none [Common::LoggingLevel]), progressToken := (ctor Option.none [Common::ProgressToken]), raw := (record Json::JsonObject {members := (nil (String * Json::Json))})}),
+  executable: true
+}
+
+definition{
+  name: paged,
+  parameters: [cursor : (Option String)],
+  result: Methods::PaginatedParams,
+  body: (record Methods::PaginatedParams {meta := (lawMeta), cursor := cursor}),
+  executable: true
+}
+
+definition{
+  name: readParams,
+  parameters: [uri : String],
+  result: Methods::ReadResourceParams,
+  body: (record Methods::ReadResourceParams {meta := (lawMeta), uri := uri, inputResponses := (ctor Option.none [Json::JsonObject]), requestState := (ctor Option.none [String])}),
+  executable: true
+}
+
+definition{
+  name: promptParams,
+  parameters: [name : String, arguments : (Option (List (String * String)))],
+  result: Methods::GetPromptParams,
+  body: (record Methods::GetPromptParams {meta := (lawMeta), name := name, arguments := arguments, inputResponses := (ctor Option.none [Json::JsonObject]), requestState := (ctor Option.none [String])}),
+  executable: true
+}
+
+definition{
+  name: completeParams,
+  parameters: [reference : Methods::CompletionReference, argument : String, typed : String],
+  result: Methods::CompleteParams,
+  body: (record Methods::CompleteParams {meta := (lawMeta), reference := reference, argument := (record Methods::CompletionArgument {name := argument, value := typed}), context := (ctor Option.none [Methods::CompletionContext])}),
+  executable: true
+}
+
+definition{
+  name: promptNamed,
+  parameters: [name : String],
+  result: Methods::CompletionReference,
+  body: (ctor Methods::CompletionReference.prompt (record Methods::PromptReference {name := name, title := (ctor Option.none [String])})),
+  executable: true
+}
+
+definition{
+  name: codeOfAnswer,
+  parameters: [answered : (Result Methods::ResultBody Refusal::ProviderRefusal)],
+  result: (Option Int),
+  body: (match answered
+    | Result.error refusal => (ctor Option.some [Int] (Refusal::providerCode refusal))
+    | Result.ok body => (ctor Option.none [Int])),
+  executable: true
+}
+
+definition{
+  name: codeOfCandidates,
+  parameters: [answered : (Result (List String) Refusal::ProviderRefusal)],
+  result: (Option Int),
+  body: (match answered
+    | Result.error refusal => (ctor Option.some [Int] (Refusal::providerCode refusal))
+    | Result.ok values => (ctor Option.none [Int])),
+  executable: true
+}
+
+definition{
+  name: hintOf,
+  parameters: [answered : (Result Methods::ResultBody Refusal::ProviderRefusal)],
+  result: (Option Common::CacheHint),
+  body: (match answered
+    | Result.error refusal => (ctor Option.none [Common::CacheHint])
+    | Result.ok body => (match body
+      | Methods::ResultBody.listResources found => (ctor Option.some [Common::CacheHint] (project found cache))
+      | Methods::ResultBody.listResourceTemplates found => (ctor Option.some [Common::CacheHint] (project found cache))
+      | Methods::ResultBody.listPrompts found => (ctor Option.some [Common::CacheHint] (project found cache))
+      | Methods::ResultBody.readResource found => (ctor Option.some [Common::CacheHint] (project found cache))
+      | Methods::ResultBody.discover found => (ctor Option.none [Common::CacheHint])
+      | Methods::ResultBody.listTools found => (ctor Option.none [Common::CacheHint])
+      | Methods::ResultBody.callTool found => (ctor Option.none [Common::CacheHint])
+      | Methods::ResultBody.progressed found => (ctor Option.none [Common::CacheHint])
+      | Methods::ResultBody.getPrompt found => (ctor Option.none [Common::CacheHint])
+      | Methods::ResultBody.complete found => (ctor Option.none [Common::CacheHint])
+      | Methods::ResultBody.getTask found => (ctor Option.none [Common::CacheHint])
+      | Methods::ResultBody.acknowledged => (ctor Option.none [Common::CacheHint])
+      | Methods::ResultBody.inputRequired found => (ctor Option.none [Common::CacheHint])
+      | Methods::ResultBody.taskCreated found => (ctor Option.none [Common::CacheHint]))),
+  executable: true
+}
+
+definition{
+  name: promptNames,
+  parameters: [prompts : (List Content::Prompt)],
+  result: (List String),
+  body: (match prompts
+    | List.nil => (nil String)
+    | List.cons head rest => (cons (project head name) (promptNames rest))),
+  executable: true,
+  recursive_argument: prompts
+}
+
+definition{
+  name: many,
+  parameters: [count : Nat],
+  result: (List String),
+  body: (match count
+    | Nat.zero => (nil String)
+    | Nat.succ below => (cons "candidate" (many below))),
+  executable: true,
+  recursive_argument: count
+}
+
+definition{
+  name: hintOfThree,
+  parameters: [],
+  result: Common::CacheHint,
+  body: (record Common::CacheHint {ttlMs := 3, cacheScope := (ctor Common::CacheScope.private)}),
+  executable: true
+}
+
+definition{
+  name: sampleContents,
+  parameters: [],
+  result: (List Content::ResourceContents),
+  body: (cons (ResourceFixture::textContents "test://sample" "text/plain" "sample") (nil Content::ResourceContents)),
+  executable: true
+}
+
+theorem{
+  name: the_catalog_lists_its_resources_in_the_declared_order,
+  parameters: [],
+  statement: ((ResourceFixture::resourceUris) = (cons "test://static-text" (cons "test://static-binary" (cons "test://watched-resource" (cons "test://stateless-static-text" (nil String)))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: resources_list_answers_with_the_catalog_in_its_declared_order,
+  parameters: [],
+  statement: ((ResourceFixture::answerResourcesList (paged (ctor Option.none [String]))) = (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.listResources (record Methods::ListResourcesResult {cache := (ResourceFixture::listCache), nextCursor := (ctor Option.none [String]), resources := (ResourceFixture::fixtureResources)})))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: templates_list_answers_with_the_catalog_in_its_declared_order,
+  parameters: [],
+  statement: ((ResourceFixture::answerTemplatesList (paged (ctor Option.none [String]))) = (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.listResourceTemplates (record Methods::ListResourceTemplatesResult {cache := (ResourceFixture::listCache), nextCursor := (ctor Option.none [String]), resourceTemplates := (ResourceFixture::fixtureTemplates)})))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_prompt_catalog_lists_its_prompts_in_the_declared_order,
+  parameters: [],
+  statement: ((promptNames (ResourceFixture::fixturePrompts)) = (cons "test_simple_prompt" (cons "test_prompt_with_arguments" (cons "test_prompt_with_embedded_resource" (cons "test_prompt_with_image" (nil String)))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: prompts_list_answers_with_the_catalog_in_its_declared_order,
+  parameters: [],
+  statement: ((ResourceFixture::answerPromptsList (paged (ctor Option.none [String]))) = (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.listPrompts (record Methods::ListPromptsResult {cache := (ResourceFixture::listCache), nextCursor := (ctor Option.none [String]), prompts := (ResourceFixture::fixturePrompts)})))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_resource_list_with_a_cursor_is_an_invalid_cursor,
+  parameters: [cursor : String],
+  statement: ((ResourceFixture::answerResourcesList (paged (ctor Option.some [String] cursor))) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidCursor cursor))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_template_list_with_a_cursor_is_an_invalid_cursor,
+  parameters: [cursor : String],
+  statement: ((ResourceFixture::answerTemplatesList (paged (ctor Option.some [String] cursor))) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidCursor cursor))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_prompt_list_with_a_cursor_is_an_invalid_cursor,
+  parameters: [cursor : String],
+  statement: ((ResourceFixture::answerPromptsList (paged (ctor Option.some [String] cursor))) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidCursor cursor))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_unknown_resource_is_refused_as_not_found,
+  parameters: [cache : Common::CacheHint, uri : String],
+  statement: ((Resources::readOutcome cache uri (ctor Option.none [(List Content::ResourceContents)])) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.resourceNotFound uri))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_unknown_resource_has_the_invalid_params_code,
+  parameters: [cache : Common::CacheHint, uri : String],
+  statement: ((codeOfAnswer (Resources::readOutcome cache uri (ctor Option.none [(List Content::ResourceContents)]))) = (ctor Option.some [Int] (-32602 : Int))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_pinned_unknown_uri_is_not_a_static_resource,
+  parameters: [],
+  statement: ((ResourceFixture::lookupStatic "test://nonexistent-resource-for-conformance-testing" (ResourceFixture::staticEntries)) = (ctor Option.none [(List Content::ResourceContents)])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_resource_without_contents_is_never_answered_with_an_empty_array,
+  parameters: [cache : Common::CacheHint, uri : String],
+  statement: ((Resources::readOutcome cache uri (ctor Option.some [(List Content::ResourceContents)] (nil Content::ResourceContents))) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "a listed resource has no contents"))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_found_resource_is_answered_with_its_contents_and_the_cache_hint,
+  parameters: [
+    cache : Common::CacheHint,
+    uri : String,
+    head : Content::ResourceContents,
+    rest : (List Content::ResourceContents)
+  ],
+  statement: ((Resources::readOutcome cache uri (ctor Option.some [(List Content::ResourceContents)] (cons head rest))) = (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.readResource (record Methods::ReadResourceResult {cache := cache, contents := (cons head rest)})))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_static_text_resource_reads_as_text,
+  parameters: [],
+  statement: ((ResourceFixture::lookupStatic "test://static-text" (ResourceFixture::staticEntries)) = (ctor Option.some [(List Content::ResourceContents)] (cons (ResourceFixture::textContents "test://static-text" "text/plain" "This is the content of the static text resource.") (nil Content::ResourceContents)))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_static_binary_resource_reads_as_a_blob,
+  parameters: [],
+  statement: ((ResourceFixture::lookupStatic "test://static-binary" (ResourceFixture::staticEntries)) = (ctor Option.some [(List Content::ResourceContents)] (cons (ResourceFixture::blobContents "test://static-binary" "image/png" (ResourceFixture::sampleImageData)) (nil Content::ResourceContents)))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_resource_list_carries_the_list_cache_hint,
+  parameters: [],
+  statement: ((hintOf (ResourceFixture::answerResourcesList (paged (ctor Option.none [String])))) = (ctor Option.some [Common::CacheHint] (ResourceFixture::listCache))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_template_list_carries_the_list_cache_hint,
+  parameters: [],
+  statement: ((hintOf (ResourceFixture::answerTemplatesList (paged (ctor Option.none [String])))) = (ctor Option.some [Common::CacheHint] (ResourceFixture::listCache))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_prompt_list_carries_the_list_cache_hint,
+  parameters: [],
+  statement: ((hintOf (ResourceFixture::answerPromptsList (paged (ctor Option.none [String])))) = (ctor Option.some [Common::CacheHint] (ResourceFixture::listCache))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_read_carries_the_read_cache_hint,
+  parameters: [],
+  statement: ((hintOf (Resources::readOutcome (ResourceFixture::readCache) "test://sample" (ctor Option.some [(List Content::ResourceContents)] (sampleContents)))) = (ctor Option.some [Common::CacheHint] (ResourceFixture::readCache))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_list_cache_hint_is_public_for_five_minutes,
+  parameters: [],
+  statement: ((ResourceFixture::listCache) = (record Common::CacheHint {ttlMs := 300000, cacheScope := (ctor Common::CacheScope.public)})),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_read_cache_hint_is_private_for_five_minutes,
+  parameters: [],
+  statement: ((ResourceFixture::readCache) = (record Common::CacheHint {ttlMs := 300000, cacheScope := (ctor Common::CacheScope.private)})),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_five_cacheable_results_are_cacheable,
+  parameters: [
+    tools : Methods::ListToolsResult,
+    resources : Methods::ListResourcesResult,
+    templates : Methods::ListResourceTemplatesResult,
+    prompts : Methods::ListPromptsResult,
+    read : Methods::ReadResourceResult
+  ],
+  statement: ((((((Methods::isCacheable (ctor Methods::ResultBody.listTools tools)) && (Methods::isCacheable (ctor Methods::ResultBody.listResources resources))) && (Methods::isCacheable (ctor Methods::ResultBody.listResourceTemplates templates))) && (Methods::isCacheable (ctor Methods::ResultBody.listPrompts prompts))) && (Methods::isCacheable (ctor Methods::ResultBody.readResource read))) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_encoded_resource_list_carries_the_cache_hint,
+  parameters: [],
+  statement: (((Json::lookup "ttlMs" (record Json::JsonObject {members := (ResultJson::listResourcesMembers (record Methods::ListResourcesResult {cache := (hintOfThree), nextCursor := (ctor Option.none [String]), resources := (nil Content::Resource)}))})), (Json::lookup "cacheScope" (record Json::JsonObject {members := (ResultJson::listResourcesMembers (record Methods::ListResourcesResult {cache := (hintOfThree), nextCursor := (ctor Option.none [String]), resources := (nil Content::Resource)}))}))) = ((ctor Json::Lookup.present (ResultJson::natJson 3)), (ctor Json::Lookup.present (ctor Json::Json.text "private")))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_encoded_template_list_carries_the_cache_hint,
+  parameters: [],
+  statement: (((Json::lookup "ttlMs" (record Json::JsonObject {members := (ResultJson::listResourceTemplatesMembers (record Methods::ListResourceTemplatesResult {cache := (hintOfThree), nextCursor := (ctor Option.none [String]), resourceTemplates := (nil Content::ResourceTemplate)}))})), (Json::lookup "cacheScope" (record Json::JsonObject {members := (ResultJson::listResourceTemplatesMembers (record Methods::ListResourceTemplatesResult {cache := (hintOfThree), nextCursor := (ctor Option.none [String]), resourceTemplates := (nil Content::ResourceTemplate)}))}))) = ((ctor Json::Lookup.present (ResultJson::natJson 3)), (ctor Json::Lookup.present (ctor Json::Json.text "private")))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_encoded_prompt_list_carries_the_cache_hint,
+  parameters: [],
+  statement: (((Json::lookup "ttlMs" (record Json::JsonObject {members := (ResultJson::listPromptsMembers (record Methods::ListPromptsResult {cache := (hintOfThree), nextCursor := (ctor Option.none [String]), prompts := (nil Content::Prompt)}))})), (Json::lookup "cacheScope" (record Json::JsonObject {members := (ResultJson::listPromptsMembers (record Methods::ListPromptsResult {cache := (hintOfThree), nextCursor := (ctor Option.none [String]), prompts := (nil Content::Prompt)}))}))) = ((ctor Json::Lookup.present (ResultJson::natJson 3)), (ctor Json::Lookup.present (ctor Json::Json.text "private")))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_encoded_read_carries_the_cache_hint,
+  parameters: [],
+  statement: (((Json::lookup "ttlMs" (record Json::JsonObject {members := (ResultJson::readResourceMembers (record Methods::ReadResourceResult {cache := (hintOfThree), contents := (nil Content::ResourceContents)}))})), (Json::lookup "cacheScope" (record Json::JsonObject {members := (ResultJson::readResourceMembers (record Methods::ReadResourceResult {cache := (hintOfThree), contents := (nil Content::ResourceContents)}))}))) = ((ctor Json::Lookup.present (ResultJson::natJson 3)), (ctor Json::Lookup.present (ctor Json::Json.text "private")))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_unknown_prompt_is_refused_as_unknown_prompt,
+  parameters: [],
+  statement: ((Resources::promptOutcome (ResourceFixture::fixturePrompts) (ref ResourceFixture::renderPrompt) (promptParams "no_such_prompt" (ctor Option.none [(List (String * String))]))) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.unknownPrompt "no_such_prompt"))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: an_unknown_prompt_has_the_invalid_params_code,
+  parameters: [],
+  statement: ((codeOfAnswer (Resources::promptOutcome (ResourceFixture::fixturePrompts) (ref ResourceFixture::renderPrompt) (promptParams "no_such_prompt" (ctor Option.none [(List (String * String))])))) = (ctor Option.some [Int] (-32602 : Int))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_prompt_called_without_its_arguments_is_invalid_params,
+  parameters: [],
+  statement: ((codeOfAnswer (Resources::promptOutcome (ResourceFixture::fixturePrompts) (ref ResourceFixture::renderPrompt) (promptParams "test_prompt_with_arguments" (ctor Option.none [(List (String * String))])))) = (ctor Option.some [Int] (-32602 : Int))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_prompt_called_with_some_of_its_arguments_is_invalid_params,
+  parameters: [],
+  statement: ((codeOfAnswer (Resources::promptOutcome (ResourceFixture::fixturePrompts) (ref ResourceFixture::renderPrompt) (promptParams "test_prompt_with_arguments" (ctor Option.some [(List (String * String))] (cons ("arg1", "hello") (nil (String * String))))))) = (ctor Option.some [Int] (-32602 : Int))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: the_first_missing_required_argument_is_named,
+  parameters: [],
+  statement: ((Resources::missingRequired (Resources::declaredArguments (record Content::Prompt {name := "p", title := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)]), description := (ctor Option.none [String]), arguments := (ctor Option.some [(List Content::PromptArgument)] (cons (ResourceFixture::promptArgument "arg1" "first") (cons (ResourceFixture::promptArgument "arg2" "second") (nil Content::PromptArgument)))), meta := (ctor Option.none [Json::JsonObject])})) (cons ("arg1", "hello") (nil (String * String)))) = (ctor Option.some [String] "arg2")),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_prompt_given_all_its_arguments_misses_none,
+  parameters: [],
+  statement: ((Resources::missingRequired (Resources::declaredArguments (record Content::Prompt {name := "p", title := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)]), description := (ctor Option.none [String]), arguments := (ctor Option.some [(List Content::PromptArgument)] (cons (ResourceFixture::promptArgument "arg1" "first") (cons (ResourceFixture::promptArgument "arg2" "second") (nil Content::PromptArgument)))), meta := (ctor Option.none [Json::JsonObject])})) (cons ("arg1", "hello") (cons ("arg2", "world") (nil (String * String))))) = (ctor Option.none [String])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_prompt_without_arguments_is_served_as_declared,
+  parameters: [],
+  statement: ((Resources::promptOutcome (ResourceFixture::fixturePrompts) (ref ResourceFixture::renderPrompt) (promptParams "test_simple_prompt" (ctor Option.none [(List (String * String))]))) = (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.getPrompt (ResourceFixture::promptResult (cons (ResourceFixture::textMessage "This is a simple prompt for testing.") (nil Content::PromptMessage)))))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: the_image_prompt_serves_an_image_and_a_text,
+  parameters: [],
+  statement: ((Resources::promptOutcome (ResourceFixture::fixturePrompts) (ref ResourceFixture::renderPrompt) (promptParams "test_prompt_with_image" (ctor Option.none [(List (String * String))]))) = (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.getPrompt (ResourceFixture::promptResult (cons (record Content::PromptMessage {role := (ctor Common::Role.user), content := (ctor Content::ContentBlock.image (record Content::ImageContent {data := (ResourceFixture::sampleImageData), mimeType := "image/png", annotations := (ctor Option.none [Common::Annotations]), meta := (ctor Option.none [Json::JsonObject])}))}) (cons (ResourceFixture::textMessage "Please analyze the image above.") (nil Content::PromptMessage))))))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_completion_without_candidates_is_the_empty_completion,
+  parameters: [],
+  statement: ((Resources::completionOf (nil String)) = (record Methods::CompleteResult {completion := (record Methods::Completion {values := (nil String), total := (ctor Option.some [Nat] 0), hasMore := (ctor Option.some [Bool] false)})})),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_short_completion_is_returned_whole,
+  parameters: [],
+  statement: ((Resources::completionOf (cons "123" (cons "124" (nil String)))) = (record Methods::CompleteResult {completion := (record Methods::Completion {values := (cons "123" (cons "124" (nil String))), total := (ctor Option.some [Nat] 2), hasMore := (ctor Option.some [Bool] false)})})),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_completion_is_cut_at_one_hundred_values,
+  parameters: [],
+  statement: ((Resources::countOnto (project (project (Resources::completionOf (many 150)) completion) values) 0) = 100),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_cut_completion_counts_what_it_cut_and_says_there_is_more,
+  parameters: [],
+  statement: (((project (project (Resources::completionOf (many 150)) completion) total), (project (project (Resources::completionOf (many 150)) completion) hasMore)) = ((ctor Option.some [Nat] 150), (ctor Option.some [Bool] true))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: exactly_one_hundred_values_are_not_cut,
+  parameters: [],
+  statement: (((Resources::countOnto (project (project (Resources::completionOf (many 100)) completion) values) 0), (project (project (Resources::completionOf (many 100)) completion) hasMore)) = (100, (ctor Option.some [Bool] false))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_completion_for_an_unknown_prompt_is_invalid_params,
+  parameters: [],
+  statement: ((codeOfCandidates (ResourceFixture::candidatesFor (completeParams (promptNamed "no_such_prompt") "arg1" "x"))) = (ctor Option.some [Int] (-32602 : Int))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_completion_for_an_undeclared_argument_is_invalid_params,
+  parameters: [],
+  statement: ((codeOfCandidates (ResourceFixture::candidatesFor (completeParams (promptNamed "test_prompt_with_arguments") "arg9" "x"))) = (ctor Option.some [Int] (-32602 : Int))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_completion_for_an_unknown_template_is_invalid_params,
+  parameters: [],
+  statement: ((codeOfCandidates (ResourceFixture::candidatesFor (completeParams (ctor Methods::CompletionReference.resourceTemplate "test://other/{id}") "id" "x"))) = (ctor Option.some [Int] (-32602 : Int))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: the_fixture_offers_resources_prompts_and_completion,
+  parameters: [],
+  statement: (((((((Dispatch::offers (Fixture::fixtureCapabilities) (ctor Methods::Method.resourcesList)) && (Dispatch::offers (Fixture::fixtureCapabilities) (ctor Methods::Method.resourcesRead))) && (Dispatch::offers (Fixture::fixtureCapabilities) (ctor Methods::Method.resourcesTemplatesList))) && (Dispatch::offers (Fixture::fixtureCapabilities) (ctor Methods::Method.promptsList))) && (Dispatch::offers (Fixture::fixtureCapabilities) (ctor Methods::Method.promptsGet))) && (Dispatch::offers (Fixture::fixtureCapabilities) (ctor Methods::Method.completionComplete))) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_tools_only_capabilities_offer_none_of_them,
+  parameters: [],
+  statement: (((((((Dispatch::offers (Fixture::toolsCapabilities) (ctor Methods::Method.resourcesList)) || (Dispatch::offers (Fixture::toolsCapabilities) (ctor Methods::Method.resourcesRead))) || (Dispatch::offers (Fixture::toolsCapabilities) (ctor Methods::Method.resourcesTemplatesList))) || (Dispatch::offers (Fixture::toolsCapabilities) (ctor Methods::Method.promptsList))) || (Dispatch::offers (Fixture::toolsCapabilities) (ctor Methods::Method.promptsGet))) || (Dispatch::offers (Fixture::toolsCapabilities) (ctor Methods::Method.completionComplete))) = false),
+  proof: reflexivity{}
+}
+\end{semanticmodule}
+\end{lexlean}

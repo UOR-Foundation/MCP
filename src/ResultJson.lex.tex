@@ -335,6 +335,228 @@ definition{
 }
 
 definition{
+  name: natMember,
+  parameters: [key : String, value : (Option Nat)],
+  result: (List (String * Json::Json)),
+  body: (match value
+    | Option.none => (nil (String * Json::Json))
+    | Option.some count => (cons (key, (natJson count)) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: resourceJson,
+  parameters: [found : Content::Resource],
+  result: Json::Json,
+  body: (ctor Json::Json.object (prim append (cons ("name", (ctor Json::Json.text (project found name))) (nil (String * Json::Json))) (prim append (Envelope::textMember "title" (project found title)) (prim append (Envelope::iconsMember (project found icons)) (prim append (cons ("uri", (ctor Json::Json.text (project found uri))) (nil (String * Json::Json))) (prim append (Envelope::textMember "description" (project found description)) (prim append (Envelope::textMember "mimeType" (project found mimeType)) (prim append (annotationsMember (project found annotations)) (prim append (sizeMember (project found size)) (metaMember (project found meta)) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: resourceTemplateJson,
+  parameters: [found : Content::ResourceTemplate],
+  result: Json::Json,
+  body: (ctor Json::Json.object (prim append (cons ("name", (ctor Json::Json.text (project found name))) (nil (String * Json::Json))) (prim append (Envelope::textMember "title" (project found title)) (prim append (Envelope::iconsMember (project found icons)) (prim append (cons ("uriTemplate", (ctor Json::Json.text (project found uriTemplate))) (nil (String * Json::Json))) (prim append (Envelope::textMember "description" (project found description)) (prim append (Envelope::textMember "mimeType" (project found mimeType)) (prim append (annotationsMember (project found annotations)) (metaMember (project found meta)) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: promptArgumentJson,
+  parameters: [found : Content::PromptArgument],
+  result: Json::Json,
+  body: (ctor Json::Json.object (prim append (cons ("name", (ctor Json::Json.text (project found name))) (nil (String * Json::Json))) (prim append (Envelope::textMember "title" (project found title)) (prim append (Envelope::textMember "description" (project found description)) (boolMember "required" (project found required)) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: resourceListOnto,
+  parameters: [items : (List Content::Resource), built : (List Json::Json)],
+  result: (List Json::Json),
+  body: (match items
+    | List.nil => built
+    | List.cons head tail => (resourceListOnto tail (cons (resourceJson head) built))),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: resourceListJson,
+  parameters: [items : (List Content::Resource)],
+  result: (List Json::Json),
+  body: (JsonRead::reverseOnto [Json::Json] (resourceListOnto items (nil Json::Json)) (nil Json::Json)),
+  executable: true
+}
+
+definition{
+  name: templateListOnto,
+  parameters: [items : (List Content::ResourceTemplate), built : (List Json::Json)],
+  result: (List Json::Json),
+  body: (match items
+    | List.nil => built
+    | List.cons head tail => (templateListOnto tail (cons (resourceTemplateJson head) built))),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: templateListJson,
+  parameters: [items : (List Content::ResourceTemplate)],
+  result: (List Json::Json),
+  body: (JsonRead::reverseOnto [Json::Json] (templateListOnto items (nil Json::Json)) (nil Json::Json)),
+  executable: true
+}
+
+definition{
+  name: argumentListOnto,
+  parameters: [items : (List Content::PromptArgument), built : (List Json::Json)],
+  result: (List Json::Json),
+  body: (match items
+    | List.nil => built
+    | List.cons head tail => (argumentListOnto tail (cons (promptArgumentJson head) built))),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: argumentListJson,
+  parameters: [items : (List Content::PromptArgument)],
+  result: (List Json::Json),
+  body: (JsonRead::reverseOnto [Json::Json] (argumentListOnto items (nil Json::Json)) (nil Json::Json)),
+  executable: true
+}
+
+definition{
+  name: contentsListOnto,
+  parameters: [items : (List Content::ResourceContents), built : (List Json::Json)],
+  result: (List Json::Json),
+  body: (match items
+    | List.nil => built
+    | List.cons head tail => (contentsListOnto tail (cons (contentsJson head) built))),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: contentsListJson,
+  parameters: [items : (List Content::ResourceContents)],
+  result: (List Json::Json),
+  body: (JsonRead::reverseOnto [Json::Json] (contentsListOnto items (nil Json::Json)) (nil Json::Json)),
+  executable: true
+}
+
+definition{
+  name: promptJson,
+  parameters: [found : Content::Prompt],
+  result: Json::Json,
+  body: (ctor Json::Json.object (prim append (cons ("name", (ctor Json::Json.text (project found name))) (nil (String * Json::Json))) (prim append (Envelope::textMember "title" (project found title)) (prim append (Envelope::iconsMember (project found icons)) (prim append (Envelope::textMember "description" (project found description)) (prim append (match (project found arguments)
+    | Option.none => (nil (String * Json::Json))
+    | Option.some declared => (cons ("arguments", (ctor Json::Json.array (argumentListJson declared))) (nil (String * Json::Json)))) (metaMember (project found meta)) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: promptListOnto,
+  parameters: [items : (List Content::Prompt), built : (List Json::Json)],
+  result: (List Json::Json),
+  body: (match items
+    | List.nil => built
+    | List.cons head tail => (promptListOnto tail (cons (promptJson head) built))),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: promptListJson,
+  parameters: [items : (List Content::Prompt)],
+  result: (List Json::Json),
+  body: (JsonRead::reverseOnto [Json::Json] (promptListOnto items (nil Json::Json)) (nil Json::Json)),
+  executable: true
+}
+
+definition{
+  name: messageJson,
+  parameters: [found : Content::PromptMessage],
+  result: (Option Json::Json),
+  body: (match (blockJson (project found content))
+    | Option.none => (ctor Option.none [Json::Json])
+    | Option.some encoded => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("role", (ctor Json::Json.text (Common::roleWire (project found role)))) (cons ("content", encoded) (nil (String * Json::Json))))))),
+  executable: true
+}
+
+definition{
+  name: messagesOnto,
+  parameters: [items : (List Content::PromptMessage), built : (List Json::Json)],
+  result: (Option (List Json::Json)),
+  body: (match items
+    | List.nil => (ctor Option.some [(List Json::Json)] built)
+    | List.cons head tail => (match (messageJson head)
+      | Option.none => (ctor Option.none [(List Json::Json)])
+      | Option.some encoded => (messagesOnto tail (cons encoded built)))),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: messagesJson,
+  parameters: [items : (List Content::PromptMessage)],
+  result: (Option (List Json::Json)),
+  body: (match (messagesOnto items (nil Json::Json))
+    | Option.none => (ctor Option.none [(List Json::Json)])
+    | Option.some built => (ctor Option.some [(List Json::Json)] (JsonRead::reverseOnto [Json::Json] built (nil Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: listResourcesMembers,
+  parameters: [found : Methods::ListResourcesResult],
+  result: (List (String * Json::Json)),
+  body: (cons ("resources", (ctor Json::Json.array (resourceListJson (project found resources)))) (prim append (Envelope::textMember "nextCursor" (project found nextCursor)) (cacheMembers (project found cache)) : (List (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: listResourceTemplatesMembers,
+  parameters: [found : Methods::ListResourceTemplatesResult],
+  result: (List (String * Json::Json)),
+  body: (cons ("resourceTemplates", (ctor Json::Json.array (templateListJson (project found resourceTemplates)))) (prim append (Envelope::textMember "nextCursor" (project found nextCursor)) (cacheMembers (project found cache)) : (List (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: listPromptsMembers,
+  parameters: [found : Methods::ListPromptsResult],
+  result: (List (String * Json::Json)),
+  body: (cons ("prompts", (ctor Json::Json.array (promptListJson (project found prompts)))) (prim append (Envelope::textMember "nextCursor" (project found nextCursor)) (cacheMembers (project found cache)) : (List (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: readResourceMembers,
+  parameters: [found : Methods::ReadResourceResult],
+  result: (List (String * Json::Json)),
+  body: (cons ("contents", (ctor Json::Json.array (contentsListJson (project found contents)))) (cacheMembers (project found cache))),
+  executable: true
+}
+
+definition{
+  name: getPromptMembers,
+  parameters: [found : Methods::GetPromptResult],
+  result: (Option (List (String * Json::Json))),
+  body: (match (messagesJson (project found messages))
+    | Option.none => (ctor Option.none [(List (String * Json::Json))])
+    | Option.some encoded => (ctor Option.some [(List (String * Json::Json))] (prim append (Envelope::textMember "description" (project found description)) (cons ("messages", (ctor Json::Json.array encoded)) (nil (String * Json::Json))) : (List (String * Json::Json))))),
+  executable: true
+}
+
+definition{
+  name: completeMembers,
+  parameters: [found : Methods::CompleteResult],
+  result: (List (String * Json::Json)),
+  body: (cons ("completion", (ctor Json::Json.object (cons ("values", (ctor Json::Json.array (Refusal::textList (project (project found completion) values)))) (prim append (natMember "total" (project (project found completion) total)) (boolMember "hasMore" (project (project found completion) hasMore)) : (List (String * Json::Json)))))) (nil (String * Json::Json))),
+  executable: true
+}
+
+definition{
   name: bodyMembers,
   parameters: [body : Methods::ResultBody],
   result: (Option (List (String * Json::Json))),
@@ -344,12 +566,12 @@ definition{
     | Methods::ResultBody.callTool found => (sanitizedMembers (callToolMembers found))
     | Methods::ResultBody.progressed found => (sanitizedMembers (callToolMembers (project found result)))
     | Methods::ResultBody.acknowledged => (ctor Option.some [(List (String * Json::Json))] (nil (String * Json::Json)))
-    | Methods::ResultBody.listResources found => (ctor Option.none [(List (String * Json::Json))])
-    | Methods::ResultBody.readResource found => (ctor Option.none [(List (String * Json::Json))])
-    | Methods::ResultBody.listResourceTemplates found => (ctor Option.none [(List (String * Json::Json))])
-    | Methods::ResultBody.listPrompts found => (ctor Option.none [(List (String * Json::Json))])
-    | Methods::ResultBody.getPrompt found => (ctor Option.none [(List (String * Json::Json))])
-    | Methods::ResultBody.complete found => (ctor Option.none [(List (String * Json::Json))])
+    | Methods::ResultBody.listResources found => (ctor Option.some [(List (String * Json::Json))] (listResourcesMembers found))
+    | Methods::ResultBody.readResource found => (ctor Option.some [(List (String * Json::Json))] (readResourceMembers found))
+    | Methods::ResultBody.listResourceTemplates found => (ctor Option.some [(List (String * Json::Json))] (listResourceTemplatesMembers found))
+    | Methods::ResultBody.listPrompts found => (ctor Option.some [(List (String * Json::Json))] (listPromptsMembers found))
+    | Methods::ResultBody.getPrompt found => (sanitizedMembers (getPromptMembers found))
+    | Methods::ResultBody.complete found => (ctor Option.some [(List (String * Json::Json))] (completeMembers found))
     | Methods::ResultBody.getTask found => (ctor Option.none [(List (String * Json::Json))])
     | Methods::ResultBody.inputRequired found => (ctor Option.none [(List (String * Json::Json))])
     | Methods::ResultBody.taskCreated found => (ctor Option.none [(List (String * Json::Json))])),
