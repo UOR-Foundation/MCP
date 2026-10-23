@@ -133,6 +133,17 @@ definition{
   executable: true
 }
 
+definition{name: rateLimitedCode, parameters: [], result: Int, body: (429 : Int), executable: true}
+
+definition{
+  name: inJsonRpcReservedRange,
+  parameters: [code : Int],
+  result: Bool,
+  body: (not ((prim less_than code (-32768 : Int) : Bool) || (prim less_than (-32000 : Int) code : Bool))),
+  axioms: [propext],
+  executable: true
+}
+
 definition{
   name: inMcpReservedRange,
   parameters: [code : Int],
@@ -177,6 +188,22 @@ theorem{
   name: jsonrpc_codes_lie_outside_both_mcp_ranges,
   parameters: [],
   statement: (((((inMcpReservedRange (parseErrorCode)) = false) /\ ((inMcpReservedRange (invalidRequestCode)) = false)) /\ (((inMcpReservedRange (methodNotFoundCode)) = false) /\ ((inMcpReservedRange (invalidParamsCode)) = false))) /\ ((((inMcpReservedRange (internalErrorCode)) = false) /\ ((inImplementationDefinedRange (invalidParamsCode)) = false)) /\ ((inImplementationDefinedRange (headerMismatchCode)) = false))),
+  proof: decide{},
+  axioms: [propext]
+}
+
+theorem{
+  name: the_rate_limit_code_is_outside_the_jsonrpc_reserved_range,
+  parameters: [],
+  statement: (((inJsonRpcReservedRange (rateLimitedCode)) = false) /\ ((inMcpReservedRange (rateLimitedCode)) = false)),
+  proof: decide{},
+  axioms: [propext]
+}
+
+theorem{
+  name: the_mcp_codes_lie_inside_the_jsonrpc_reserved_range,
+  parameters: [],
+  statement: ((((inJsonRpcReservedRange (headerMismatchCode)) = true) /\ ((inJsonRpcReservedRange (missingRequiredClientCapabilityCode)) = true)) /\ ((inJsonRpcReservedRange (unsupportedProtocolVersionCode)) = true)),
   proof: decide{},
   axioms: [propext]
 }

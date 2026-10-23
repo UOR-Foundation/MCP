@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-json-schema-validation"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Schema"
+component = "Schema"
+
+[[form]]
+id = "mcp-json-schema-validation"
+channel = "text"
+surface = "MCP JSON Schema validation"
+canonical_source = true
+features = ["sentence-case", "singular"]

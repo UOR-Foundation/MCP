@@ -1,0 +1,307 @@
+\begin{lexlean}{Tools}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Admission}
+\importmodule{Common}
+\importmodule{Content}
+\importmodule{Extension}
+\importmodule{Json}
+\importmodule{Methods}
+\importmodule{Numeric}
+\importmodule{Refusal}
+\importmodule{Sanitize}
+\importmodule{Schema}
+\title{MCP tools}
+\begin{semanticmodule}
+definition{
+  name: admits,
+  parameters: [limit : Nat, used : Nat],
+  result: Bool,
+  body: (used <? limit),
+  executable: true
+}
+
+definition{
+  name: gate,
+  parameters: [
+    limit : Nat,
+    used : Nat,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    request : Methods::ClientRequest
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match request
+    | Methods::ClientRequest.toolsCall params => (if (admits limit used) then (apply answer request) else (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.rateLimited limit)))
+    | Methods::ClientRequest.serverDiscover params => (apply answer request)
+    | Methods::ClientRequest.toolsList params => (apply answer request)
+    | Methods::ClientRequest.resourcesList params => (apply answer request)
+    | Methods::ClientRequest.resourcesRead params => (apply answer request)
+    | Methods::ClientRequest.resourcesTemplatesList params => (apply answer request)
+    | Methods::ClientRequest.promptsList params => (apply answer request)
+    | Methods::ClientRequest.promptsGet params => (apply answer request)
+    | Methods::ClientRequest.completionComplete params => (apply answer request)
+    | Methods::ClientRequest.tasksGet params => (apply answer request)
+    | Methods::ClientRequest.tasksUpdate params => (apply answer request)
+    | Methods::ClientRequest.tasksCancel params => (apply answer request)),
+  executable: true
+}
+
+definition{
+  name: findTool,
+  parameters: [name : String, tools : (List Content::Tool)],
+  result: (Option Content::Tool),
+  body: (match tools
+    | List.nil => (ctor Option.none [Content::Tool])
+    | List.cons head rest => (if (prim equal (project head name) name : Bool) then (ctor Option.some [Content::Tool] head) else (findTool name rest))),
+  executable: true,
+  recursive_argument: tools
+}
+
+definition{
+  name: textResult,
+  parameters: [text : String, failed : Bool],
+  result: Methods::CallToolResult,
+  body: (record Methods::CallToolResult {content := (cons (ctor Content::ContentBlock.text (record Content::TextContent {text := text, annotations := (ctor Option.none [Common::Annotations]), meta := (ctor Option.none [Json::JsonObject])})) (nil Content::ContentBlock)), structuredContent := (ctor Option.none [Json::Json]), isError := (if failed then (ctor Option.some [Bool] true) else (ctor Option.none [Bool]))}),
+  executable: true
+}
+
+definition{
+  name: invalidText,
+  parameters: [path : (List Schema::Seg), keyword : String],
+  result: String,
+  body: (let where : String := (Schema::pointerOf path); (prim join (cons "Invalid arguments:" (cons (if (prim equal where "" : Bool) then "the arguments object" else where) (cons "fails" (cons keyword (nil String))))) " " : String)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: payloadsOk,
+  parameters: [blocks : (List Content::ContentBlock)],
+  result: Bool,
+  body: (match blocks
+    | List.nil => true
+    | List.cons head rest => (match head
+      | Content::ContentBlock.text found => (payloadsOk rest)
+      | Content::ContentBlock.image found => (if (Sanitize::payloadOk (project found data)) then (payloadsOk rest) else false)
+      | Content::ContentBlock.audio found => (if (Sanitize::payloadOk (project found data)) then (payloadsOk rest) else false)
+      | Content::ContentBlock.resource_link found => (payloadsOk rest)
+      | Content::ContentBlock.resource found => (match (project found resource)
+        | Content::ResourceContents.text inner => (payloadsOk rest)
+        | Content::ResourceContents.blob inner => (if (Sanitize::payloadOk (project inner blob)) then (payloadsOk rest) else false)))),
+  axioms: [Quot.sound, propext],
+  executable: true,
+  recursive_argument: blocks
+}
+
+definition{
+  name: isFailure,
+  parameters: [result : Methods::CallToolResult],
+  result: Bool,
+  body: (match (project result isError) | Option.none => false | Option.some flag => flag),
+  executable: true
+}
+
+definition{
+  name: increasing,
+  parameters: [steps : (List Methods::ProgressStep), previous : Json::Decimal],
+  result: Bool,
+  body: (match steps
+    | List.nil => true
+    | List.cons head rest => (if (Numeric::isGreater (Numeric::compare (project head progress) previous)) then (increasing rest (project head progress)) else false)),
+  axioms: [propext],
+  executable: true,
+  recursive_argument: steps
+}
+
+definition{
+  name: stepsOk,
+  parameters: [steps : (List Methods::ProgressStep)],
+  result: Bool,
+  body: (match steps
+    | List.nil => true
+    | List.cons head rest => (increasing rest (project head progress))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: finish,
+  parameters: [done : Methods::Progressed],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match (project done steps)
+    | List.nil => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.callTool (project done result)))
+    | List.cons head rest => (if (stepsOk (project done steps)) then (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.progressed done)) else (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.badToolOutput "progress did not increase")))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: structuredStep,
+  parameters: [outputSchema : Json::JsonObject, done : Methods::Progressed],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match (project (project done result) structuredContent)
+    | Option.none => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.badToolOutput "the tool declares an outputSchema and returned no structuredContent"))
+    | Option.some structured => (match (Schema::validate (ctor Json::Json.object (project outputSchema members)) (ctor Json::Json.object (project outputSchema members)) structured)
+      | Schema::Verdict.valid => (finish done)
+      | Schema::Verdict.invalid path keyword => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.badToolOutput "structuredContent does not conform to the outputSchema"))
+      | Schema::Verdict.malformed keyword => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the outputSchema is malformed"))
+      | Schema::Verdict.unresolved target => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the outputSchema has an unresolved reference"))
+      | Schema::Verdict.exhausted => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the outputSchema exceeded the validation budget")))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: outputStep,
+  parameters: [tool : Content::Tool, done : Methods::Progressed],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (if (isFailure (project done result)) then (finish done) else (match (project tool outputSchema)
+    | Option.none => (finish done)
+    | Option.some declared => (structuredStep declared done))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: checkExecuted,
+  parameters: [tool : Content::Tool, done : Methods::Progressed],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (if (payloadsOk (project (project done result) content)) then (outputStep tool done) else (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.badToolOutput "a content payload is not canonical Base64"))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: executeStep,
+  parameters: [
+    tool : Content::Tool,
+    behave : (Fn (Methods::CallToolParams) (Result Methods::Progressed Refusal::ProviderRefusal)),
+    params : Methods::CallToolParams
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match (apply behave params)
+    | Result.error refusal => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] refusal)
+    | Result.ok done => (checkExecuted tool done)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: argumentsOf,
+  parameters: [params : Methods::CallToolParams],
+  result: Json::Json,
+  body: (match (project params arguments)
+    | Option.none => (ctor Json::Json.object (nil (String * Json::Json)))
+    | Option.some given => (ctor Json::Json.object (project given members))),
+  executable: true
+}
+
+definition{
+  name: argumentsStep,
+  parameters: [
+    tool : Content::Tool,
+    behave : (Fn (Methods::CallToolParams) (Result Methods::Progressed Refusal::ProviderRefusal)),
+    params : Methods::CallToolParams
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match (Schema::validate (ctor Json::Json.object (project (project tool inputSchema) members)) (ctor Json::Json.object (project (project tool inputSchema) members)) (argumentsOf params))
+    | Schema::Verdict.valid => (executeStep tool behave params)
+    | Schema::Verdict.invalid path keyword => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.callTool (textResult (invalidText path keyword) true)))
+    | Schema::Verdict.malformed keyword => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the inputSchema is malformed"))
+    | Schema::Verdict.unresolved target => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the inputSchema has an unresolved reference"))
+    | Schema::Verdict.exhausted => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the inputSchema exceeded the validation budget"))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: answerCall,
+  parameters: [
+    tools : (List Content::Tool),
+    behave : (Fn (Methods::CallToolParams) (Result Methods::Progressed Refusal::ProviderRefusal)),
+    params : Methods::CallToolParams
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match (findTool (project params name) tools)
+    | Option.none => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.unknownTool (project params name)))
+    | Option.some tool => (argumentsStep tool behave params)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: answerList,
+  parameters: [
+    cache : Common::CacheHint,
+    tools : (List Content::Tool),
+    params : Methods::PaginatedParams
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match (project params cursor)
+    | Option.some cursor => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidCursor cursor))
+    | Option.none => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.listTools (record Methods::ListToolsResult {cache := cache, nextCursor := (ctor Option.none [String]), tools := tools})))),
+  executable: true
+}
+
+definition{
+  name: admissionRefusal,
+  parameters: [tools : (List Content::Tool)],
+  result: (Option Refusal::ProviderRefusal),
+  body: (match (Admission::admitCatalog tools)
+    | Result.error fault => (ctor Option.some [Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal (Admission::faultText fault)))
+    | Result.ok rules => (ctor Option.none [Refusal::ProviderRefusal])),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: namesOf,
+  parameters: [tools : (List Content::Tool)],
+  result: (List String),
+  body: (match tools
+    | List.nil => (nil String)
+    | List.cons head rest => (cons (project head name) (namesOf rest))),
+  executable: true,
+  recursive_argument: tools
+}
+
+definition{
+  name: isToolError,
+  parameters: [answered : (Result Methods::ResultBody Refusal::ProviderRefusal)],
+  result: Bool,
+  body: (match answered
+    | Result.error refusal => false
+    | Result.ok body => (match body
+      | Methods::ResultBody.callTool found => (isFailure found)
+      | Methods::ResultBody.discover found => false
+      | Methods::ResultBody.listTools found => false
+      | Methods::ResultBody.progressed found => (isFailure (project found result))
+      | Methods::ResultBody.listResources found => false
+      | Methods::ResultBody.readResource found => false
+      | Methods::ResultBody.listResourceTemplates found => false
+      | Methods::ResultBody.listPrompts found => false
+      | Methods::ResultBody.getPrompt found => false
+      | Methods::ResultBody.complete found => false
+      | Methods::ResultBody.getTask found => false
+      | Methods::ResultBody.acknowledged => false
+      | Methods::ResultBody.inputRequired found => false
+      | Methods::ResultBody.taskCreated found => false)),
+  executable: true
+}
+
+theorem{
+  name: a_call_below_the_limit_is_admitted,
+  parameters: [],
+  statement: (((admits 3 0) = true) /\ (((admits 3 1) = true) /\ ((admits 3 2) = true))),
+  proof: decide{}
+}
+
+theorem{
+  name: a_call_at_or_above_the_limit_is_refused,
+  parameters: [],
+  statement: (((admits 3 3) = false) /\ (((admits 3 4) = false) /\ ((admits 0 0) = false))),
+  proof: decide{}
+}
+\end{semanticmodule}
+\end{lexlean}

@@ -76,7 +76,9 @@ definition{
   result: (Result Http::HttpRequest FrameFault),
   body: (match (chunkAt source (second read))
     | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated (second read)))
-    | Option.some body => (if ((project body next) =? (prim length source : Nat)) then (ctor Result.ok [Http::HttpRequest, FrameFault] (record Http::HttpRequest {method := (JsonText::bytesToList (project method bytes)), target := (JsonText::bytesToList (project target bytes)), fields := (first read), body := (project body bytes)})) else (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.trailing (project body next))))),
+    | Option.some body => (match (u32At source (project body next))
+      | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated (project body next)))
+      | Option.some calls => (if (((project body next) + 4) =? (prim length source : Nat)) then (ctor Result.ok [Http::HttpRequest, FrameFault] (record Http::HttpRequest {method := (JsonText::bytesToList (project method bytes)), target := (JsonText::bytesToList (project target bytes)), fields := (first read), body := (project body bytes), toolCalls := calls})) else (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.trailing ((project body next) + 4)))))),
   axioms: [Quot.sound, propext],
   executable: true
 }
@@ -152,10 +154,37 @@ definition{
 }
 
 definition{
+  name: noteList,
+  parameters: [note : (List Nat)],
+  result: (List Nat),
+  body: (prim append (u32List (prim length note : Nat)) note : (List Nat)),
+  executable: true
+}
+
+definition{
+  name: notesListOnto,
+  parameters: [reversed : (List (List Nat)), built : (List Nat)],
+  result: (List Nat),
+  body: (match reversed
+    | List.nil => built
+    | List.cons head tail => (notesListOnto tail (prim append (noteList head) built : (List Nat)))),
+  executable: true,
+  recursive_argument: reversed
+}
+
+definition{
+  name: notesList,
+  parameters: [notes : (List (List Nat))],
+  result: (List Nat),
+  body: (notesListOnto (JsonRead::reverseOnto [(List Nat)] notes (nil (List Nat))) (nil Nat)),
+  executable: true
+}
+
+definition{
   name: writeResponse,
   parameters: [response : Http::HttpResponse],
   result: (List Nat),
-  body: (prim append (u32List (project response status)) (prim append (u32List (prim length (project response fields) : Nat)) (prim append (fieldsList (project response fields)) (prim append (u32List (prim length (project response body) : Nat)) (project response body) : (List Nat)) : (List Nat)) : (List Nat)) : (List Nat)),
+  body: (prim append (u32List (project response status)) (prim append (u32List (prim length (project response fields) : Nat)) (prim append (fieldsList (project response fields)) (prim append (u32List (prim length (project response notifications) : Nat)) (prim append (notesList (project response notifications)) (prim append (u32List (prim length (project response body) : Nat)) (project response body) : (List Nat)) : (List Nat)) : (List Nat)) : (List Nat)) : (List Nat)) : (List Nat)),
   executable: true
 }
 \end{semanticmodule}

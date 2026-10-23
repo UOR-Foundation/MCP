@@ -1,0 +1,861 @@
+\begin{lexlean}{Schema}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Json}
+\importmodule{JsonEq}
+\importmodule{JsonRead}
+\importmodule{JsonText}
+\importmodule{Numeric}
+\title{MCP JSON Schema validation}
+\begin{semanticmodule}
+inductive{
+  name: Seg,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: key, fields: [String]}, {name: index, fields: [Nat]}]
+}
+
+inductive{
+  name: Verdict,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: valid, fields: []},
+    {name: invalid, fields: [(List Seg), String]},
+    {name: malformed, fields: [String]},
+    {name: unresolved, fields: [String]},
+    {name: exhausted, fields: []}
+  ]
+}
+
+inductive{
+  name: Kw,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: ok, fields: []}, {name: fails, fields: []}, {name: bad, fields: []}]
+}
+
+inductive{
+  name: Applicator,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: anyOfKind, fields: []},
+    {name: oneOfKind, fields: []},
+    {name: notKind, fields: []},
+    {name: ifKind, fields: []}
+  ]
+}
+
+inductive{
+  name: Frame,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: check, fields: [Json::Json, Json::Json, (List Seg)]},
+    {name: anyOf, fields: [(List Json::Json), Json::Json, (List Seg)]},
+    {name: oneOf, fields: [(List Json::Json), Json::Json, (List Seg), Nat]},
+    {name: notGuard, fields: [(List Seg)]},
+    {name: ifGuard, fields: [(Option Json::Json), (Option Json::Json), Json::Json, (List Seg)]},
+    {name: defer, fields: [Applicator, Json::Json, Json::Json, (List Seg)]}
+  ]
+}
+
+inductive{
+  name: Mode,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: running, fields: []}, {name: failing, fields: [(List Seg), String]}]
+}
+
+structure{
+  name: Next,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: mode, type: Mode}, {name: stack, type: (List Frame)}]
+}
+
+inductive{
+  name: Grown,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: failed, fields: [String]},
+    {name: malformedKw, fields: [String]},
+    {name: unresolvedRef, fields: [String]},
+    {name: built, fields: [(List Frame)]}
+  ]
+}
+
+definition{name: stepBudget, parameters: [], result: Nat, body: 67108864, executable: true}
+
+definition{
+  name: dialect,
+  parameters: [],
+  result: String,
+  body: "https://json-schema.org/draft/2020-12/schema",
+  executable: true
+}
+
+definition{
+  name: kindName,
+  parameters: [value : Json::Json],
+  result: String,
+  body: (match value
+    | Json::Json.null => "null"
+    | Json::Json.bool flag => "boolean"
+    | Json::Json.number amount => "number"
+    | Json::Json.text content => "string"
+    | Json::Json.array items => "array"
+    | Json::Json.object members => "object"),
+  executable: true
+}
+
+definition{
+  name: validTypeName,
+  parameters: [name : String],
+  result: Bool,
+  body: ((prim equal name "null" : Bool) || ((prim equal name "boolean" : Bool) || ((prim equal name "object" : Bool) || ((prim equal name "array" : Bool) || ((prim equal name "number" : Bool) || ((prim equal name "string" : Bool) || (prim equal name "integer" : Bool))))))),
+  executable: true
+}
+
+definition{
+  name: typeAllows,
+  parameters: [name : String, value : Json::Json],
+  result: Bool,
+  body: (if (prim equal name (kindName value) : Bool) then true else (if (prim equal name "integer" : Bool) then (match (Json::asNumber value)
+    | Option.none => false
+    | Option.some amount => (Numeric::isWhole amount)) else false)),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: typeNameOf,
+  parameters: [entry : Json::Json],
+  result: String,
+  body: (match (Json::asText entry) | Option.none => "" | Option.some name => name),
+  executable: true
+}
+
+definition{
+  name: typeList,
+  parameters: [names : (List Json::Json), value : Json::Json, matched : Bool],
+  result: Kw,
+  body: (match names
+    | List.nil => (if matched then (ctor Kw.ok) else (ctor Kw.fails))
+    | List.cons head tail => (if (validTypeName (typeNameOf head)) then (typeList tail value (matched || (typeAllows (typeNameOf head) value))) else (ctor Kw.bad))),
+  axioms: [propext],
+  executable: true,
+  recursive_argument: names
+}
+
+definition{
+  name: typeKw,
+  parameters: [members : (List (String * Json::Json)), value : Json::Json],
+  result: Kw,
+  body: (match (Json::lookupIn "type" members)
+    | Json::Lookup.absent => (ctor Kw.ok)
+    | Json::Lookup.present declared => (match (Json::asText declared)
+      | Option.some name => (if (validTypeName name) then (if (typeAllows name value) then (ctor Kw.ok) else (ctor Kw.fails)) else (ctor Kw.bad))
+      | Option.none => (match (Json::asArray declared)
+        | Option.some names => (typeList names value false)
+        | Option.none => (ctor Kw.bad)))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: enumLoop,
+  parameters: [options : (List Json::Json), value : Json::Json],
+  result: Kw,
+  body: (match options
+    | List.nil => (ctor Kw.fails)
+    | List.cons head tail => (match (JsonEq::compare head value)
+      | JsonEq::Same.yes => (ctor Kw.ok)
+      | JsonEq::Same.no => (enumLoop tail value)
+      | JsonEq::Same.exhausted => (ctor Kw.bad))),
+  axioms: [propext],
+  executable: true,
+  recursive_argument: options
+}
+
+definition{
+  name: enumKw,
+  parameters: [members : (List (String * Json::Json)), value : Json::Json],
+  result: Kw,
+  body: (match (Json::lookupIn "enum" members)
+    | Json::Lookup.absent => (ctor Kw.ok)
+    | Json::Lookup.present declared => (match (Json::asArray declared)
+      | Option.none => (ctor Kw.bad)
+      | Option.some options => (enumLoop options value))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: constKw,
+  parameters: [members : (List (String * Json::Json)), value : Json::Json],
+  result: Kw,
+  body: (match (Json::lookupIn "const" members)
+    | Json::Lookup.absent => (ctor Kw.ok)
+    | Json::Lookup.present declared => (match (JsonEq::compare declared value)
+      | JsonEq::Same.yes => (ctor Kw.ok)
+      | JsonEq::Same.no => (ctor Kw.fails)
+      | JsonEq::Same.exhausted => (ctor Kw.bad))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: boundPasses,
+  parameters: [code : Nat, order : Numeric::Cmp],
+  result: Bool,
+  body: (if (code =? 0) then (not (Numeric::isLess order)) else (if (code =? 1) then (not (Numeric::isGreater order)) else (if (code =? 2) then (Numeric::isGreater order) else (Numeric::isLess order)))),
+  executable: true
+}
+
+definition{
+  name: boundKw,
+  parameters: [
+    key : String,
+    code : Nat,
+    members : (List (String * Json::Json)),
+    value : Json::Json
+  ],
+  result: Kw,
+  body: (match (Json::lookupIn key members)
+    | Json::Lookup.absent => (ctor Kw.ok)
+    | Json::Lookup.present declared => (match (Json::asNumber declared)
+      | Option.none => (ctor Kw.bad)
+      | Option.some limit => (match (Json::asNumber value)
+        | Option.none => (ctor Kw.ok)
+        | Option.some actual => (if (boundPasses code (Numeric::compare actual limit)) then (ctor Kw.ok) else (ctor Kw.fails))))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: sizeKw,
+  parameters: [key : String, atLeast : Bool, members : (List (String * Json::Json)), size : Nat],
+  result: Kw,
+  body: (match (Json::lookupIn key members)
+    | Json::Lookup.absent => (ctor Kw.ok)
+    | Json::Lookup.present declared => (match (Json::asInteger declared)
+      | Option.none => (ctor Kw.bad)
+      | Option.some bound => (if (prim less_than bound (0 : Int) : Bool) then (ctor Kw.bad) else (if atLeast then (if (Numeric::isLess (Numeric::cmpInt (Numeric::natToInt size (0 : Int)) bound)) then (ctor Kw.fails) else (ctor Kw.ok)) else (if (Numeric::isGreater (Numeric::cmpInt (Numeric::natToInt size (0 : Int)) bound)) then (ctor Kw.fails) else (ctor Kw.ok)))))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: countPoints,
+  parameters: [bytes : (List Nat), counted : Nat],
+  result: Nat,
+  body: (match bytes
+    | List.nil => counted
+    | List.cons byte rest => (if ((byte <? 128) || (191 <? byte)) then (countPoints rest (counted + 1)) else (countPoints rest counted))),
+  executable: true,
+  recursive_argument: bytes
+}
+
+definition{
+  name: codePoints,
+  parameters: [content : String],
+  result: Nat,
+  body: (countPoints (JsonText::bytesToList (prim utf8_encode content : Bytes)) 0),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: requiredLoop,
+  parameters: [names : (List Json::Json), present : Json::JsonObject],
+  result: Kw,
+  body: (match names
+    | List.nil => (ctor Kw.ok)
+    | List.cons head tail => (match (Json::asText head)
+      | Option.none => (ctor Kw.bad)
+      | Option.some name => (if (Json::hasKey name present) then (requiredLoop tail present) else (ctor Kw.fails)))),
+  executable: true,
+  recursive_argument: names
+}
+
+definition{
+  name: requiredKw,
+  parameters: [members : (List (String * Json::Json)), value : Json::Json],
+  result: Kw,
+  body: (match (Json::lookupIn "required" members)
+    | Json::Lookup.absent => (ctor Kw.ok)
+    | Json::Lookup.present declared => (match (Json::asArray declared)
+      | Option.none => (ctor Kw.bad)
+      | Option.some names => (match (Json::asObject value)
+        | Option.none => (ctor Kw.ok)
+        | Option.some present => (requiredLoop names present)))),
+  executable: true
+}
+
+definition{
+  name: sizeChecks,
+  parameters: [members : (List (String * Json::Json)), value : Json::Json],
+  result: (List (String * Kw)),
+  body: (match value
+    | Json::Json.null => (nil (String * Kw))
+    | Json::Json.bool flag => (nil (String * Kw))
+    | Json::Json.number amount => (nil (String * Kw))
+    | Json::Json.text content => (cons ("minLength", (sizeKw "minLength" true members (codePoints content))) (cons ("maxLength", (sizeKw "maxLength" false members (codePoints content))) (nil (String * Kw))))
+    | Json::Json.array items => (cons ("minItems", (sizeKw "minItems" true members (JsonEq::itemCount items 0))) (cons ("maxItems", (sizeKw "maxItems" false members (JsonEq::itemCount items 0))) (nil (String * Kw))))
+    | Json::Json.object entries => (cons ("minProperties", (sizeKw "minProperties" true members (JsonEq::memberCount entries 0))) (cons ("maxProperties", (sizeKw "maxProperties" false members (JsonEq::memberCount entries 0))) (nil (String * Kw))))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: firstProblem,
+  parameters: [checks : (List (String * Kw))],
+  result: Grown,
+  body: (match checks
+    | List.nil => (ctor Grown.built (nil Frame))
+    | List.cons entry rest => (match (second entry)
+      | Kw.ok => (firstProblem rest)
+      | Kw.fails => (ctor Grown.failed (first entry))
+      | Kw.bad => (ctor Grown.malformedKw (first entry)))),
+  executable: true,
+  recursive_argument: checks
+}
+
+definition{
+  name: immediate,
+  parameters: [members : (List (String * Json::Json)), value : Json::Json],
+  result: Grown,
+  body: (firstProblem (cons ("type", (typeKw members value)) (cons ("enum", (enumKw members value)) (cons ("const", (constKw members value)) (cons ("minimum", (boundKw "minimum" 0 members value)) (cons ("maximum", (boundKw "maximum" 1 members value)) (cons ("exclusiveMinimum", (boundKw "exclusiveMinimum" 2 members value)) (cons ("exclusiveMaximum", (boundKw "exclusiveMaximum" 3 members value)) (prim append (sizeChecks members value) (cons ("required", (requiredKw members value)) (nil (String * Kw))) : (List (String * Kw))))))))))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: resolveIn,
+  parameters: [reference : String, defs : (List (String * Json::Json))],
+  result: (Option Json::Json),
+  body: (match defs
+    | List.nil => (ctor Option.none [Json::Json])
+    | List.cons entry rest => (if (prim equal reference (prim join (cons "#/$defs/" (cons (first entry) (nil String))) "" : String) : Bool) then (ctor Option.some [Json::Json] (second entry)) else (match (Json::asObject (second entry))
+      | Option.none => (resolveIn reference rest)
+      | Option.some declared => (match (Json::lookup "$anchor" declared)
+        | Json::Lookup.absent => (resolveIn reference rest)
+        | Json::Lookup.present anchor => (match (Json::asText anchor)
+          | Option.none => (resolveIn reference rest)
+          | Option.some label => (if (prim equal reference (prim join (cons "#" (cons label (nil String))) "" : String) : Bool) then (ctor Option.some [Json::Json] (second entry)) else (resolveIn reference rest))))))),
+  axioms: [propext],
+  executable: true,
+  recursive_argument: defs
+}
+
+definition{
+  name: resolve,
+  parameters: [root : Json::Json, reference : String],
+  result: (Option Json::Json),
+  body: (if (prim equal reference "#" : Bool) then (ctor Option.some [Json::Json] root) else (match (Json::asObject root)
+    | Option.none => (ctor Option.none [Json::Json])
+    | Option.some declared => (match (Json::lookup "$defs" declared)
+      | Json::Lookup.absent => (ctor Option.none [Json::Json])
+      | Json::Lookup.present defs => (match (Json::asObject defs)
+        | Option.none => (ctor Option.none [Json::Json])
+        | Option.some table => (resolveIn reference (project table members)))))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: refFrames,
+  parameters: [
+    root : Json::Json,
+    members : (List (String * Json::Json)),
+    value : Json::Json,
+    path : (List Seg)
+  ],
+  result: Grown,
+  body: (match (Json::lookupIn "$ref" members)
+    | Json::Lookup.absent => (ctor Grown.built (nil Frame))
+    | Json::Lookup.present declared => (match (Json::asText declared)
+      | Option.none => (ctor Grown.malformedKw "$ref")
+      | Option.some reference => (match (resolve root reference)
+        | Option.none => (ctor Grown.unresolvedRef reference)
+        | Option.some target => (ctor Grown.built (cons (ctor Frame.check target value path) (nil Frame)))))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: propertyLoop,
+  parameters: [
+    declared : (List (String * Json::Json)),
+    present : (List (String * Json::Json)),
+    path : (List Seg),
+    built : (List Frame)
+  ],
+  result: (List Frame),
+  body: (match declared
+    | List.nil => built
+    | List.cons entry rest => (match (Json::lookupIn (first entry) present)
+      | Json::Lookup.absent => (propertyLoop rest present path built)
+      | Json::Lookup.present found => (propertyLoop rest present path (cons (ctor Frame.check (second entry) found (cons (ctor Seg.key (first entry)) path)) built)))),
+  executable: true,
+  recursive_argument: declared
+}
+
+definition{
+  name: propertyFrames,
+  parameters: [members : (List (String * Json::Json)), value : Json::Json, path : (List Seg)],
+  result: Grown,
+  body: (match (Json::lookupIn "properties" members)
+    | Json::Lookup.absent => (ctor Grown.built (nil Frame))
+    | Json::Lookup.present declared => (match (Json::asObject declared)
+      | Option.none => (ctor Grown.malformedKw "properties")
+      | Option.some table => (match (Json::asObject value)
+        | Option.none => (ctor Grown.built (nil Frame))
+        | Option.some present => (ctor Grown.built (propertyLoop (project table members) (project present members) path (nil Frame)))))),
+  executable: true
+}
+
+definition{
+  name: extraLoop,
+  parameters: [
+    present : (List (String * Json::Json)),
+    known : (List (String * Json::Json)),
+    extra : Json::Json,
+    path : (List Seg),
+    built : (List Frame)
+  ],
+  result: (List Frame),
+  body: (match present
+    | List.nil => built
+    | List.cons entry rest => (match (Json::lookupIn (first entry) known)
+      | Json::Lookup.present found => (extraLoop rest known extra path built)
+      | Json::Lookup.absent => (extraLoop rest known extra path (cons (ctor Frame.check extra (second entry) (cons (ctor Seg.key (first entry)) path)) built)))),
+  executable: true,
+  recursive_argument: present
+}
+
+definition{
+  name: hasExtra,
+  parameters: [present : (List (String * Json::Json)), known : (List (String * Json::Json))],
+  result: Bool,
+  body: (match present
+    | List.nil => false
+    | List.cons entry rest => (match (Json::lookupIn (first entry) known)
+      | Json::Lookup.present found => (hasExtra rest known)
+      | Json::Lookup.absent => true)),
+  executable: true,
+  recursive_argument: present
+}
+
+definition{
+  name: knownProperties,
+  parameters: [members : (List (String * Json::Json))],
+  result: (List (String * Json::Json)),
+  body: (match (Json::lookupIn "properties" members)
+    | Json::Lookup.absent => (nil (String * Json::Json))
+    | Json::Lookup.present declared => (match (Json::asObject declared)
+      | Option.none => (nil (String * Json::Json))
+      | Option.some table => (project table members))),
+  executable: true
+}
+
+definition{
+  name: extraFrames,
+  parameters: [members : (List (String * Json::Json)), value : Json::Json, path : (List Seg)],
+  result: Grown,
+  body: (match (Json::lookupIn "additionalProperties" members)
+    | Json::Lookup.absent => (ctor Grown.built (nil Frame))
+    | Json::Lookup.present extra => (match (Json::asObject value)
+      | Option.none => (ctor Grown.built (nil Frame))
+      | Option.some present => (match (Json::asBool extra)
+        | Option.some flag => (if flag then (ctor Grown.built (nil Frame)) else (if (hasExtra (project present members) (knownProperties members)) then (ctor Grown.failed "additionalProperties") else (ctor Grown.built (nil Frame))))
+        | Option.none => (ctor Grown.built (extraLoop (project present members) (knownProperties members) extra path (nil Frame)))))),
+  executable: true
+}
+
+definition{
+  name: itemLoop,
+  parameters: [
+    items : (List Json::Json),
+    position : Nat,
+    schema : Json::Json,
+    path : (List Seg),
+    built : (List Frame)
+  ],
+  result: (List Frame),
+  body: (match items
+    | List.nil => built
+    | List.cons head tail => (itemLoop tail (position + 1) schema path (cons (ctor Frame.check schema head (cons (ctor Seg.index position) path)) built))),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: itemFrames,
+  parameters: [members : (List (String * Json::Json)), value : Json::Json, path : (List Seg)],
+  result: Grown,
+  body: (match (Json::lookupIn "items" members)
+    | Json::Lookup.absent => (ctor Grown.built (nil Frame))
+    | Json::Lookup.present schema => (match (Json::asArray value)
+      | Option.none => (ctor Grown.built (nil Frame))
+      | Option.some items => (ctor Grown.built (itemLoop items 0 schema path (nil Frame))))),
+  executable: true
+}
+
+definition{
+  name: allFrames,
+  parameters: [
+    schemas : (List Json::Json),
+    value : Json::Json,
+    path : (List Seg),
+    built : (List Frame)
+  ],
+  result: (List Frame),
+  body: (match schemas
+    | List.nil => built
+    | List.cons head tail => (allFrames tail value path (cons (ctor Frame.check head value path) built))),
+  executable: true,
+  recursive_argument: schemas
+}
+
+definition{
+  name: allOfFrames,
+  parameters: [members : (List (String * Json::Json)), value : Json::Json, path : (List Seg)],
+  result: Grown,
+  body: (match (Json::lookupIn "allOf" members)
+    | Json::Lookup.absent => (ctor Grown.built (nil Frame))
+    | Json::Lookup.present declared => (match (Json::asArray declared)
+      | Option.none => (ctor Grown.malformedKw "allOf")
+      | Option.some schemas => (match schemas
+        | List.nil => (ctor Grown.malformedKw "allOf")
+        | List.cons head tail => (ctor Grown.built (allFrames schemas value path (nil Frame)))))),
+  executable: true
+}
+
+definition{
+  name: anyOfFrames,
+  parameters: [members : (List (String * Json::Json)), value : Json::Json, path : (List Seg)],
+  result: Grown,
+  body: (match (Json::lookupIn "anyOf" members)
+    | Json::Lookup.absent => (ctor Grown.built (nil Frame))
+    | Json::Lookup.present declared => (match (Json::asArray declared)
+      | Option.none => (ctor Grown.malformedKw "anyOf")
+      | Option.some schemas => (match schemas
+        | List.nil => (ctor Grown.malformedKw "anyOf")
+        | List.cons head tail => (ctor Grown.built (cons (ctor Frame.check head value path) (cons (ctor Frame.anyOf tail value path) (nil Frame))))))),
+  executable: true
+}
+
+definition{
+  name: oneOfFrames,
+  parameters: [members : (List (String * Json::Json)), value : Json::Json, path : (List Seg)],
+  result: Grown,
+  body: (match (Json::lookupIn "oneOf" members)
+    | Json::Lookup.absent => (ctor Grown.built (nil Frame))
+    | Json::Lookup.present declared => (match (Json::asArray declared)
+      | Option.none => (ctor Grown.malformedKw "oneOf")
+      | Option.some schemas => (match schemas
+        | List.nil => (ctor Grown.malformedKw "oneOf")
+        | List.cons head tail => (ctor Grown.built (cons (ctor Frame.check head value path) (cons (ctor Frame.oneOf tail value path 0) (nil Frame))))))),
+  executable: true
+}
+
+definition{
+  name: notFrames,
+  parameters: [members : (List (String * Json::Json)), value : Json::Json, path : (List Seg)],
+  result: Grown,
+  body: (match (Json::lookupIn "not" members)
+    | Json::Lookup.absent => (ctor Grown.built (nil Frame))
+    | Json::Lookup.present inner => (ctor Grown.built (cons (ctor Frame.check inner value path) (cons (ctor Frame.notGuard path) (nil Frame))))),
+  executable: true
+}
+
+definition{
+  name: optionalMember,
+  parameters: [key : String, members : (List (String * Json::Json))],
+  result: (Option Json::Json),
+  body: (match (Json::lookupIn key members)
+    | Json::Lookup.absent => (ctor Option.none [Json::Json])
+    | Json::Lookup.present found => (ctor Option.some [Json::Json] found)),
+  executable: true
+}
+
+definition{
+  name: ifFrames,
+  parameters: [members : (List (String * Json::Json)), value : Json::Json, path : (List Seg)],
+  result: Grown,
+  body: (match (Json::lookupIn "if" members)
+    | Json::Lookup.absent => (ctor Grown.built (nil Frame))
+    | Json::Lookup.present condition => (ctor Grown.built (cons (ctor Frame.check condition value path) (cons (ctor Frame.ifGuard (optionalMember "then" members) (optionalMember "else" members) value path) (nil Frame))))),
+  executable: true
+}
+
+definition{
+  name: joinGrown,
+  parameters: [left : Grown, right : Grown],
+  result: Grown,
+  body: (match left
+    | Grown.failed keyword => left
+    | Grown.malformedKw keyword => left
+    | Grown.unresolvedRef reference => left
+    | Grown.built head => (match right
+      | Grown.failed keyword => right
+      | Grown.malformedKw keyword => right
+      | Grown.unresolvedRef reference => right
+      | Grown.built tail => (ctor Grown.built (prim append head tail : (List Frame))))),
+  executable: true
+}
+
+definition{
+  name: deferred,
+  parameters: [
+    kind : Applicator,
+    frames : Grown,
+    members : (List (String * Json::Json)),
+    value : Json::Json,
+    path : (List Seg)
+  ],
+  result: Grown,
+  body: (match frames
+    | Grown.failed keyword => frames
+    | Grown.malformedKw keyword => frames
+    | Grown.unresolvedRef reference => frames
+    | Grown.built built => (match built
+      | List.nil => frames
+      | List.cons head tail => (ctor Grown.built (cons (ctor Frame.defer kind (ctor Json::Json.object members) value path) (nil Frame))))),
+  executable: true
+}
+
+definition{
+  name: reopen,
+  parameters: [kind : Applicator, schema : Json::Json, value : Json::Json, path : (List Seg)],
+  result: Grown,
+  body: (match (Json::asObject schema)
+    | Option.none => (ctor Grown.malformedKw "schema")
+    | Option.some declared => (match kind
+      | Applicator.anyOfKind => (anyOfFrames (project declared members) value path)
+      | Applicator.oneOfKind => (oneOfFrames (project declared members) value path)
+      | Applicator.notKind => (notFrames (project declared members) value path)
+      | Applicator.ifKind => (ifFrames (project declared members) value path))),
+  executable: true
+}
+
+definition{
+  name: structural,
+  parameters: [
+    root : Json::Json,
+    members : (List (String * Json::Json)),
+    value : Json::Json,
+    path : (List Seg)
+  ],
+  result: Grown,
+  body: (joinGrown (refFrames root members value path) (joinGrown (propertyFrames members value path) (joinGrown (extraFrames members value path) (joinGrown (itemFrames members value path) (joinGrown (allOfFrames members value path) (joinGrown (deferred (ctor Applicator.anyOfKind) (anyOfFrames members value path) members value path) (joinGrown (deferred (ctor Applicator.oneOfKind) (oneOfFrames members value path) members value path) (joinGrown (deferred (ctor Applicator.notKind) (notFrames members value path) members value path) (deferred (ctor Applicator.ifKind) (ifFrames members value path) members value path))))))))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: grow,
+  parameters: [
+    root : Json::Json,
+    members : (List (String * Json::Json)),
+    value : Json::Json,
+    path : (List Seg)
+  ],
+  result: Grown,
+  body: (match (immediate members value)
+    | Grown.failed keyword => (ctor Grown.failed keyword)
+    | Grown.malformedKw keyword => (ctor Grown.malformedKw keyword)
+    | Grown.unresolvedRef reference => (ctor Grown.unresolvedRef reference)
+    | Grown.built clear => (structural root members value path)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: expand,
+  parameters: [root : Json::Json, schema : Json::Json, value : Json::Json, path : (List Seg)],
+  result: Grown,
+  body: (match (Json::asBool schema)
+    | Option.some flag => (if flag then (ctor Grown.built (nil Frame)) else (ctor Grown.failed "false"))
+    | Option.none => (match (Json::asObject schema)
+      | Option.some declared => (grow root (project declared members) value path)
+      | Option.none => (ctor Grown.malformedKw "schema"))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: nextAny,
+  parameters: [
+    alternatives : (List Json::Json),
+    value : Json::Json,
+    path : (List Seg),
+    rest : (List Frame)
+  ],
+  result: Next,
+  body: (match alternatives
+    | List.nil => (record Next {mode := (ctor Mode.failing path "anyOf"), stack := rest})
+    | List.cons head tail => (record Next {mode := (ctor Mode.running), stack := (cons (ctor Frame.check head value path) (cons (ctor Frame.anyOf tail value path) rest))})),
+  executable: true
+}
+
+definition{
+  name: nextOne,
+  parameters: [
+    alternatives : (List Json::Json),
+    value : Json::Json,
+    path : (List Seg),
+    found : Nat,
+    rest : (List Frame)
+  ],
+  result: Next,
+  body: (match alternatives
+    | List.nil => (if (found =? 1) then (record Next {mode := (ctor Mode.running), stack := rest}) else (record Next {mode := (ctor Mode.failing path "oneOf"), stack := rest}))
+    | List.cons head tail => (record Next {mode := (ctor Mode.running), stack := (cons (ctor Frame.check head value path) (cons (ctor Frame.oneOf tail value path found) rest))})),
+  executable: true
+}
+
+definition{
+  name: nextBranch,
+  parameters: [
+    branch : (Option Json::Json),
+    value : Json::Json,
+    path : (List Seg),
+    rest : (List Frame)
+  ],
+  result: Next,
+  body: (match branch
+    | Option.none => (record Next {mode := (ctor Mode.running), stack := rest})
+    | Option.some schema => (record Next {mode := (ctor Mode.running), stack := (cons (ctor Frame.check schema value path) rest)})),
+  executable: true
+}
+
+definition{
+  name: nextOnSuccess,
+  parameters: [frame : Frame, rest : (List Frame)],
+  result: Next,
+  body: (match frame
+    | Frame.check schema value path => (record Next {mode := (ctor Mode.running), stack := rest})
+    | Frame.anyOf alternatives value path => (record Next {mode := (ctor Mode.running), stack := rest})
+    | Frame.oneOf alternatives value path found => (nextOne alternatives value path (found + 1) rest)
+    | Frame.notGuard path => (record Next {mode := (ctor Mode.failing path "not"), stack := rest})
+    | Frame.ifGuard thenBranch elseBranch value path => (nextBranch thenBranch value path rest)
+    | Frame.defer kind schema value path => (record Next {mode := (ctor Mode.running), stack := rest})),
+  executable: true
+}
+
+definition{
+  name: nextOnFailure,
+  parameters: [frame : Frame, rest : (List Frame), at : (List Seg), keyword : String],
+  result: Next,
+  body: (match frame
+    | Frame.check schema value path => (record Next {mode := (ctor Mode.failing at keyword), stack := rest})
+    | Frame.anyOf alternatives value path => (nextAny alternatives value path rest)
+    | Frame.oneOf alternatives value path found => (nextOne alternatives value path found rest)
+    | Frame.notGuard path => (record Next {mode := (ctor Mode.running), stack := rest})
+    | Frame.ifGuard thenBranch elseBranch value path => (nextBranch elseBranch value path rest)
+    | Frame.defer kind schema value path => (record Next {mode := (ctor Mode.failing at keyword), stack := rest})),
+  executable: true
+}
+
+definition{
+  name: run,
+  parameters: [root : Json::Json, fuel : Nat, mode : Mode, stack : (List Frame)],
+  result: Verdict,
+  body: (match fuel
+    | Nat.zero => (ctor Verdict.exhausted)
+    | Nat.succ below => (match stack
+      | List.nil => (match mode
+        | Mode.running => (ctor Verdict.valid)
+        | Mode.failing path keyword => (ctor Verdict.invalid path keyword))
+      | List.cons frame rest => (match mode
+        | Mode.running => (match frame
+          | Frame.check schema value path => (match (expand root schema value path)
+            | Grown.failed keyword => (run root below (ctor Mode.failing path keyword) rest)
+            | Grown.malformedKw keyword => (ctor Verdict.malformed keyword)
+            | Grown.unresolvedRef reference => (ctor Verdict.unresolved reference)
+            | Grown.built more => (let joined : (List Frame) := (prim append more rest : (List Frame)); (run root below mode joined)))
+          | Frame.anyOf alternatives value path => (run root below mode rest)
+          | Frame.oneOf alternatives value path found => (let next : Next := (nextOnSuccess frame rest); (run root below (project next mode) (project next stack)))
+          | Frame.notGuard path => (run root below (ctor Mode.failing path "not") rest)
+          | Frame.defer kind schema value path => (match (reopen kind schema value path)
+            | Grown.failed keyword => (run root below (ctor Mode.failing path keyword) rest)
+            | Grown.malformedKw keyword => (ctor Verdict.malformed keyword)
+            | Grown.unresolvedRef reference => (ctor Verdict.unresolved reference)
+            | Grown.built more => (let joined : (List Frame) := (prim append more rest : (List Frame)); (run root below mode joined)))
+          | Frame.ifGuard thenBranch elseBranch value path => (let next : Next := (nextOnSuccess frame rest); (run root below (project next mode) (project next stack))))
+        | Mode.failing at keyword => (let next : Next := (nextOnFailure frame rest at keyword); (run root below (project next mode) (project next stack)))))),
+  axioms: [Quot.sound, propext],
+  executable: true,
+  recursive_argument: fuel
+}
+
+definition{
+  name: validate,
+  parameters: [root : Json::Json, schema : Json::Json, value : Json::Json],
+  result: Verdict,
+  body: (run root (stepBudget) (ctor Mode.running) (cons (ctor Frame.check schema value (nil Seg)) (nil Frame))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: escapeBytes,
+  parameters: [bytes : (List Nat), built : (List Nat)],
+  result: (List Nat),
+  body: (match bytes
+    | List.nil => built
+    | List.cons byte rest => (if (byte =? 126) then (escapeBytes rest (cons 48 (cons 126 built))) else (if (byte =? 47) then (escapeBytes rest (cons 49 (cons 126 built))) else (escapeBytes rest (cons byte built))))),
+  executable: true,
+  recursive_argument: bytes
+}
+
+definition{
+  name: escapeKey,
+  parameters: [name : String],
+  result: String,
+  body: (match (prim utf8_decode (JsonText::listToBytes (JsonText::emptyBytes) (JsonRead::reverseOnto [Nat] (escapeBytes (JsonText::bytesToList (prim utf8_encode name : Bytes)) (nil Nat)) (nil Nat))) : (Option String))
+    | Option.none => name
+    | Option.some escaped => escaped),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: segText,
+  parameters: [seg : Seg],
+  result: String,
+  body: (match seg
+    | Seg.key name => (escapeKey name)
+    | Seg.index position => (prim format_decimal (Numeric::natToInt position (0 : Int)) : String)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: segsOnto,
+  parameters: [path : (List Seg), built : (List String)],
+  result: (List String),
+  body: (match path
+    | List.nil => built
+    | List.cons head tail => (segsOnto tail (cons (segText head) built))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true,
+  recursive_argument: path
+}
+
+definition{
+  name: pointerOf,
+  parameters: [path : (List Seg)],
+  result: String,
+  body: (prim join (cons "" (segsOnto path (nil String))) "/" : String),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

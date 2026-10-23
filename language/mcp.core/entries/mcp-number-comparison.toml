@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-number-comparison"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Numeric"
+component = "Numeric"
+
+[[form]]
+id = "mcp-number-comparison"
+channel = "text"
+surface = "MCP number comparison"
+canonical_source = true
+features = ["sentence-case", "singular"]

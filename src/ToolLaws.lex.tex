@@ -1,0 +1,677 @@
+\begin{lexlean}{ToolLaws}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Admission}
+\importmodule{Capabilities}
+\importmodule{Common}
+\importmodule{Content}
+\importmodule{Extension}
+\importmodule{Fixture}
+\importmodule{Json}
+\importmodule{Meta}
+\importmodule{Methods}
+\importmodule{Refusal}
+\importmodule{Schema}
+\importmodule{Tools}
+\title{MCP tool laws}
+\begin{semanticmodule}
+definition{
+  name: probeMeta,
+  parameters: [],
+  result: Meta::RequestMeta,
+  body: (record Meta::RequestMeta {protocolVersion := "2026-07-28", clientCapabilities := (Capabilities::noClientCapabilities), clientInfo := (ctor Option.none [Json::JsonObject]), logLevel := (ctor Option.none [Common::LoggingLevel]), progressToken := (ctor Option.none [Common::ProgressToken]), raw := (record Json::JsonObject {members := (nil (String * Json::Json))})}),
+  executable: true
+}
+
+definition{
+  name: probeCall,
+  parameters: [name : String, arguments : (Option Json::JsonObject)],
+  result: Methods::CallToolParams,
+  body: (record Methods::CallToolParams {meta := (probeMeta), name := name, arguments := arguments, inputResponses := (ctor Option.none [Json::JsonObject]), requestState := (ctor Option.none [String])}),
+  executable: true
+}
+
+definition{
+  name: withArguments,
+  parameters: [members : (List (String * Json::Json))],
+  result: (Option Json::JsonObject),
+  body: (ctor Option.some [Json::JsonObject] (record Json::JsonObject {members := members})),
+  executable: true
+}
+
+definition{
+  name: callIn,
+  parameters: [tools : (List Content::Tool), name : String, arguments : (Option Json::JsonObject)],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (Tools::answerCall tools (ref Fixture::fixtureBehaviour) (probeCall name arguments)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: callFixture,
+  parameters: [name : String, arguments : (Option Json::JsonObject)],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (callIn (Fixture::fixtureTools) name arguments),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: toolWith,
+  parameters: [name : String, schema : Json::JsonObject],
+  result: Content::Tool,
+  body: (Fixture::plainTool name "probe" schema),
+  executable: true
+}
+
+definition{
+  name: faultOf,
+  parameters: [tool : Content::Tool],
+  result: (Option Admission::AdmitFault),
+  body: (match (Admission::admitShape tool)
+    | Result.ok rules => (ctor Option.none [Admission::AdmitFault])
+    | Result.error fault => (ctor Option.some [Admission::AdmitFault] fault)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+theorem{
+  name: the_catalog_lists_its_tools_in_the_declared_order,
+  parameters: [],
+  statement: ((Tools::namesOf (Fixture::fixtureTools)) = (cons "echo" (cons "execute_sql" (cons "test_missing_capability" (cons "test_simple_text" (cons "test_image_content" (cons "test_audio_content" (cons "test_embedded_resource" (cons "test_multiple_content_types" (cons "test_error_handling" (cons "test_tool_with_progress" (cons "json_schema_2020_12_tool" (cons "test_arguments" (cons "test_nested_header" (cons "test_structured_output" (cons "test_bad_structured_output" (cons "test_bad_payload" (cons "test_unsafe_text" (cons "test_backward_progress" (nil String)))))))))))))))))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: tools_list_answers_with_the_catalog_in_its_declared_order,
+  parameters: [],
+  statement: ((Tools::answerList (Fixture::fixtureCache) (Fixture::fixtureTools) (record Methods::PaginatedParams {meta := (probeMeta), cursor := (ctor Option.none [String])})) = (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.listTools (record Methods::ListToolsResult {cache := (Fixture::fixtureCache), nextCursor := (ctor Option.none [String]), tools := (Fixture::fixtureTools)})))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_unknown_tool_is_invalid_params,
+  parameters: [],
+  statement: ((callFixture "no_such_tool" (ctor Option.none [Json::JsonObject])) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.unknownTool "no_such_tool"))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: an_unknown_tool_has_the_invalid_params_code,
+  parameters: [],
+  statement: ((Refusal::providerCode (ctor Refusal::ProviderRefusal.unknownTool "no_such_tool")) = (-32602 : Int)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_invalid_argument_is_a_tool_result_with_is_error,
+  parameters: [],
+  statement: ((Tools::isToolError (callFixture "test_arguments" (withArguments (cons ("name", (ctor Json::Json.text "x")) (cons ("count", (ctor Json::Json.number (record Json::Decimal {mantissa := (11 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json))))))) = true),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_missing_required_argument_is_a_tool_result_with_is_error,
+  parameters: [],
+  statement: ((Tools::isToolError (callFixture "test_arguments" (withArguments (cons ("count", (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))))) = true),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: an_argument_of_the_wrong_type_is_a_tool_result_with_is_error,
+  parameters: [],
+  statement: ((Tools::isToolError (callFixture "execute_sql" (withArguments (cons ("region", (ctor Json::Json.number (record Json::Decimal {mantissa := (5 : Int), exponent := (0 : Int)}))) (cons ("query", (ctor Json::Json.text "q")) (nil (String * Json::Json))))))) = true),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: an_undeclared_argument_is_a_tool_result_with_is_error,
+  parameters: [],
+  statement: ((Tools::isToolError (callFixture "test_arguments" (withArguments (cons ("name", (ctor Json::Json.text "x")) (cons ("extra", (ctor Json::Json.bool true)) (nil (String * Json::Json))))))) = true),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: valid_arguments_are_executed,
+  parameters: [],
+  statement: ((Tools::isToolError (callFixture "test_arguments" (withArguments (cons ("name", (ctor Json::Json.text "x")) (cons ("count", (ctor Json::Json.number (record Json::Decimal {mantissa := (3 : Int), exponent := (0 : Int)}))) (cons ("mode", (ctor Json::Json.text "fast")) (cons ("tags", (ctor Json::Json.array (cons (ctor Json::Json.text "a") (cons (ctor Json::Json.text "b") (nil Json::Json))))) (nil (String * Json::Json))))))))) = false),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: missing_arguments_stand_for_the_empty_object,
+  parameters: [],
+  statement: ((Tools::isToolError (callFixture "test_simple_text" (ctor Option.none [Json::JsonObject]))) = false),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_tool_error_is_not_a_protocol_error,
+  parameters: [],
+  statement: ((callFixture "test_error_handling" (ctor Option.none [Json::JsonObject])) = (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.callTool (record Methods::CallToolResult {content := (cons (Fixture::textBlock "This tool intentionally returns an error for testing") (nil Content::ContentBlock)), structuredContent := (ctor Option.none [Json::Json]), isError := (ctor Option.some [Bool] true)})))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: structured_content_that_violates_the_output_schema_is_refused,
+  parameters: [],
+  statement: ((callFixture "test_bad_structured_output" (ctor Option.none [Json::JsonObject])) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.badToolOutput "structuredContent does not conform to the outputSchema"))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: structured_content_that_conforms_is_returned,
+  parameters: [],
+  statement: ((match (callFixture "test_structured_output" (ctor Option.none [Json::JsonObject]))
+    | Result.ok body => true
+    | Result.error refusal => false) = true),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: progress_that_does_not_increase_is_refused,
+  parameters: [],
+  statement: ((callFixture "test_backward_progress" (ctor Option.none [Json::JsonObject])) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.badToolOutput "progress did not increase"))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_cursor_is_an_invalid_cursor,
+  parameters: [],
+  statement: ((Tools::answerList (Fixture::fixtureCache) (Fixture::fixtureTools) (record Methods::PaginatedParams {meta := (probeMeta), cursor := (ctor Option.some [String] "abc")})) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidCursor "abc"))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: no_cursor_lists_every_tool,
+  parameters: [],
+  statement: ((match (Tools::answerList (Fixture::fixtureCache) (Fixture::fixtureTools) (record Methods::PaginatedParams {meta := (probeMeta), cursor := (ctor Option.none [String])}))
+    | Result.ok body => true
+    | Result.error refusal => false) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_call_at_the_limit_is_rate_limited,
+  parameters: [],
+  statement: ((Tools::gate 3 3 (ref Fixture::fixtureServe) (ctor Methods::ClientRequest.toolsCall (probeCall "test_simple_text" (ctor Option.none [Json::JsonObject])))) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.rateLimited 3))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_call_below_the_limit_reaches_the_tool,
+  parameters: [],
+  statement: ((match (Tools::gate 3 2 (ref Fixture::fixtureServe) (ctor Methods::ClientRequest.toolsCall (probeCall "test_simple_text" (ctor Option.none [Json::JsonObject]))))
+    | Result.ok body => true
+    | Result.error refusal => false) = true),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: the_limit_does_not_apply_to_listing,
+  parameters: [],
+  statement: ((match (Tools::gate 0 0 (ref Fixture::fixtureServe) (ctor Methods::ClientRequest.toolsList (record Methods::PaginatedParams {meta := (probeMeta), cursor := (ctor Option.none [String])})))
+    | Result.ok body => true
+    | Result.error refusal => false) = true),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_header_inside_items_is_unreachable,
+  parameters: [],
+  statement: ((faultOf (toolWith "probe" (record Json::JsonObject {members := (cons ("type", (ctor Json::Json.text "object")) (cons ("properties", (ctor Json::Json.object (cons ("list", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "array")) (cons ("items", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (cons ("x-mcp-header", (ctor Json::Json.text "X")) (nil (String * Json::Json)))))) (nil (String * Json::Json)))))) (nil (String * Json::Json))))) (nil (String * Json::Json))))}))) = (ctor Option.some [Admission::AdmitFault] (ctor Admission::AdmitFault.headerUnreachable "probe"))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_header_inside_a_composition_is_unreachable,
+  parameters: [],
+  statement: ((faultOf (toolWith "probe" (record Json::JsonObject {members := (cons ("type", (ctor Json::Json.text "object")) (cons ("properties", (ctor Json::Json.object (nil (String * Json::Json)))) (cons ("anyOf", (ctor Json::Json.array (cons (ctor Json::Json.object (cons ("properties", (ctor Json::Json.object (cons ("a", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (cons ("x-mcp-header", (ctor Json::Json.text "X")) (nil (String * Json::Json)))))) (nil (String * Json::Json))))) (nil (String * Json::Json)))) (nil Json::Json)))) (nil (String * Json::Json)))))}))) = (ctor Option.some [Admission::AdmitFault] (ctor Admission::AdmitFault.headerUnreachable "probe"))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_header_that_is_not_text_is_refused,
+  parameters: [],
+  statement: ((faultOf (toolWith "probe" (record Json::JsonObject {members := (cons ("type", (ctor Json::Json.text "object")) (cons ("properties", (ctor Json::Json.object (cons ("a", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (cons ("x-mcp-header", (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))))) (nil (String * Json::Json))))) (nil (String * Json::Json))))}))) = (ctor Option.some [Admission::AdmitFault] (ctor Admission::AdmitFault.headerNotText "probe"))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: an_unsupported_keyword_is_refused,
+  parameters: [],
+  statement: ((faultOf (toolWith "probe" (record Json::JsonObject {members := (cons ("type", (ctor Json::Json.text "object")) (cons ("properties", (ctor Json::Json.object (cons ("a", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (cons ("pattern", (ctor Json::Json.text "x")) (nil (String * Json::Json)))))) (nil (String * Json::Json))))) (nil (String * Json::Json))))}))) = (ctor Option.some [Admission::AdmitFault] (ctor Admission::AdmitFault.keywordUnsupported "probe" "pattern"))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_malformed_keyword_is_refused,
+  parameters: [],
+  statement: ((faultOf (toolWith "probe" (record Json::JsonObject {members := (cons ("type", (ctor Json::Json.text "object")) (cons ("properties", (ctor Json::Json.object (cons ("a", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (cons ("minimum", (ctor Json::Json.text "x")) (nil (String * Json::Json)))))) (nil (String * Json::Json))))) (nil (String * Json::Json))))}))) = (ctor Option.some [Admission::AdmitFault] (ctor Admission::AdmitFault.keywordMalformed "probe" "minimum"))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: an_unresolved_reference_is_refused,
+  parameters: [],
+  statement: ((faultOf (toolWith "probe" (record Json::JsonObject {members := (cons ("type", (ctor Json::Json.text "object")) (cons ("properties", (ctor Json::Json.object (cons ("a", (ctor Json::Json.object (cons ("$ref", (ctor Json::Json.text "https://example.com/schema")) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (nil (String * Json::Json))))}))) = (ctor Option.some [Admission::AdmitFault] (ctor Admission::AdmitFault.referenceUnresolved "probe" "https://example.com/schema"))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_foreign_dialect_is_refused,
+  parameters: [],
+  statement: ((faultOf (toolWith "probe" (record Json::JsonObject {members := (cons ("$schema", (ctor Json::Json.text "http://json-schema.org/draft-07/schema#")) (cons ("type", (ctor Json::Json.text "object")) (nil (String * Json::Json))))}))) = (ctor Option.some [Admission::AdmitFault] (ctor Admission::AdmitFault.dialectUnsupported "probe"))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_root_that_is_not_an_object_is_refused,
+  parameters: [],
+  statement: ((faultOf (toolWith "probe" (record Json::JsonObject {members := (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json)))}))) = (ctor Option.some [Admission::AdmitFault] (ctor Admission::AdmitFault.rootNotObject "probe"))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: an_integer_accepts_a_whole_number_written_with_a_fraction,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (nil (String * Json::Json)))) (ctor Json::Json.number (record Json::Decimal {mantissa := (10 : Int), exponent := (-1 : Int)}))) = (ctor Schema::Verdict.valid)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: an_integer_refuses_a_fraction,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (nil (String * Json::Json)))) (ctor Json::Json.number (record Json::Decimal {mantissa := (15 : Int), exponent := (-1 : Int)}))) = (ctor Schema::Verdict.invalid (nil Schema::Seg) "type")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_type_list_accepts_any_member,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("type", (ctor Json::Json.array (cons (ctor Json::Json.text "string") (cons (ctor Json::Json.text "null") (nil Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("type", (ctor Json::Json.array (cons (ctor Json::Json.text "string") (cons (ctor Json::Json.text "null") (nil Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.null)) = (ctor Schema::Verdict.valid)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: an_enum_refuses_a_value_outside_it,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("enum", (ctor Json::Json.array (cons (ctor Json::Json.text "a") (cons (ctor Json::Json.text "b") (nil Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("enum", (ctor Json::Json.array (cons (ctor Json::Json.text "a") (cons (ctor Json::Json.text "b") (nil Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.text "c")) = (ctor Schema::Verdict.invalid (nil Schema::Seg) "enum")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: const_compares_objects_without_member_order,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("const", (ctor Json::Json.object (cons ("a", (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) (cons ("b", (ctor Json::Json.number (record Json::Decimal {mantissa := (2 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("const", (ctor Json::Json.object (cons ("a", (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) (cons ("b", (ctor Json::Json.number (record Json::Decimal {mantissa := (2 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("b", (ctor Json::Json.number (record Json::Decimal {mantissa := (2 : Int), exponent := (0 : Int)}))) (cons ("a", (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))))) = (ctor Schema::Verdict.valid)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: minimum_refuses_a_smaller_number,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("minimum", (ctor Json::Json.number (record Json::Decimal {mantissa := (5 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("minimum", (ctor Json::Json.number (record Json::Decimal {mantissa := (5 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))) (ctor Json::Json.number (record Json::Decimal {mantissa := (4 : Int), exponent := (0 : Int)}))) = (ctor Schema::Verdict.invalid (nil Schema::Seg) "minimum")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: minimum_accepts_the_bound,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("minimum", (ctor Json::Json.number (record Json::Decimal {mantissa := (5 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("minimum", (ctor Json::Json.number (record Json::Decimal {mantissa := (5 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))) (ctor Json::Json.number (record Json::Decimal {mantissa := (5 : Int), exponent := (0 : Int)}))) = (ctor Schema::Verdict.valid)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: exclusive_minimum_refuses_the_bound,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("exclusiveMinimum", (ctor Json::Json.number (record Json::Decimal {mantissa := (5 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("exclusiveMinimum", (ctor Json::Json.number (record Json::Decimal {mantissa := (5 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))) (ctor Json::Json.number (record Json::Decimal {mantissa := (5 : Int), exponent := (0 : Int)}))) = (ctor Schema::Verdict.invalid (nil Schema::Seg) "exclusiveMinimum")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: maximum_refuses_a_larger_number,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("maximum", (ctor Json::Json.number (record Json::Decimal {mantissa := (5 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("maximum", (ctor Json::Json.number (record Json::Decimal {mantissa := (5 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))) (ctor Json::Json.number (record Json::Decimal {mantissa := (6 : Int), exponent := (0 : Int)}))) = (ctor Schema::Verdict.invalid (nil Schema::Seg) "maximum")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: max_items_refuses_a_longer_array,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("maxItems", (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("maxItems", (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))) (ctor Json::Json.array (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)})) (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (2 : Int), exponent := (0 : Int)})) (nil Json::Json))))) = (ctor Schema::Verdict.invalid (nil Schema::Seg) "maxItems")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: min_properties_refuses_a_smaller_object,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("minProperties", (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("minProperties", (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))) (ctor Json::Json.object (nil (String * Json::Json)))) = (ctor Schema::Verdict.invalid (nil Schema::Seg) "minProperties")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: required_refuses_a_missing_member,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "a") (nil Json::Json)))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "a") (nil Json::Json)))) (nil (String * Json::Json)))) (ctor Json::Json.object (nil (String * Json::Json)))) = (ctor Schema::Verdict.invalid (nil Schema::Seg) "required")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: additional_properties_false_refuses_an_extra_member,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("properties", (ctor Json::Json.object (cons ("a", (ctor Json::Json.object (nil (String * Json::Json)))) (nil (String * Json::Json))))) (cons ("additionalProperties", (ctor Json::Json.bool false)) (nil (String * Json::Json))))) (ctor Json::Json.object (cons ("properties", (ctor Json::Json.object (cons ("a", (ctor Json::Json.object (nil (String * Json::Json)))) (nil (String * Json::Json))))) (cons ("additionalProperties", (ctor Json::Json.bool false)) (nil (String * Json::Json))))) (ctor Json::Json.object (cons ("b", (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json))))) = (ctor Schema::Verdict.invalid (nil Schema::Seg) "additionalProperties")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: an_additional_property_schema_is_applied,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("additionalProperties", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (nil (String * Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("additionalProperties", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (nil (String * Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("b", (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json))))) = (ctor Schema::Verdict.valid)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: an_item_failure_names_the_index,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("items", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (nil (String * Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("items", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (nil (String * Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.array (cons (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)})) (cons (ctor Json::Json.text "x") (nil Json::Json))))) = (ctor Schema::Verdict.invalid (cons (ctor Schema::Seg.index 1) (nil Schema::Seg)) "type")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_property_failure_names_the_member,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("properties", (ctor Json::Json.object (cons ("a", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("properties", (ctor Json::Json.object (cons ("a", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("a", (ctor Json::Json.text "x")) (nil (String * Json::Json))))) = (ctor Schema::Verdict.invalid (cons (ctor Schema::Seg.key "a") (nil Schema::Seg)) "type")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: any_of_accepts_one_match,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("anyOf", (ctor Json::Json.array (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json)))) (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (nil (String * Json::Json)))) (nil Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("anyOf", (ctor Json::Json.array (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json)))) (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (nil (String * Json::Json)))) (nil Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) = (ctor Schema::Verdict.valid)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: any_of_refuses_no_match,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("anyOf", (ctor Json::Json.array (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json)))) (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "boolean")) (nil (String * Json::Json)))) (nil Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("anyOf", (ctor Json::Json.array (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json)))) (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "boolean")) (nil (String * Json::Json)))) (nil Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) = (ctor Schema::Verdict.invalid (nil Schema::Seg) "anyOf")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: one_of_accepts_exactly_one_match,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("oneOf", (ctor Json::Json.array (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json)))) (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (nil (String * Json::Json)))) (nil Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("oneOf", (ctor Json::Json.array (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json)))) (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (nil (String * Json::Json)))) (nil Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) = (ctor Schema::Verdict.valid)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: one_of_refuses_two_matches,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("oneOf", (ctor Json::Json.array (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (nil (String * Json::Json)))) (cons (ctor Json::Json.object (cons ("minimum", (ctor Json::Json.number (record Json::Decimal {mantissa := (0 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))) (nil Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("oneOf", (ctor Json::Json.array (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (nil (String * Json::Json)))) (cons (ctor Json::Json.object (cons ("minimum", (ctor Json::Json.number (record Json::Decimal {mantissa := (0 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))) (nil Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) = (ctor Schema::Verdict.invalid (nil Schema::Seg) "oneOf")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: one_of_refuses_no_match,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("oneOf", (ctor Json::Json.array (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json)))) (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "boolean")) (nil (String * Json::Json)))) (nil Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("oneOf", (ctor Json::Json.array (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json)))) (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "boolean")) (nil (String * Json::Json)))) (nil Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) = (ctor Schema::Verdict.invalid (nil Schema::Seg) "oneOf")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: not_refuses_a_match,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("not", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (nil (String * Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("not", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (nil (String * Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) = (ctor Schema::Verdict.invalid (nil Schema::Seg) "not")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: not_accepts_a_non_match,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("not", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("not", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json))))) (nil (String * Json::Json)))) (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) = (ctor Schema::Verdict.valid)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: if_then_else_applies_then,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("if", (ctor Json::Json.object (cons ("properties", (ctor Json::Json.object (cons ("k", (ctor Json::Json.object (cons ("const", (ctor Json::Json.text "a")) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "k") (nil Json::Json)))) (nil (String * Json::Json)))))) (cons ("then", (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "x") (nil Json::Json)))) (nil (String * Json::Json))))) (cons ("else", (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "y") (nil Json::Json)))) (nil (String * Json::Json))))) (nil (String * Json::Json)))))) (ctor Json::Json.object (cons ("if", (ctor Json::Json.object (cons ("properties", (ctor Json::Json.object (cons ("k", (ctor Json::Json.object (cons ("const", (ctor Json::Json.text "a")) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "k") (nil Json::Json)))) (nil (String * Json::Json)))))) (cons ("then", (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "x") (nil Json::Json)))) (nil (String * Json::Json))))) (cons ("else", (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "y") (nil Json::Json)))) (nil (String * Json::Json))))) (nil (String * Json::Json)))))) (ctor Json::Json.object (cons ("k", (ctor Json::Json.text "a")) (cons ("x", (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))))) = (ctor Schema::Verdict.valid)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: if_then_else_refuses_a_failing_then,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("if", (ctor Json::Json.object (cons ("properties", (ctor Json::Json.object (cons ("k", (ctor Json::Json.object (cons ("const", (ctor Json::Json.text "a")) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "k") (nil Json::Json)))) (nil (String * Json::Json)))))) (cons ("then", (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "x") (nil Json::Json)))) (nil (String * Json::Json))))) (cons ("else", (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "y") (nil Json::Json)))) (nil (String * Json::Json))))) (nil (String * Json::Json)))))) (ctor Json::Json.object (cons ("if", (ctor Json::Json.object (cons ("properties", (ctor Json::Json.object (cons ("k", (ctor Json::Json.object (cons ("const", (ctor Json::Json.text "a")) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "k") (nil Json::Json)))) (nil (String * Json::Json)))))) (cons ("then", (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "x") (nil Json::Json)))) (nil (String * Json::Json))))) (cons ("else", (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "y") (nil Json::Json)))) (nil (String * Json::Json))))) (nil (String * Json::Json)))))) (ctor Json::Json.object (cons ("k", (ctor Json::Json.text "a")) (nil (String * Json::Json))))) = (ctor Schema::Verdict.invalid (nil Schema::Seg) "required")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: if_then_else_applies_else,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("if", (ctor Json::Json.object (cons ("properties", (ctor Json::Json.object (cons ("k", (ctor Json::Json.object (cons ("const", (ctor Json::Json.text "a")) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "k") (nil Json::Json)))) (nil (String * Json::Json)))))) (cons ("then", (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "x") (nil Json::Json)))) (nil (String * Json::Json))))) (cons ("else", (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "y") (nil Json::Json)))) (nil (String * Json::Json))))) (nil (String * Json::Json)))))) (ctor Json::Json.object (cons ("if", (ctor Json::Json.object (cons ("properties", (ctor Json::Json.object (cons ("k", (ctor Json::Json.object (cons ("const", (ctor Json::Json.text "a")) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "k") (nil Json::Json)))) (nil (String * Json::Json)))))) (cons ("then", (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "x") (nil Json::Json)))) (nil (String * Json::Json))))) (cons ("else", (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "y") (nil Json::Json)))) (nil (String * Json::Json))))) (nil (String * Json::Json)))))) (ctor Json::Json.object (cons ("y", (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json))))) = (ctor Schema::Verdict.valid)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: an_unresolved_reference_is_reported,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("$ref", (ctor Json::Json.text "#/$defs/nope")) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("$ref", (ctor Json::Json.text "#/$defs/nope")) (nil (String * Json::Json)))) (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) = (ctor Schema::Verdict.unresolved "#/$defs/nope")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_self_reference_exhausts_the_budget,
+  parameters: [],
+  statement: ((Schema::run (ctor Json::Json.object (cons ("$ref", (ctor Json::Json.text "#")) (nil (String * Json::Json)))) 8 (ctor Schema::Mode.running) (cons (ctor Schema::Frame.check (ctor Json::Json.object (cons ("$ref", (ctor Json::Json.text "#")) (nil (String * Json::Json)))) (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)})) (nil Schema::Seg)) (nil Schema::Frame))) = (ctor Schema::Verdict.exhausted)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_malformed_keyword_is_reported_by_the_validator,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("minimum", (ctor Json::Json.text "x")) (nil (String * Json::Json)))) (ctor Json::Json.object (cons ("minimum", (ctor Json::Json.text "x")) (nil (String * Json::Json)))) (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) = (ctor Schema::Verdict.malformed "minimum")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: an_empty_header_is_refused,
+  parameters: [],
+  statement: ((Admission::headerTextStep "probe" (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json))) "" (nil Nat) (cons "a" (nil String)) (record Admission::Acc {rules := (nil Extension::ParamRule), seen := (nil (List Nat))})) = (ctor Admission::HeaderStep.refused (ctor Admission::AdmitFault.headerEmpty "probe"))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_header_that_is_not_a_token_is_refused,
+  parameters: [],
+  statement: ((Admission::headerTextStep "probe" (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json))) "Not Ok" (cons 78 (cons 111 (cons 116 (cons 32 (cons 79 (cons 107 (nil Nat))))))) (cons "a" (nil String)) (record Admission::Acc {rules := (nil Extension::ParamRule), seen := (nil (List Nat))})) = (ctor Admission::HeaderStep.refused (ctor Admission::AdmitFault.headerNotToken "probe"))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_header_on_a_number_is_refused,
+  parameters: [],
+  statement: ((Admission::headerTextStep "probe" (cons ("type", (ctor Json::Json.text "number")) (nil (String * Json::Json))) "X" (cons 88 (nil Nat)) (cons "a" (nil String)) (record Admission::Acc {rules := (nil Extension::ParamRule), seen := (nil (List Nat))})) = (ctor Admission::HeaderStep.refused (ctor Admission::AdmitFault.headerType "probe"))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_header_without_a_type_is_refused,
+  parameters: [],
+  statement: ((Admission::headerTextStep "probe" (nil (String * Json::Json)) "X" (cons 88 (nil Nat)) (cons "a" (nil String)) (record Admission::Acc {rules := (nil Extension::ParamRule), seen := (nil (List Nat))})) = (ctor Admission::HeaderStep.refused (ctor Admission::AdmitFault.headerType "probe"))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: headers_that_differ_only_in_case_are_duplicates,
+  parameters: [],
+  statement: ((Admission::headerTextStep "probe" (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json))) "REGION" (cons 82 (cons 69 (cons 71 (cons 73 (cons 79 (cons 78 (nil Nat))))))) (cons "b" (nil String)) (record Admission::Acc {rules := (nil Extension::ParamRule), seen := (cons (cons 114 (cons 101 (cons 103 (cons 105 (cons 111 (cons 110 (nil Nat))))))) (nil (List Nat)))})) = (ctor Admission::HeaderStep.refused (ctor Admission::AdmitFault.headerDuplicate "probe" "REGION"))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_nested_header_becomes_a_rule_with_its_path,
+  parameters: [],
+  statement: ((Admission::headerTextStep "probe" (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json))) "Zone" (cons 90 (cons 111 (cons 110 (cons 101 (nil Nat))))) (cons "zone" (cons "target" (nil String))) (record Admission::Acc {rules := (nil Extension::ParamRule), seen := (nil (List Nat))})) = (ctor Admission::HeaderStep.accepted (record Admission::Acc {rules := (cons (record Extension::ParamRule {tool := "probe", header := "Zone", path := (cons "target" (cons "zone" (nil String))), kind := (ctor Common::ParamKind.text)}) (nil Extension::ParamRule)), seen := (cons (cons 122 (cons 111 (cons 110 (cons 101 (nil Nat))))) (nil (List Nat)))}))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: case_folding_maps_upper_case_letters_to_lower_case,
+  parameters: [],
+  statement: ((Admission::loweredBytes (cons 68 (cons 114 (cons 121 (cons 45 (cons 82 (cons 117 (cons 110 (nil Nat))))))))) = (cons 100 (cons 114 (cons 121 (cons 45 (cons 114 (cons 117 (cons 110 (nil Nat))))))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_name_with_a_space_is_refused,
+  parameters: [],
+  statement: ((Admission::nameFault "bad name" (cons 98 (cons 97 (cons 100 (cons 32 (cons 110 (cons 97 (cons 109 (cons 101 (nil Nat)))))))))) = (ctor Option.some [Admission::AdmitFault] (ctor Admission::AdmitFault.nameInvalid "bad name"))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_empty_name_is_refused,
+  parameters: [],
+  statement: ((Admission::nameFault "" (nil Nat)) = (ctor Option.some [Admission::AdmitFault] (ctor Admission::AdmitFault.nameInvalid ""))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_name_of_sixty_four_bytes_is_admitted,
+  parameters: [],
+  statement: ((Admission::nameFault "n" (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (nil Nat)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) = (ctor Option.none [Admission::AdmitFault])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_name_of_sixty_five_bytes_is_refused,
+  parameters: [],
+  statement: ((Admission::nameFault "n" (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (cons 97 (nil Nat))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) = (ctor Option.some [Admission::AdmitFault] (ctor Admission::AdmitFault.nameInvalid "n"))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_name_of_letters_digits_underscore_hyphen_and_dot_is_admitted,
+  parameters: [],
+  statement: ((Admission::nameFault "n" (cons 71 (cons 101 (cons 116 (cons 95 (cons 117 (cons 115 (cons 101 (cons 114 (cons 45 (cons 50 (cons 46 (cons 118 (cons 49 (nil Nat))))))))))))))) = (ctor Option.none [Admission::AdmitFault])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_duplicate_tool_name_is_refused,
+  parameters: [],
+  statement: ((Admission::duplicateFault (cons (Fixture::plainTool "twice" "probe" (Fixture::emptyObjectSchema)) (cons (Fixture::plainTool "twice" "probe" (Fixture::emptyObjectSchema)) (nil Content::Tool)))) = (ctor Option.some [Admission::AdmitFault] (ctor Admission::AdmitFault.nameDuplicate "twice"))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_fixture_catalog_has_no_duplicate_name,
+  parameters: [],
+  statement: ((Admission::duplicateFault (Fixture::fixtureTools)) = (ctor Option.none [Admission::AdmitFault])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_failing_property_is_not_forgiven_by_a_passing_any_of,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("properties", (ctor Json::Json.object (cons ("a", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (cons ("anyOf", (ctor Json::Json.array (cons (ctor Json::Json.object (nil (String * Json::Json))) (cons (ctor Json::Json.object (nil (String * Json::Json))) (nil Json::Json))))) (nil (String * Json::Json))))) (ctor Json::Json.object (cons ("properties", (ctor Json::Json.object (cons ("a", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (cons ("anyOf", (ctor Json::Json.array (cons (ctor Json::Json.object (nil (String * Json::Json))) (cons (ctor Json::Json.object (nil (String * Json::Json))) (nil Json::Json))))) (nil (String * Json::Json))))) (ctor Json::Json.object (cons ("a", (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json))))) = (ctor Schema::Verdict.invalid (cons (ctor Schema::Seg.key "a") (nil Schema::Seg)) "type")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_failing_property_is_not_forgiven_by_a_one_of_that_matches,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("properties", (ctor Json::Json.object (cons ("a", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (cons ("oneOf", (ctor Json::Json.array (cons (ctor Json::Json.object (nil (String * Json::Json))) (nil Json::Json)))) (nil (String * Json::Json))))) (ctor Json::Json.object (cons ("properties", (ctor Json::Json.object (cons ("a", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (cons ("oneOf", (ctor Json::Json.array (cons (ctor Json::Json.object (nil (String * Json::Json))) (nil Json::Json)))) (nil (String * Json::Json))))) (ctor Json::Json.object (cons ("a", (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json))))) = (ctor Schema::Verdict.invalid (cons (ctor Schema::Seg.key "a") (nil Schema::Seg)) "type")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_failing_property_is_not_forgiven_by_a_not,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("properties", (ctor Json::Json.object (cons ("a", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (cons ("not", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "boolean")) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (ctor Json::Json.object (cons ("properties", (ctor Json::Json.object (cons ("a", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (cons ("not", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "boolean")) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (ctor Json::Json.object (cons ("a", (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json))))) = (ctor Schema::Verdict.invalid (cons (ctor Schema::Seg.key "a") (nil Schema::Seg)) "type")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_failing_property_is_not_forgiven_by_an_if_without_else,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("properties", (ctor Json::Json.object (cons ("a", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (cons ("if", (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "z") (nil Json::Json)))) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (ctor Json::Json.object (cons ("properties", (ctor Json::Json.object (cons ("a", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (cons ("if", (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "z") (nil Json::Json)))) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (ctor Json::Json.object (cons ("a", (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json))))) = (ctor Schema::Verdict.invalid (cons (ctor Schema::Seg.key "a") (nil Schema::Seg)) "type")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_failing_any_of_keeps_its_keyword_before_a_later_one_of,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("anyOf", (ctor Json::Json.array (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json)))) (nil Json::Json)))) (cons ("oneOf", (ctor Json::Json.array (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "object")) (nil (String * Json::Json)))) (nil Json::Json)))) (nil (String * Json::Json))))) (ctor Json::Json.object (cons ("anyOf", (ctor Json::Json.array (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (nil (String * Json::Json)))) (nil Json::Json)))) (cons ("oneOf", (ctor Json::Json.array (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "object")) (nil (String * Json::Json)))) (nil Json::Json)))) (nil (String * Json::Json))))) (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) = (ctor Schema::Verdict.invalid (nil Schema::Seg) "anyOf")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_failing_not_keeps_its_keyword_before_a_later_if,
+  parameters: [],
+  statement: ((Schema::validate (ctor Json::Json.object (cons ("not", (ctor Json::Json.object (nil (String * Json::Json)))) (cons ("if", (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "z") (nil Json::Json)))) (nil (String * Json::Json))))) (cons ("else", (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "y") (nil Json::Json)))) (nil (String * Json::Json))))) (nil (String * Json::Json)))))) (ctor Json::Json.object (cons ("not", (ctor Json::Json.object (nil (String * Json::Json)))) (cons ("if", (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "z") (nil Json::Json)))) (nil (String * Json::Json))))) (cons ("else", (ctor Json::Json.object (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "y") (nil Json::Json)))) (nil (String * Json::Json))))) (nil (String * Json::Json)))))) (ctor Json::Json.object (nil (String * Json::Json)))) = (ctor Schema::Verdict.invalid (nil Schema::Seg) "not")),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+\end{semanticmodule}
+\end{lexlean}

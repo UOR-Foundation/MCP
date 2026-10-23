@@ -9,11 +9,13 @@
 \importmodule{Extension}
 \importmodule{Input}
 \importmodule{Json}
+\importmodule{JsonRead}
 \importmodule{JsonRpc}
 \importmodule{Meta}
 \importmodule{Methods}
 \importmodule{Refusal}
 \importmodule{Tasks}
+\importmodule{Tools}
 \importmodule{Validation}
 \title{MCP dispatch}
 \begin{semanticmodule}
@@ -21,7 +23,11 @@ structure{
   name: Reply,
   type_parameters: [],
   parameters: [],
-  fields: [{name: body, type: Methods::ResultBody}, {name: meta, type: Meta::ResultMeta}]
+  fields: [
+    {name: body, type: Methods::ResultBody},
+    {name: meta, type: Meta::ResultMeta},
+    {name: notes, type: (List Methods::ProgressNote)}
+  ]
 }
 
 structure{
@@ -67,7 +73,7 @@ definition{
   name: replyOf,
   parameters: [info : Extension::ProviderInfo, body : Methods::ResultBody],
   result: Reply,
-  body: (record Reply {body := body, meta := (record Meta::ResultMeta {serverInfo := (ctor Option.some [Common::Implementation] (project info serverInfo)), others := (ctor Option.none [Json::JsonObject])})}),
+  body: (record Reply {body := body, meta := (record Meta::ResultMeta {serverInfo := (ctor Option.some [Common::Implementation] (project info serverInfo)), others := (ctor Option.none [Json::JsonObject])}), notes := (nil Methods::ProgressNote)}),
   executable: true
 }
 
@@ -147,6 +153,7 @@ definition{
     | Methods::ResultBody.discover found => (sameMethod method (ctor Methods::Method.serverDiscover))
     | Methods::ResultBody.listTools found => (sameMethod method (ctor Methods::Method.toolsList))
     | Methods::ResultBody.callTool found => (sameMethod method (ctor Methods::Method.toolsCall))
+    | Methods::ResultBody.progressed found => (sameMethod method (ctor Methods::Method.toolsCall))
     | Methods::ResultBody.listResources found => (sameMethod method (ctor Methods::Method.resourcesList))
     | Methods::ResultBody.readResource found => (sameMethod method (ctor Methods::Method.resourcesRead))
     | Methods::ResultBody.listResourceTemplates found => (sameMethod method (ctor Methods::Method.resourcesTemplatesList))
@@ -157,6 +164,43 @@ definition{
     | Methods::ResultBody.acknowledged => ((sameMethod method (ctor Methods::Method.tasksUpdate)) || (sameMethod method (ctor Methods::Method.tasksCancel)))
     | Methods::ResultBody.inputRequired needed => (Methods::supportsInputRequired method)
     | Methods::ResultBody.taskCreated created => (Methods::supportsTaskResult method)),
+  executable: true
+}
+
+definition{
+  name: notesOnto,
+  parameters: [
+    token : Common::ProgressToken,
+    steps : (List Methods::ProgressStep),
+    built : (List Methods::ProgressNote)
+  ],
+  result: (List Methods::ProgressNote),
+  body: (match steps
+    | List.nil => built
+    | List.cons head tail => (notesOnto token tail (cons (record Methods::ProgressNote {token := token, step := head}) built))),
+  executable: true,
+  recursive_argument: steps
+}
+
+definition{
+  name: notesFor,
+  parameters: [meta : Meta::RequestMeta, steps : (List Methods::ProgressStep)],
+  result: (List Methods::ProgressNote),
+  body: (match (project meta progressToken)
+    | Option.none => (nil Methods::ProgressNote)
+    | Option.some token => (JsonRead::reverseOnto [Methods::ProgressNote] (notesOnto token steps (nil Methods::ProgressNote)) (nil Methods::ProgressNote))),
+  executable: true
+}
+
+definition{
+  name: progressReply,
+  parameters: [
+    info : Extension::ProviderInfo,
+    meta : Meta::RequestMeta,
+    found : Methods::Progressed
+  ],
+  result: Reply,
+  body: (record Reply {body := (ctor Methods::ResultBody.callTool (project found result)), meta := (project (replyOf info (ctor Methods::ResultBody.acknowledged)) meta), notes := (notesFor meta (project found steps))}),
   executable: true
 }
 
@@ -174,6 +218,7 @@ definition{
     | Methods::ResultBody.discover found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))
     | Methods::ResultBody.listTools found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))
     | Methods::ResultBody.callTool found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))
+    | Methods::ResultBody.progressed found => (ctor Result.ok [Reply, Refusal::Refusal] (progressReply info (metaOfRequest request) found))
     | Methods::ResultBody.listResources found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))
     | Methods::ResultBody.readResource found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))
     | Methods::ResultBody.listResourceTemplates found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))
@@ -240,10 +285,11 @@ definition{
   parameters: [
     info : Extension::ProviderInfo,
     answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    used : Nat,
     request : Methods::ClientRequest
   ],
   result: (Result Reply Refusal::Refusal),
-  body: (if (isDiscoverMethod (Methods::methodOfRequest request)) then (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info (ctor Methods::ResultBody.discover (discoverOf info)))) else (settle info request (apply answer request))),
+  body: (if (isDiscoverMethod (Methods::methodOfRequest request)) then (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info (ctor Methods::ResultBody.discover (discoverOf info)))) else (settle info request (Tools::gate (project info toolCallLimit) used answer request))),
   executable: true
 }
 
@@ -252,12 +298,13 @@ definition{
   parameters: [
     info : Extension::ProviderInfo,
     answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    used : Nat,
     decoded : (Result Methods::ClientRequest Refusal::ParamsProblem)
   ],
   result: (Result Reply Refusal::Refusal),
   body: (match decoded
     | Result.error problem => (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.invalidParams problem))
-    | Result.ok typed => (run info answer typed)),
+    | Result.ok typed => (run info answer used typed)),
   executable: true
 }
 
@@ -266,11 +313,12 @@ definition{
   parameters: [
     info : Extension::ProviderInfo,
     answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    used : Nat,
     routed : Validation::Routed,
     offered : Bool
   ],
   result: (Result Reply Refusal::Refusal),
-  body: (if offered then (afterDecode info answer (Decode::decodeParams (project routed method) (project routed meta) (project routed params))) else (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound (Methods::methodWire (project routed method))))),
+  body: (if offered then (afterDecode info answer used (Decode::decodeParams (project routed method) (project routed meta) (project routed params))) else (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound (Methods::methodWire (project routed method))))),
   executable: true
 }
 
@@ -279,10 +327,11 @@ definition{
   parameters: [
     info : Extension::ProviderInfo,
     answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    used : Nat,
     routed : Validation::Routed
   ],
   result: (Result Reply Refusal::Refusal),
-  body: (gateOffer info answer routed (offers (project info capabilities) (project routed method))),
+  body: (gateOffer info answer used routed (offers (project info capabilities) (project routed method))),
   executable: true
 }
 
@@ -291,12 +340,13 @@ definition{
   parameters: [
     info : Extension::ProviderInfo,
     answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    used : Nat,
     validated : (Result Validation::Routed Refusal::Refusal)
   ],
   result: (Result Reply Refusal::Refusal),
   body: (match validated
     | Result.error refusal => (ctor Result.error [Reply, Refusal::Refusal] refusal)
-    | Result.ok routed => (dispatch info answer routed)),
+    | Result.ok routed => (dispatch info answer used routed)),
   executable: true
 }
 
@@ -305,12 +355,13 @@ definition{
   parameters: [
     info : Extension::ProviderInfo,
     answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    used : Nat,
     headers : (Option Validation::Headers),
     versions : (List String),
     request : JsonRpc::Request
   ],
   result: Handled,
-  body: (record Handled {id := (project request id), outcome := (afterValidation info answer (Validation::validate headers versions request))}),
+  body: (record Handled {id := (project request id), outcome := (afterValidation info answer used (Validation::validate headers versions request))}),
   axioms: [Quot.sound, propext],
   executable: true
 }
@@ -331,7 +382,7 @@ definition{
     request : JsonRpc::Request
   ],
   result: Handled,
-  body: (handleWith (Extension::infoOf provider) (answerFn provider) headers versions request),
+  body: (handleWith (Extension::infoOf provider) (answerFn provider) 0 headers versions request),
   axioms: [Quot.sound, propext]
 }
 
@@ -339,7 +390,7 @@ definition{
   name: toolsProvider,
   parameters: [],
   result: Extension::Provider,
-  body: (record Extension::Provider {serverInfo := (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])}), instructions := (ctor Option.none [String]), capabilities := (record Capabilities::ServerCapabilities {experimental := (ctor Option.none [Json::JsonObject]), logging := (ctor Option.none [Json::JsonObject]), completions := (ctor Option.none [Json::JsonObject]), prompts := (ctor Option.none [Capabilities::ListChangedCapability]), resources := (ctor Option.none [Capabilities::ResourcesCapability]), tools := (ctor Option.some [Capabilities::ListChangedCapability] (record Capabilities::ListChangedCapability {listChanged := (ctor Option.some [Bool] false)})), extensions := (ctor Option.none [Json::JsonObject])}), discoverCache := (record Common::CacheHint {ttlMs := 0, cacheScope := (ctor Common::CacheScope.private)}), paramRules := (nil Extension::ParamRule), listTools := (fun (params : Methods::PaginatedParams) => (ctor Result.ok [Methods::ListToolsResult, Refusal::ProviderRefusal] (record Methods::ListToolsResult {cache := (record Common::CacheHint {ttlMs := 60000, cacheScope := (ctor Common::CacheScope.public)}), nextCursor := (ctor Option.none [String]), tools := (cons (record Content::Tool {name := "echo", title := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)]), description := (ctor Option.none [String]), inputSchema := (Capabilities::noObject), outputSchema := (ctor Option.none [Json::JsonObject]), annotations := (ctor Option.none [Content::ToolAnnotations]), meta := (ctor Option.none [Json::JsonObject])}) (nil Content::Tool))}))), callTool := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) callTool), listResources := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) listResources), listResourceTemplates := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) listResourceTemplates), readResource := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) readResource), listPrompts := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) listPrompts), getPrompt := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) getPrompt), complete := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) complete), getTask := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) getTask), updateTask := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) updateTask), cancelTask := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) cancelTask)})
+  body: (record Extension::Provider {serverInfo := (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])}), instructions := (ctor Option.none [String]), capabilities := (record Capabilities::ServerCapabilities {experimental := (ctor Option.none [Json::JsonObject]), logging := (ctor Option.none [Json::JsonObject]), completions := (ctor Option.none [Json::JsonObject]), prompts := (ctor Option.none [Capabilities::ListChangedCapability]), resources := (ctor Option.none [Capabilities::ResourcesCapability]), tools := (ctor Option.some [Capabilities::ListChangedCapability] (record Capabilities::ListChangedCapability {listChanged := (ctor Option.some [Bool] false)})), extensions := (ctor Option.none [Json::JsonObject])}), discoverCache := (record Common::CacheHint {ttlMs := 0, cacheScope := (ctor Common::CacheScope.private)}), paramRules := (nil Extension::ParamRule), toolCallLimit := 100, listTools := (fun (params : Methods::PaginatedParams) => (ctor Result.ok [Methods::ListToolsResult, Refusal::ProviderRefusal] (record Methods::ListToolsResult {cache := (record Common::CacheHint {ttlMs := 60000, cacheScope := (ctor Common::CacheScope.public)}), nextCursor := (ctor Option.none [String]), tools := (cons (record Content::Tool {name := "echo", title := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)]), description := (ctor Option.none [String]), inputSchema := (Capabilities::noObject), outputSchema := (ctor Option.none [Json::JsonObject]), annotations := (ctor Option.none [Content::ToolAnnotations]), meta := (ctor Option.none [Json::JsonObject])}) (nil Content::Tool))}))), callTool := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) callTool), listResources := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) listResources), listResourceTemplates := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) listResourceTemplates), readResource := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) readResource), listPrompts := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) listPrompts), getPrompt := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) getPrompt), complete := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) complete), getTask := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) getTask), updateTask := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) updateTask), cancelTask := (project (Extension::inertProvider (record Common::Implementation {name := "sample", title := (ctor Option.none [String]), version := "0", description := (ctor Option.none [String]), websiteUrl := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)])})) cancelTask)})
 }
 
 definition{
@@ -440,49 +491,50 @@ theorem{
 
 theorem{
   name: unoffered_method_never_reaches_the_provider,
-  parameters: [provider : Extension::Provider, routed : Validation::Routed],
-  statement: ((gateOffer (Extension::infoOf provider) (answerFn provider) routed false) = (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound (Methods::methodWire (project routed method))))),
+  parameters: [used : Nat, provider : Extension::Provider, routed : Validation::Routed],
+  statement: ((gateOffer (Extension::infoOf provider) (answerFn provider) used routed false) = (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound (Methods::methodWire (project routed method))))),
   proof: reflexivity{}
 }
 
 theorem{
   name: dispatch_gates_on_the_declared_capability,
-  parameters: [provider : Extension::Provider, routed : Validation::Routed],
-  statement: ((dispatch (Extension::infoOf provider) (answerFn provider) routed) = (gateOffer (Extension::infoOf provider) (answerFn provider) routed (offers (project provider capabilities) (project routed method)))),
+  parameters: [used : Nat, provider : Extension::Provider, routed : Validation::Routed],
+  statement: ((dispatch (Extension::infoOf provider) (answerFn provider) used routed) = (gateOffer (Extension::infoOf provider) (answerFn provider) used routed (offers (project provider capabilities) (project routed method)))),
   proof: reflexivity{}
 }
 
 theorem{
   name: offered_method_decodes_its_params_before_running,
-  parameters: [provider : Extension::Provider, routed : Validation::Routed],
-  statement: ((gateOffer (Extension::infoOf provider) (answerFn provider) routed true) = (afterDecode (Extension::infoOf provider) (answerFn provider) (Decode::decodeParams (project routed method) (project routed meta) (project routed params)))),
+  parameters: [used : Nat, provider : Extension::Provider, routed : Validation::Routed],
+  statement: ((gateOffer (Extension::infoOf provider) (answerFn provider) used routed true) = (afterDecode (Extension::infoOf provider) (answerFn provider) used (Decode::decodeParams (project routed method) (project routed meta) (project routed params)))),
   proof: reflexivity{}
 }
 
 theorem{
   name: undecodable_params_are_invalid_params,
-  parameters: [provider : Extension::Provider, problem : Refusal::ParamsProblem],
-  statement: ((afterDecode (Extension::infoOf provider) (answerFn provider) (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)) = (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.invalidParams problem))),
+  parameters: [used : Nat, provider : Extension::Provider, problem : Refusal::ParamsProblem],
+  statement: ((afterDecode (Extension::infoOf provider) (answerFn provider) used (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)) = (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.invalidParams problem))),
   proof: reflexivity{}
 }
 
 theorem{
   name: decoded_params_are_run,
-  parameters: [provider : Extension::Provider, typed : Methods::ClientRequest],
-  statement: ((afterDecode (Extension::infoOf provider) (answerFn provider) (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] typed)) = (run (Extension::infoOf provider) (answerFn provider) typed)),
+  parameters: [used : Nat, provider : Extension::Provider, typed : Methods::ClientRequest],
+  statement: ((afterDecode (Extension::infoOf provider) (answerFn provider) used (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] typed)) = (run (Extension::infoOf provider) (answerFn provider) used typed)),
   proof: reflexivity{}
 }
 
 theorem{
   name: a_provider_without_capabilities_answers_only_discovery,
   parameters: [
+    used : Nat,
     info : Common::Implementation,
     identifier : JsonRpc::RequestId,
     method : Methods::Method,
     meta : Meta::RequestMeta,
     params : Json::JsonObject
   ],
-  statement: ((discoverOrRefused method (dispatch (Extension::infoOf (Extension::inertProvider info)) (answerFn (Extension::inertProvider info)) (record Validation::Routed {id := identifier, method := method, meta := meta, params := params}))) = true),
+  statement: ((discoverOrRefused method (dispatch (Extension::infoOf (Extension::inertProvider info)) (answerFn (Extension::inertProvider info)) used (record Validation::Routed {id := identifier, method := method, meta := meta, params := params}))) = true),
   proof: cases{
     branches: [
       {proof: reflexivity{}, binders: [], constructor: serverDiscover},
@@ -505,11 +557,12 @@ theorem{
 theorem{
   name: an_unknown_method_never_gets_a_result_whatever_the_admission,
   parameters: [
+    used : Nat,
     provider : Extension::Provider,
     route : Methods::MethodRoute,
     admission : Validation::Admission
   ],
-  statement: ((refusesUnknown route (afterValidation (Extension::infoOf provider) (answerFn provider) (Validation::afterAdmit route admission))) = true),
+  statement: ((refusesUnknown route (afterValidation (Extension::infoOf provider) (answerFn provider) used (Validation::afterAdmit route admission))) = true),
   proof: cases{
     branches: [
       {proof: reflexivity{}, binders: [method], constructor: known},
@@ -540,6 +593,7 @@ theorem{
   statement: ((refusesUnknown (Methods::routeOf (project request method)) (project (handle provider headers versions request) outcome)) = true),
   proof: apply{
     arguments: [
+      0,
       provider,
       (Methods::routeOf (project request method)),
       (Validation::admissionOf headers versions request)

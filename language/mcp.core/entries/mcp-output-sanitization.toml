@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-output-sanitization"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Sanitize"
+component = "Sanitize"
+
+[[form]]
+id = "mcp-output-sanitization"
+channel = "text"
+surface = "MCP output sanitization"
+canonical_source = true
+features = ["sentence-case", "singular"]

@@ -16,7 +16,9 @@
 \importmodule{Refusal}
 \importmodule{ResultJson}
 \importmodule{RpcWire}
+\importmodule{Sanitize}
 \importmodule{Status}
+\importmodule{Tools}
 \importmodule{Validation}
 \title{MCP stateless serving}
 \begin{semanticmodule}
@@ -96,7 +98,7 @@ definition{
   name: internalResponse,
   parameters: [],
   result: Http::HttpResponse,
-  body: (record Http::HttpResponse {status := (Status::serverErrorStatus), fields := (jsonFields), body := (internalBody)}),
+  body: (record Http::HttpResponse {status := (Status::serverErrorStatus), fields := (jsonFields), notifications := (nil (List Nat)), body := (internalBody)}),
   executable: true
 }
 
@@ -104,7 +106,7 @@ definition{
   name: notAllowedResponse,
   parameters: [],
   result: Http::HttpResponse,
-  body: (record Http::HttpResponse {status := (Status::methodNotAllowedStatus), fields := (cons (record Http::Field {name := (allowName), value := (postValue)}) (nil Http::Field)), body := (nil Nat)}),
+  body: (record Http::HttpResponse {status := (Status::methodNotAllowedStatus), fields := (cons (record Http::Field {name := (allowName), value := (postValue)}) (nil Http::Field)), notifications := (nil (List Nat)), body := (nil Nat)}),
   executable: true
 }
 
@@ -114,7 +116,7 @@ definition{
   result: Http::HttpResponse,
   body: (match (JsonWrite::writeList message)
     | Result.error refusal => (internalResponse)
-    | Result.ok produced => (record Http::HttpResponse {status := status, fields := (jsonFields), body := produced})),
+    | Result.ok produced => (record Http::HttpResponse {status := status, fields := (jsonFields), notifications := (nil (List Nat)), body := produced})),
   axioms: [Quot.sound, propext],
   executable: true
 }
@@ -132,15 +134,52 @@ definition{
 }
 
 definition{
+  name: noteBytes,
+  parameters: [note : Methods::ProgressNote],
+  result: (Option (List Nat)),
+  body: (match (Sanitize::sanitizeJson (RpcWire::progressNotification note))
+    | Option.none => (ctor Option.none [(List Nat)])
+    | Option.some cleaned => (match (JsonWrite::writeList cleaned)
+      | Result.error refusal => (ctor Option.none [(List Nat)])
+      | Result.ok produced => (ctor Option.some [(List Nat)] produced))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: notesOnto,
+  parameters: [notes : (List Methods::ProgressNote), built : (List (List Nat))],
+  result: (Option (List (List Nat))),
+  body: (match notes
+    | List.nil => (ctor Option.some [(List (List Nat))] built)
+    | List.cons head rest => (match (noteBytes head)
+      | Option.none => (ctor Option.none [(List (List Nat))])
+      | Option.some produced => (notesOnto rest (cons produced built)))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true,
+  recursive_argument: notes
+}
+
+definition{
+  name: withNotes,
+  parameters: [response : Http::HttpResponse, encoded : (Option (List (List Nat)))],
+  result: Http::HttpResponse,
+  body: (match encoded
+    | Option.none => (internalResponse)
+    | Option.some built => (record Http::HttpResponse {status := (project response status), fields := (project response fields), notifications := (JsonRead::reverseOnto [(List Nat)] built (nil (List Nat))), body := (project response body)})),
+  executable: true
+}
+
+definition{
   name: respond,
   parameters: [handled : Dispatch::Handled],
   result: Http::HttpResponse,
   body: (match (project handled outcome)
     | Result.ok reply => (match (ResultJson::resultObject reply)
       | Option.none => (internalResponse)
-      | Option.some found => (jsonResponse (Status::okStatus) (RpcWire::resultResponse (project handled id) found)))
+      | Option.some found => (withNotes (jsonResponse (Status::okStatus) (RpcWire::resultResponse (project handled id) found)) (notesOnto (project reply notes) (nil (List Nat)))))
     | Result.error refusal => (jsonResponse (Status::statusOf refusal) (RpcWire::errorResponse (ctor Option.some [JsonRpc::RequestId] (project handled id)) (Refusal::errorObjectOf refusal)))),
-  axioms: [Quot.sound, propext],
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
@@ -149,11 +188,12 @@ definition{
   parameters: [
     info : Extension::ProviderInfo,
     answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    used : Nat,
     fields : (List Http::Field),
     rpc : JsonRpc::Request
   ],
   result: Http::HttpResponse,
-  body: (respond (Dispatch::handleWith info answer (ctor Option.some [Validation::Headers] (Http::headersOf fields (project info paramRules) (toolNameOf rpc) (project rpc method))) (Validation::supportedVersions) rpc)),
+  body: (respond (Dispatch::handleWith info answer used (ctor Option.some [Validation::Headers] (Http::headersOf fields (project info paramRules) (toolNameOf rpc) (project rpc method))) (Validation::supportedVersions) rpc)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -163,13 +203,14 @@ definition{
   parameters: [
     info : Extension::ProviderInfo,
     answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    used : Nat,
     fields : (List Http::Field),
     decoded : (Result JsonRpc::Request RpcWire::Fault)
   ],
   result: Http::HttpResponse,
   body: (match decoded
     | Result.error fault => (jsonResponse (Status::faultStatus fault) (RpcWire::errorResponse (RpcWire::faultId fault) (RpcWire::faultObject fault)))
-    | Result.ok rpc => (answerRequest info answer fields rpc)),
+    | Result.ok rpc => (answerRequest info answer used fields rpc)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -179,13 +220,14 @@ definition{
   parameters: [
     info : Extension::ProviderInfo,
     answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    used : Nat,
     fields : (List Http::Field),
     parsed : (Result Json::Json JsonText::JsonRefusal)
   ],
   result: Http::HttpResponse,
   body: (match parsed
     | Result.error refusal => (jsonResponse (Status::badRequestStatus) (RpcWire::errorResponse (ctor Option.none [JsonRpc::RequestId]) (RpcWire::faultObject (ctor RpcWire::Fault.parseError))))
-    | Result.ok message => (afterDecode info answer fields (RpcWire::decodeRequest message))),
+    | Result.ok message => (afterDecode info answer used fields (RpcWire::decodeRequest message))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -198,7 +240,7 @@ definition{
     request : Http::HttpRequest
   ],
   result: Http::HttpResponse,
-  body: (if (Http::isPost (project request method)) then (afterParse info answer (project request fields) (JsonRead::readJson (project request body))) else (notAllowedResponse)),
+  body: (if (Http::isPost (project request method)) then (afterParse info answer (project request toolCalls) (project request fields) (JsonRead::readJson (project request body))) else (notAllowedResponse)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }

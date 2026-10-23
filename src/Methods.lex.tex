@@ -429,6 +429,31 @@ structure{
 }
 
 structure{
+  name: ProgressStep,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: progress, type: Json::Decimal},
+    {name: total, type: (Option Json::Decimal)},
+    {name: message, type: (Option String)}
+  ]
+}
+
+structure{
+  name: ProgressNote,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: token, type: Common::ProgressToken}, {name: step, type: ProgressStep}]
+}
+
+structure{
+  name: Progressed,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: result, type: CallToolResult}, {name: steps, type: (List ProgressStep)}]
+}
+
+structure{
   name: ListResourcesResult,
   type_parameters: [],
   parameters: [],
@@ -507,6 +532,7 @@ inductive{
     {name: discover, fields: [DiscoverResult]},
     {name: listTools, fields: [ListToolsResult]},
     {name: callTool, fields: [CallToolResult]},
+    {name: progressed, fields: [Progressed]},
     {name: listResources, fields: [ListResourcesResult]},
     {name: readResource, fields: [ReadResourceResult]},
     {name: listResourceTemplates, fields: [ListResourceTemplatesResult]},
@@ -528,6 +554,7 @@ definition{
     | ResultBody.discover result => (ctor Meta::ResultType.complete)
     | ResultBody.listTools result => (ctor Meta::ResultType.complete)
     | ResultBody.callTool result => (ctor Meta::ResultType.complete)
+    | ResultBody.progressed result => (ctor Meta::ResultType.complete)
     | ResultBody.listResources result => (ctor Meta::ResultType.complete)
     | ResultBody.readResource result => (ctor Meta::ResultType.complete)
     | ResultBody.listResourceTemplates result => (ctor Meta::ResultType.complete)
@@ -571,6 +598,7 @@ definition{
     | ResultBody.discover result => true
     | ResultBody.listTools result => true
     | ResultBody.callTool result => false
+    | ResultBody.progressed result => false
     | ResultBody.listResources result => true
     | ResultBody.readResource result => true
     | ResultBody.listResourceTemplates result => true
@@ -593,6 +621,7 @@ theorem{
       {proof: reflexivity{}, binders: [result], constructor: discover},
       {proof: reflexivity{}, binders: [result], constructor: listTools},
       {proof: reflexivity{}, binders: [result], constructor: callTool},
+      {proof: reflexivity{}, binders: [result], constructor: progressed},
       {proof: reflexivity{}, binders: [result], constructor: listResources},
       {proof: reflexivity{}, binders: [result], constructor: readResource},
       {proof: reflexivity{}, binders: [result], constructor: listResourceTemplates},

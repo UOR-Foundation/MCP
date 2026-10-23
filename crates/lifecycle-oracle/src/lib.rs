@@ -30,15 +30,40 @@
     clippy::manual_unwrap_or,
     clippy::manual_unwrap_or_default,
     clippy::manual_map,
-    clippy::manual_ok_err
+    clippy::manual_ok_err,
+    clippy::collapsible_match
 )]
 #[rustfmt::skip]
 #[path = "../generated/mcp_lifecycle/src/lib.rs"]
 mod lifecycle;
 
+// The second root, over a catalog of many tools, for the stress tests (`TOOLS.md`).
+#[allow(
+    dead_code,
+    unused,
+    missing_docs,
+    clippy::type_complexity,
+    clippy::too_many_arguments,
+    clippy::large_enum_variant,
+    clippy::result_large_err,
+    clippy::result_unit_err,
+    clippy::single_match,
+    clippy::manual_unwrap_or,
+    clippy::manual_unwrap_or_default,
+    clippy::manual_map,
+    clippy::manual_ok_err,
+    clippy::collapsible_match
+)]
+#[rustfmt::skip]
+#[path = "../generated/mcp_crowd/src/lib.rs"]
+mod crowd;
+
 /// The text of the generated package this crate compiled, so a test can hash the
 /// file the oracle ran against the digest the export recorded.
 pub const GENERATED_SOURCE: &str = include_str!("../generated/mcp_lifecycle/src/lib.rs");
+
+/// The text of the second generated package, the root `UorMcp.Crowd.crowdRun`.
+pub const CROWD_SOURCE: &str = include_str!("../generated/mcp_crowd/src/lib.rs");
 
 /// The stack the root runs on: 2 MiB, which is the size Rust gives a spawned thread
 /// when nothing says otherwise. The export states no `recursion` effect and no
@@ -62,15 +87,25 @@ pub struct Request {
     pub fields: Vec<Field>,
     /// The body bytes.
     pub body: Vec<u8>,
+    /// The number of `tools/call` requests the host has already counted for this client
+    /// in the current rate-limit window, not counting this one. The host owns the window
+    /// and the client identity; the core only compares the count with the limit its
+    /// provider declares (`LIFECYCLE.md`, "The boundary encoding").
+    pub tool_calls: u32,
 }
 
-/// An HTTP response at the core boundary: the status, the header fields and the body.
+/// An HTTP response at the core boundary: the status, the header fields, the progress
+/// notifications and the body.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Response {
     /// The status code the core chose.
     pub status: u32,
     /// The header fields the core wrote.
     pub fields: Vec<Field>,
+    /// The JSON-RPC progress notifications the core produced while answering, each the
+    /// bytes of one compact JSON text, in the order they are sent. An adapter that finds
+    /// any sends the exchange as a stream (`text/event-stream`); issue 11 is that encoding.
+    pub notifications: Vec<Vec<u8>>,
     /// The body bytes.
     pub body: Vec<u8>,
 }
@@ -97,7 +132,8 @@ fn put_chunk(out: &mut Vec<u8>, bytes: &[u8]) {
 
 /// Encode a request as the frame the root reads: a length-prefixed method, a
 /// length-prefixed target, the field count, each field as a length-prefixed name and
-/// value, and a length-prefixed body, every length four bytes big-endian.
+/// value, a length-prefixed body, and the four-byte count of tool calls the host has
+/// already counted for this client, every length and count four bytes big-endian.
 pub fn encode_request(request: &Request) -> Vec<u8> {
     let mut out = Vec::new();
     put_chunk(&mut out, &request.method);
@@ -108,6 +144,7 @@ pub fn encode_request(request: &Request) -> Vec<u8> {
         put_chunk(&mut out, value);
     }
     put_chunk(&mut out, &request.body);
+    put_u32(&mut out, request.tool_calls as usize);
     out
 }
 
@@ -133,7 +170,8 @@ impl Cursor<'_> {
     }
 }
 
-/// Decode the frame the root writes: the status, the field count, each field, and a
+/// Decode the frame the root writes: the status, the field count, each field, the
+/// notification count, each notification as a length-prefixed text, and a
 /// length-prefixed body, with no bytes after it.
 ///
 /// # Errors
@@ -152,6 +190,11 @@ pub fn decode_response(frame: &[u8]) -> Result<Response, FrameError> {
         let value = cursor.chunk()?;
         fields.push((name, value));
     }
+    let note_count = cursor.word()?;
+    let mut notifications = Vec::new();
+    for _ in 0..note_count {
+        notifications.push(cursor.chunk()?);
+    }
     let body = cursor.chunk()?;
     if cursor.at != frame.len() {
         return Err(FrameError::Trailing);
@@ -159,6 +202,7 @@ pub fn decode_response(frame: &[u8]) -> Result<Response, FrameError> {
     Ok(Response {
         status,
         fields,
+        notifications,
         body,
     })
 }
@@ -206,6 +250,31 @@ pub fn exchange_frame_on(frame: &[u8], stack_bytes: usize) -> Vec<u8> {
         })
         .expect("a worker thread starts");
     words_to_bytes(worker.join().expect("the lifecycle root did not panic"))
+}
+
+/// [`exchange_frame_on`] for the second root, `UorMcp.Crowd.crowdRun`: the same pipeline
+/// over a catalog of 60 tools named `crowd_0` to `crowd_59`.
+///
+/// # Panics
+///
+/// Panics when the realization reports an overflow, and aborts the process when the
+/// stack is too small for the frame.
+pub fn exchange_crowd_frame_on(frame: &[u8], stack_bytes: usize) -> Vec<u8> {
+    let input = frame.to_vec();
+    let worker = std::thread::Builder::new()
+        .stack_size(stack_bytes)
+        .spawn(move || {
+            let mut list = crowd::run(crowd::Bytes::lit(&input))
+                .expect("the crowd root does not overflow on this input");
+            let mut out = Vec::new();
+            while let Some((head, tail)) = list.uncons() {
+                out.push(head);
+                list = tail;
+            }
+            out
+        })
+        .expect("a worker thread starts");
+    words_to_bytes(worker.join().expect("the crowd root did not panic"))
 }
 
 /// One HTTP exchange through the generated root.

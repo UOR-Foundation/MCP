@@ -1,0 +1,221 @@
+\begin{lexlean}{Numeric}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Json}
+\importmodule{JsonRead}
+\title{MCP number comparison}
+\begin{semanticmodule}
+inductive{
+  name: Cmp,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: less, fields: []}, {name: same, fields: []}, {name: greater, fields: []}]
+}
+
+definition{
+  name: natToInt,
+  parameters: [count : Nat, total : Int],
+  result: Int,
+  body: (match count
+    | Nat.zero => total
+    | Nat.succ below => (natToInt below (JsonRead::intAdd total (1 : Int)))),
+  executable: true,
+  recursive_argument: count
+}
+
+definition{
+  name: cmpInt,
+  parameters: [left : Int, right : Int],
+  result: Cmp,
+  body: (if (prim less_than left right : Bool) then (ctor Cmp.less) else (if (prim less_than right left : Bool) then (ctor Cmp.greater) else (ctor Cmp.same))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: flip,
+  parameters: [order : Cmp],
+  result: Cmp,
+  body: (match order
+    | Cmp.less => (ctor Cmp.greater)
+    | Cmp.same => (ctor Cmp.same)
+    | Cmp.greater => (ctor Cmp.less)),
+  executable: true
+}
+
+definition{
+  name: digitCount,
+  parameters: [fuel : Nat, magnitude : Int, counted : Nat],
+  result: Nat,
+  body: (match fuel
+    | Nat.zero => counted
+    | Nat.succ below => (let next : Nat := (counted + 1); (if (prim less_than magnitude (10 : Int) : Bool) then next else (digitCount below (prim quotient magnitude (10 : Int) (0 : Int) : Int) next)))),
+  axioms: [propext],
+  executable: true,
+  recursive_argument: fuel
+}
+
+definition{
+  name: digits,
+  parameters: [magnitude : Int],
+  result: Nat,
+  body: (digitCount 20 magnitude 0),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: timesTen,
+  parameters: [count : Nat, value : Int],
+  result: Int,
+  body: (match count
+    | Nat.zero => value
+    | Nat.succ below => (timesTen below (prim multiply value (10 : Int) : Int))),
+  executable: true,
+  recursive_argument: count
+}
+
+definition{
+  name: orderOf,
+  parameters: [mantissa : Int, exponent : Int],
+  result: Int,
+  body: (JsonRead::intAdd (natToInt (digits mantissa) (0 : Int)) exponent),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: cmpAligned,
+  parameters: [left : Int, leftDigits : Nat, right : Int, rightDigits : Nat],
+  result: Cmp,
+  body: (if (leftDigits <? rightDigits) then (cmpInt (timesTen (prim subtract rightDigits leftDigits : Nat) left) right) else (if (rightDigits <? leftDigits) then (cmpInt left (timesTen (prim subtract leftDigits rightDigits : Nat) right)) else (cmpInt left right))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: cmpMagnitude,
+  parameters: [leftMantissa : Int, leftExponent : Int, rightMantissa : Int, rightExponent : Int],
+  result: Cmp,
+  body: (match (cmpInt (orderOf leftMantissa leftExponent) (orderOf rightMantissa rightExponent))
+    | Cmp.less => (ctor Cmp.less)
+    | Cmp.greater => (ctor Cmp.greater)
+    | Cmp.same => (cmpAligned leftMantissa (digits leftMantissa) rightMantissa (digits rightMantissa))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: signOf,
+  parameters: [mantissa : Int],
+  result: Cmp,
+  body: (cmpInt mantissa (0 : Int)),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: absolute,
+  parameters: [mantissa : Int],
+  result: Int,
+  body: (if (prim less_than mantissa (0 : Int) : Bool) then (prim negate mantissa : Int) else mantissa),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: withSign,
+  parameters: [sign : Cmp, magnitude : Cmp],
+  result: Cmp,
+  body: (match sign
+    | Cmp.less => (flip magnitude)
+    | Cmp.same => (ctor Cmp.same)
+    | Cmp.greater => magnitude),
+  executable: true
+}
+
+definition{
+  name: afterSigns,
+  parameters: [left : Json::Decimal, right : Json::Decimal, leftSign : Cmp, rightSign : Cmp],
+  result: Cmp,
+  body: (match leftSign
+    | Cmp.same => (match rightSign
+      | Cmp.same => (ctor Cmp.same)
+      | Cmp.less => (ctor Cmp.greater)
+      | Cmp.greater => (ctor Cmp.less))
+    | Cmp.less => (match rightSign
+      | Cmp.less => (withSign (ctor Cmp.less) (cmpMagnitude (absolute (project left mantissa)) (project left exponent) (absolute (project right mantissa)) (project right exponent)))
+      | Cmp.same => (ctor Cmp.less)
+      | Cmp.greater => (ctor Cmp.less))
+    | Cmp.greater => (match rightSign
+      | Cmp.less => (ctor Cmp.greater)
+      | Cmp.same => (ctor Cmp.greater)
+      | Cmp.greater => (cmpMagnitude (project left mantissa) (project left exponent) (project right mantissa) (project right exponent)))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: compare,
+  parameters: [left : Json::Decimal, right : Json::Decimal],
+  result: Cmp,
+  body: (afterSigns left right (signOf (project left mantissa)) (signOf (project right mantissa))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: isLess,
+  parameters: [order : Cmp],
+  result: Bool,
+  body: (match order | Cmp.less => true | Cmp.same => false | Cmp.greater => false),
+  executable: true
+}
+
+definition{
+  name: isSame,
+  parameters: [order : Cmp],
+  result: Bool,
+  body: (match order | Cmp.less => false | Cmp.same => true | Cmp.greater => false),
+  executable: true
+}
+
+definition{
+  name: isGreater,
+  parameters: [order : Cmp],
+  result: Bool,
+  body: (match order | Cmp.less => false | Cmp.same => false | Cmp.greater => true),
+  executable: true
+}
+
+definition{
+  name: wholeLoop,
+  parameters: [fuel : Nat, mantissa : Int, exponent : Int],
+  result: Bool,
+  body: (match fuel
+    | Nat.zero => false
+    | Nat.succ below => (if (prim less_than exponent (0 : Int) : Bool) then (if (Json::isZero (prim remainder mantissa (10 : Int) (0 : Int) : Int)) then (wholeLoop below (prim quotient mantissa (10 : Int) (0 : Int) : Int) (JsonRead::intAdd exponent (1 : Int))) else false) else true)),
+  axioms: [propext],
+  executable: true,
+  recursive_argument: fuel
+}
+
+definition{
+  name: isWhole,
+  parameters: [amount : Json::Decimal],
+  result: Bool,
+  body: (if (Json::isZero (project amount mantissa)) then true else (wholeLoop 40 (project amount mantissa) (project amount exponent))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: fromNat,
+  parameters: [count : Nat],
+  result: Json::Decimal,
+  body: (record Json::Decimal {mantissa := (natToInt count (0 : Int)), exponent := (0 : Int)}),
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-tool-laws"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "ToolLaws"
+component = "ToolLaws"
+
+[[form]]
+id = "mcp-tool-laws"
+channel = "text"
+surface = "MCP tool laws"
+canonical_source = true
+features = ["sentence-case", "singular"]
