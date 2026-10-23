@@ -161,7 +161,33 @@ only when the connection fails, which a request to the root cannot.
 
 ## Planted defects
 
-PLANTED
+Each was planted alone in the sources of a tree on which every gate passed, run, and
+reverted with `git checkout`. The first six are stopped by the kernel before an export is
+possible. The next two pass `lexlean verify` because no theorem covers the encoder or the
+byte-level matching, and are stopped by the oracle after `cargo xtask export` exported the
+root again. The last five are stopped by the gates that read the vendored files, the vectors,
+the tests and the register.
+
+| Defect | Planted in | Gate | Command | Diagnostic |
+| --- | --- | --- | --- | --- |
+| an unknown resource is refused as an internal error | `Resources.readOutcome`: the `none` branch returns `internal` | kernel | `lexlean verify src/ResourceLaws.lex.tex` | `LLV7002`, `Tactic rfl failed` in `an_unknown_resource_is_refused_as_not_found`: `Resources.readOutcome cache uri none` is not definitionally equal to `Result.error (resourceNotFound uri)`; `an_unknown_resource_has_the_invalid_params_code` fails too |
+| `resources/list` is out of order | `ResourceFixture.resourcesOf`: the closing reversal left out | kernel | same | `LLV7002` in `the_catalog_lists_its_resources_in_the_declared_order`: `ResourceFixture.resourceUris` is not definitionally equal to the declared order |
+| a completion is cut at 101 values | `Resources.completionLimit` 101 for 100 | kernel | same | `LLV7002` in `a_completion_is_cut_at_one_hundred_values`: `Resources.countOnto (Resources.completionOf (many 150)).completion.values 0` is not definitionally equal to `100` |
+| a required prompt argument is not enforced | `Resources.isRequired`: `some flag => false` | kernel | same | `LLV7002` in `a_prompt_called_without_its_arguments_is_invalid_params` and `a_prompt_called_with_some_of_its_arguments_is_invalid_params`: `codeOfAnswer ...` is not definitionally equal to `some (-32602)` |
+| a missing resource is answered with 404 | `Status.providerStatus`: `resourceNotFound` maps to `notFoundStatus` | kernel | `lexlean verify src/Status.lex.tex` | `LLV7002` in `a_missing_resource_is_a_bad_request`: `statusOf (provider (resourceNotFound uri))` is not definitionally equal to `400`; `the_status_follows_the_code` fails too |
+| the refusal of a missing resource drops `data.uri` | `Refusal.dataOf`: `resourceNotFound` returns no data | kernel | `lexlean verify src/Refusal.lex.tex` | `LLV7002` in `a_missing_resource_names_its_uri`: `dataOf (provider (resourceNotFound uri))` is not definitionally equal to `some {"uri": uri}` |
+| a template id may hold a solidus | `ResourceFixture.withoutSlash`: the solidus test left out | oracle | `cargo xtask export`, then `cargo test -p lifecycle-oracle --test resources` | 1 test fails: `a_uri_the_template_does_not_match_is_not_found_rp_05` (`test://template/a/b/data` is answered with contents, not -32602) |
+| a prompt is written unsanitized | `ResultJson.bodyMembers`: the `getPrompt` arm without `sanitizedMembers` | oracle | same | 1 test fails: `control_and_bidirectional_characters_of_a_prompt_are_replaced_rp_19`: the text still holds `\u{7}`, `\u{1b}`, `\u{202e}` and `\u{85}` where U+FFFD is expected |
+| a vendored suite file is altered | `suite/.../resources.ts` | pin and checksum | `cargo test -p lifecycle-oracle --test provenance` | `the_vendored_suite_is_the_pinned_commit_and_matches_its_recorded_checksum_lc_12`: `the vendored files are not the files the authority records` |
+| a vector cites the wrong line | `vectors/resources.json`, RS-05 line 515 made 516 | coverage | same | `every_request_a_scenario_sends_is_a_vector_or_a_listed_probe_that_is_not_run_lc_14`: `"RS-05": line 516 of src/scenarios/server/resources.ts does not contain "result = await conn.request<ReadResourceResult>('resources/read', {"` |
+| a listed request that is not run cites the wrong line | `vectors/resources.json`, the `ping` entry line 142 made 143 | coverage | same | same test: `line 143 of src/scenarios/server/utils.ts does not contain "const result = await conn.request<EmptyResult>('ping');"` |
+| the tests of RP-12 are renamed so none ends in `rp_12` | `tests/resources.rs` | meta-gate | `cargo test -p repo-conformance` | `CM-02: RP-12 is registered but no test name ends in rp_12. A claim with no test is an assertion.` |
+| the register changes and `CONFORMANCE.md` is not regenerated | `model/ids.toml`, the statement of RP-19 | model | `cargo xtask check-model` | `gate failed: CONFORMANCE.md is stale: it disagrees with model/ids.toml.` |
+
+Restored result: every defect was reverted with `git checkout`, and on the final tree
+`lexlean verify` reports the project verified, the committed packages equal a fresh export
+(`cargo xtask export`), and `cargo fmt --all -- --check`, `cargo clippy --workspace
+--all-targets -- -D warnings`, the audits of `xtask` and `cargo test --workspace` pass.
 
 ## Not met
 
