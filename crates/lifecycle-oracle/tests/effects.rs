@@ -617,8 +617,8 @@ fn the_byte_serve_answers_a_provider_that_requests_an_effect_with_the_internal_e
         prompt_effect(),
     ] {
         let mut request = request;
-        request.target = b"/bytes".to_vec();
-        // The root answers the target /bytes with the byte serve: a response frame, and
+        request.target = b"byte-serve".to_vec();
+        // The root answers the target byte-serve with the byte serve: a response frame, and
         // not a step.
         let written = exchange_step(&encode_turn(&encode_request(&request), &[]));
         let response = decode_response(&written).expect("a response frame, not a step");
@@ -637,7 +637,7 @@ fn the_byte_serve_answers_a_provider_that_requests_an_effect_with_the_internal_e
 #[test]
 fn the_byte_serve_answers_a_request_without_an_effect_as_ever_pe_06() {
     let mut request = tool_call("echo", "{}");
-    request.target = b"/bytes".to_vec();
+    request.target = b"byte-serve".to_vec();
     let written = exchange_step(&encode_turn(&encode_request(&request), &[]));
     let response = decode_response(&written).expect("a response frame");
     assert_eq!(response.status, 200);

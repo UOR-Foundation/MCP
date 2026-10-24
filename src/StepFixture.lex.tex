@@ -273,7 +273,7 @@ definition{
   result: Bool,
   body: (match read
     | Result.error fault => false
-    | Result.ok request => (Http::sameBytes (project request target) (Http::asciiOf "/bytes"))),
+    | Result.ok request => (Http::sameBytes (project request target) (Http::asciiOf "byte-serve"))),
   axioms: [Quot.sound, propext],
   executable: true
 }

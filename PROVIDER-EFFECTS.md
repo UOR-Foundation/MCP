@@ -102,6 +102,22 @@ The tests are falsifying evidence. The theorems in `StepLaws` are the kernel-che
 they are about the step and the wire as data, the pre-provider checks that end in `done`
 without the provider being applied, and the byte serve's answer to an effect request.
 
+## Limits
+
+* A record of functions cannot be an exported root's parameter in LexLean 1.2, and
+  `Extension.answerOf` is not an executable definition, so the oracle does not reach
+  `answerOf`. `StepFixture` drives the three outcomes through `Extension.callAnswer`,
+  `readAnswer` and `promptAnswer`, which `answerOf` calls for `tools/call`,
+  `resources/read` and `prompts/get`; that `answerOf` calls them is the reading of its source
+  that `the_three_outcomes_declare_the_constructor_and_answer_of_maps_each_to_the_refusal_pe_01`
+  checks.
+* The kernel cannot evaluate a slice of a byte literal (it stops at the maximum recursion depth),
+  so the laws about reading a turn are stated on `readCompleted`, `turnAfter`, `afterCount` and
+  `closed`, and the reading of concrete bytes is tested by `effects.rs`.
+* The three declared production roots together exceed the 64 MiB `max_total_source_bytes` that
+  `lexlean.toml` configured (67 944 171 bytes), because a production build generates the
+  certificates of every declared root. The limit is 128 MiB.
+
 ## Regenerate
 
 `stepFixtureRun` is the third root of `crates/lifecycle-oracle/generated/request.json`. After
