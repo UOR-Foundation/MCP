@@ -12,6 +12,8 @@
 \importmodule{Methods}
 \importmodule{Refusal}
 \importmodule{Sanitize}
+\importmodule{TaskJson}
+\importmodule{Tasks}
 \title{MCP result bodies as JSON}
 \begin{semanticmodule}
 definition{
@@ -573,8 +575,9 @@ definition{
     | Methods::ResultBody.getPrompt found => (sanitizedMembers (getPromptMembers found))
     | Methods::ResultBody.complete found => (ctor Option.some [(List (String * Json::Json))] (completeMembers found))
     | Methods::ResultBody.getTask found => (ctor Option.none [(List (String * Json::Json))])
-    | Methods::ResultBody.inputRequired found => (ctor Option.none [(List (String * Json::Json))])
-    | Methods::ResultBody.taskCreated found => (ctor Option.none [(List (String * Json::Json))])),
+    | Methods::ResultBody.inputRequired found => (sanitizedMembers (TaskJson::inputRequiredMembers found))
+    | Methods::ResultBody.taskCreated found => (sanitizedMembers (TaskJson::detailedMembers (project (project found entry) task)))
+    | Methods::ResultBody.stored found => (TaskJson::storedMembers found)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }

@@ -11,6 +11,7 @@
 \importmodule{Methods}
 \importmodule{Param}
 \importmodule{Refusal}
+\importmodule{Tasks}
 \importmodule{Validation}
 \title{MCP HTTP exchange}
 \begin{semanticmodule}
@@ -31,7 +32,8 @@ structure{
     {name: fields, type: (List Field)},
     {name: body, type: Bytes},
     {name: toolCalls, type: Nat},
-    {name: allowedHosts, type: (List (List Nat))}
+    {name: allowedHosts, type: (List (List Nat))},
+    {name: host, type: Tasks::TaskHost}
   ]
 }
 
@@ -43,7 +45,8 @@ structure{
     {name: status, type: Nat},
     {name: fields, type: (List Field)},
     {name: notifications, type: (List (List Nat))},
-    {name: body, type: (List Nat)}
+    {name: body, type: (List Nat)},
+    {name: tasks, type: (Option (List Nat))}
   ]
 }
 

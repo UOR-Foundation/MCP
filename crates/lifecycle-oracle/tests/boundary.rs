@@ -7,12 +7,22 @@
 
 mod common;
 
-use common::{call, outcome, post, post_owned, rpc, send, standard, META};
+use common::{call, crowd_checked, outcome, post, post_owned, rpc, send, standard, META};
 use lifecycle_oracle::Request;
 use serde_json::{json, Value};
 
 fn discover(id: &str) -> String {
     rpc("server/discover", &format!(r#"{{"_meta":{META}}}"#), id)
+}
+
+/// The status and error code of the second root, which offers tools and nothing else.
+fn crowd_outcome(request: &Request) -> (u32, Option<i64>) {
+    let response = crowd_checked(request);
+    let body: Value = serde_json::from_slice(&response.body).expect("JSON");
+    (
+        response.status,
+        body.pointer("/error/code").and_then(Value::as_i64),
+    )
 }
 
 fn with_headers(method: &str, name: Option<&str>, body: &str) -> Request {
@@ -144,6 +154,7 @@ fn only_post_is_served_and_anything_else_is_405_with_allow_post_lc_09() {
             fields: vec![],
             body: discover("1").into_bytes(),
             tool_calls: 0,
+            host: lifecycle_oracle::TaskHost::default(),
         };
         let response = common::exchange_checked(&request).expect("a response frame");
         assert_eq!(response.status, 405, "method {method:?}");
@@ -263,10 +274,13 @@ fn the_version_is_checked_before_the_route_and_the_params_lc_10() {
 
 #[test]
 fn the_route_is_checked_before_the_params_lc_10() {
-    // tasks/get is a known method the fixture does not offer; its params are invalid.
-    let body = rpc("tasks/get", &format!(r#"{{"_meta":{META}}}"#), "1");
-    let headers = standard("tasks/get", Some("anything"));
-    assert_eq!(outcome(&post_owned(&headers, &body)), (404, Some(-32601)));
+    // resources/read is a known method the second root does not offer; its params are invalid.
+    let body = rpc("resources/read", &format!(r#"{{"_meta":{META}}}"#), "1");
+    let headers = standard("resources/read", Some("anything"));
+    assert_eq!(
+        crowd_outcome(&post_owned(&headers, &body)),
+        (404, Some(-32601))
+    );
     // prompts/get is offered, so the same fault in its params is reached and refused
     let body = rpc("prompts/get", &format!(r#"{{"_meta":{META}}}"#), "1");
     let headers = standard("prompts/get", Some("anything"));
@@ -275,18 +289,22 @@ fn the_route_is_checked_before_the_params_lc_10() {
 
 #[test]
 fn a_header_check_runs_even_for_a_method_the_server_does_not_offer_lc_10() {
-    // tasks/get is not offered, but a missing Mcp-Name is still a header mismatch.
+    // resources/read is not offered by the second root, but a missing Mcp-Name is still a
+    // header mismatch.
     let body = rpc(
-        "tasks/get",
-        &format!(r#"{{"taskId":"t-1","_meta":{META}}}"#),
+        "resources/read",
+        &format!(r#"{{"uri":"file:///a","_meta":{META}}}"#),
         "1",
     );
     assert_eq!(
-        outcome(&post_owned(&standard("tasks/get", None), &body)),
+        crowd_outcome(&post_owned(&standard("resources/read", None), &body)),
         (400, Some(-32020))
     );
     assert_eq!(
-        outcome(&post_owned(&standard("tasks/get", Some("t-1")), &body)),
+        crowd_outcome(&post_owned(
+            &standard("resources/read", Some("file:///a")),
+            &body
+        )),
         (404, Some(-32601))
     );
 }

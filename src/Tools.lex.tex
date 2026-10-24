@@ -216,6 +216,20 @@ definition{
 }
 
 definition{
+  name: checkArguments,
+  parameters: [tool : Content::Tool, params : Methods::CallToolParams],
+  result: (Result (Option Methods::ResultBody) Refusal::ProviderRefusal),
+  body: (match (Schema::validate (ctor Json::Json.object (project (project tool inputSchema) members)) (ctor Json::Json.object (project (project tool inputSchema) members)) (argumentsOf params))
+    | Schema::Verdict.valid => (ctor Result.ok [(Option Methods::ResultBody), Refusal::ProviderRefusal] (ctor Option.none [Methods::ResultBody]))
+    | Schema::Verdict.invalid path keyword => (ctor Result.ok [(Option Methods::ResultBody), Refusal::ProviderRefusal] (ctor Option.some [Methods::ResultBody] (ctor Methods::ResultBody.callTool (textResult (invalidText path keyword) true))))
+    | Schema::Verdict.malformed keyword => (ctor Result.error [(Option Methods::ResultBody), Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the inputSchema is malformed"))
+    | Schema::Verdict.unresolved target => (ctor Result.error [(Option Methods::ResultBody), Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the inputSchema has an unresolved reference"))
+    | Schema::Verdict.exhausted => (ctor Result.error [(Option Methods::ResultBody), Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the inputSchema exceeded the validation budget"))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
   name: answerCall,
   parameters: [
     tools : (List Content::Tool),
@@ -286,7 +300,8 @@ definition{
       | Methods::ResultBody.getTask found => false
       | Methods::ResultBody.acknowledged => false
       | Methods::ResultBody.inputRequired found => false
-      | Methods::ResultBody.taskCreated found => false)),
+      | Methods::ResultBody.taskCreated found => false
+      | Methods::ResultBody.stored found => false)),
   executable: true
 }
 

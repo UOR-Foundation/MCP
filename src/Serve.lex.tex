@@ -18,6 +18,9 @@
 \importmodule{RpcWire}
 \importmodule{Sanitize}
 \importmodule{Status}
+\importmodule{TaskJson}
+\importmodule{TaskServe}
+\importmodule{Tasks}
 \importmodule{Tools}
 \importmodule{Transport}
 \importmodule{Validation}
@@ -99,7 +102,7 @@ definition{
   name: internalResponse,
   parameters: [],
   result: Http::HttpResponse,
-  body: (record Http::HttpResponse {status := (Status::serverErrorStatus), fields := (jsonFields), notifications := (nil (List Nat)), body := (internalBody)}),
+  body: (record Http::HttpResponse {status := (Status::serverErrorStatus), fields := (jsonFields), notifications := (nil (List Nat)), body := (internalBody), tasks := (ctor Option.none [(List Nat)])}),
   executable: true
 }
 
@@ -107,7 +110,7 @@ definition{
   name: notAllowedResponse,
   parameters: [],
   result: Http::HttpResponse,
-  body: (record Http::HttpResponse {status := (Status::methodNotAllowedStatus), fields := (cons (record Http::Field {name := (allowName), value := (postValue)}) (nil Http::Field)), notifications := (nil (List Nat)), body := (nil Nat)}),
+  body: (record Http::HttpResponse {status := (Status::methodNotAllowedStatus), fields := (cons (record Http::Field {name := (allowName), value := (postValue)}) (nil Http::Field)), notifications := (nil (List Nat)), body := (nil Nat), tasks := (ctor Option.none [(List Nat)])}),
   executable: true
 }
 
@@ -117,7 +120,7 @@ definition{
   result: Http::HttpResponse,
   body: (match (JsonWrite::writeList message)
     | Result.error refusal => (internalResponse)
-    | Result.ok produced => (record Http::HttpResponse {status := status, fields := (jsonFields), notifications := (nil (List Nat)), body := produced})),
+    | Result.ok produced => (record Http::HttpResponse {status := status, fields := (jsonFields), notifications := (nil (List Nat)), body := produced, tasks := (ctor Option.none [(List Nat)])})),
   axioms: [Quot.sound, propext],
   executable: true
 }
@@ -180,13 +183,76 @@ definition{
 }
 
 definition{
+  name: taskNoteBytes,
+  parameters: [found : Tasks::StoredTask],
+  result: (Option (List (List Nat))),
+  body: (if (Tasks::notifies found) then (match (TaskJson::notificationJson (project (project found entry) task))
+    | Option.none => (ctor Option.none [(List (List Nat))])
+    | Option.some note => (match (Sanitize::sanitizeJson note)
+      | Option.none => (ctor Option.none [(List (List Nat))])
+      | Option.some cleaned => (match (JsonWrite::writeList cleaned)
+        | Result.error refusal => (ctor Option.none [(List (List Nat))])
+        | Result.ok produced => (ctor Option.some [(List (List Nat))] (cons produced (nil (List Nat))))))) else (ctor Option.some [(List (List Nat))] (nil (List Nat)))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: taskNotes,
+  parameters: [stored : (Option Tasks::StoredTask)],
+  result: (Option (List (List Nat))),
+  body: (match stored
+    | Option.none => (ctor Option.some [(List (List Nat))] (nil (List Nat)))
+    | Option.some found => (taskNoteBytes found)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: allNotes,
+  parameters: [progress : (Option (List (List Nat))), tasks : (Option (List (List Nat)))],
+  result: (Option (List (List Nat))),
+  body: (match progress
+    | Option.none => (ctor Option.none [(List (List Nat))])
+    | Option.some built => (match tasks
+      | Option.none => (ctor Option.none [(List (List Nat))])
+      | Option.some more => (ctor Option.some [(List (List Nat))] (JsonRead::reverseOnto [(List Nat)] more built)))),
+  executable: true
+}
+
+definition{
+  name: withTable,
+  parameters: [written : (Option (Option (List Nat))), response : Http::HttpResponse],
+  result: Http::HttpResponse,
+  body: (match written
+    | Option.none => (internalResponse)
+    | Option.some table => (record Http::HttpResponse {status := (project response status), fields := (project response fields), notifications := (project response notifications), body := (project response body), tasks := table})),
+  executable: true
+}
+
+definition{
+  name: withStore,
+  parameters: [
+    host : Tasks::TaskHost,
+    stored : (Option Tasks::StoredTask),
+    response : Http::HttpResponse
+  ],
+  result: Http::HttpResponse,
+  body: (match stored
+    | Option.none => response
+    | Option.some found => (if ((project response status) =? (Status::okStatus)) then (withTable (TaskServe::tableAfter host found) response) else response)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
   name: respond,
-  parameters: [accepts : Bool, handled : Dispatch::Handled],
+  parameters: [host : Tasks::TaskHost, accepts : Bool, handled : Dispatch::Handled],
   result: Http::HttpResponse,
   body: (match (project handled outcome)
     | Result.ok reply => (match (ResultJson::resultObject reply)
       | Option.none => (internalResponse)
-      | Option.some found => (withNotes accepts (jsonResponse (Status::okStatus) (RpcWire::resultResponse (project handled id) found)) (notesOnto (project reply notes) (nil (List Nat)))))
+      | Option.some found => (withStore host (Methods::storedOf (project reply body)) (withNotes accepts (jsonResponse (Status::okStatus) (RpcWire::resultResponse (project handled id) found)) (allNotes (notesOnto (project reply notes) (nil (List Nat))) (taskNotes (Methods::storedOf (project reply body)))))))
     | Result.error refusal => (jsonResponse (Status::statusOf refusal) (RpcWire::errorResponse (ctor Option.some [JsonRpc::RequestId] (project handled id)) (Refusal::errorObjectOf refusal)))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
@@ -195,6 +261,7 @@ definition{
 definition{
   name: answerRequest,
   parameters: [
+    host : Tasks::TaskHost,
     info : Extension::ProviderInfo,
     answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
     used : Nat,
@@ -202,7 +269,7 @@ definition{
     rpc : JsonRpc::Request
   ],
   result: Http::HttpResponse,
-  body: (respond (Transport::acceptsStream fields) (Dispatch::handleWith info answer used (ctor Option.some [Validation::Headers] (Http::headersOf fields (project info paramRules) (toolNameOf rpc) (project rpc method))) (Validation::supportedVersions) rpc)),
+  body: (respond host (Transport::acceptsStream fields) (Dispatch::handleWith info answer used (ctor Option.some [Validation::Headers] (Http::headersOf fields (project info paramRules) (toolNameOf rpc) (project rpc method))) (Validation::supportedVersions) rpc)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -210,6 +277,7 @@ definition{
 definition{
   name: afterDecode,
   parameters: [
+    host : Tasks::TaskHost,
     info : Extension::ProviderInfo,
     answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
     used : Nat,
@@ -219,7 +287,7 @@ definition{
   result: Http::HttpResponse,
   body: (match decoded
     | Result.error fault => (jsonResponse (Status::faultStatus fault) (RpcWire::errorResponse (RpcWire::faultId fault) (RpcWire::faultObject fault)))
-    | Result.ok rpc => (answerRequest info answer used fields rpc)),
+    | Result.ok rpc => (answerRequest host info answer used fields rpc)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -227,6 +295,7 @@ definition{
 definition{
   name: afterParse,
   parameters: [
+    host : Tasks::TaskHost,
     info : Extension::ProviderInfo,
     answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
     used : Nat,
@@ -236,7 +305,7 @@ definition{
   result: Http::HttpResponse,
   body: (match parsed
     | Result.error refusal => (jsonResponse (Status::badRequestStatus) (RpcWire::errorResponse (ctor Option.none [JsonRpc::RequestId]) (RpcWire::faultObject (ctor RpcWire::Fault.parseError))))
-    | Result.ok message => (afterDecode info answer used fields (RpcWire::decodeRequest message))),
+    | Result.ok message => (afterDecode host info answer used fields (RpcWire::decodeRequest message))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -254,11 +323,11 @@ definition{
   name: serveOpen,
   parameters: [
     info : Extension::ProviderInfo,
-    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    answerWith : (Fn (Tasks::TaskHost Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
     request : Http::HttpRequest
   ],
   result: Http::HttpResponse,
-  body: (if (Http::isPost (project request method)) then (afterParse info answer (project request toolCalls) (project request fields) (JsonRead::readJson (project request body))) else (notAllowedResponse)),
+  body: (if (Http::isPost (project request method)) then (afterParse (project request host) info (fun [answerWith, request] (typed : Methods::ClientRequest) => (apply answerWith (project request host) typed)) (project request toolCalls) (project request fields) (JsonRead::readJson (project request body))) else (notAllowedResponse)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -267,14 +336,14 @@ definition{
   name: serveGated,
   parameters: [
     info : Extension::ProviderInfo,
-    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    answerWith : (Fn (Tasks::TaskHost Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
     request : Http::HttpRequest,
     gate : (Option Transport::TransportRefusal)
   ],
   result: Http::HttpResponse,
   body: (match gate
     | Option.some refusal => (forbiddenResponse refusal)
-    | Option.none => (serveOpen info answer request)),
+    | Option.none => (serveOpen info answerWith request)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -283,26 +352,26 @@ definition{
   name: serveRequest,
   parameters: [
     info : Extension::ProviderInfo,
-    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    answerWith : (Fn (Tasks::TaskHost Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
     request : Http::HttpRequest
   ],
   result: Http::HttpResponse,
-  body: (serveGated info answer request (Transport::gateOf (project request fields) (project request allowedHosts))),
+  body: (serveGated info answerWith request (Transport::gateOf (project request fields) (project request allowedHosts))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
 definition{
-  name: serve,
+  name: serveTasks,
   parameters: [
     info : Extension::ProviderInfo,
-    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    answerWith : (Fn (Tasks::TaskHost Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
     input : Bytes
   ],
   result: (List Nat),
   body: (match (Frame::readRequest input)
     | Result.error fault => (Frame::writeResponse (internalResponse))
-    | Result.ok request => (Frame::writeResponse (serveRequest info answer request))),
+    | Result.ok request => (Frame::writeResponse (serveRequest info answerWith request))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
