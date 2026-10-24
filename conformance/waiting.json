@@ -1,55 +1,30 @@
 {
   "spec": "2026-07-28",
   "waiting": {
-    "input-required-result-basic-elicitation": {
-      "issue": 10,
-      "pr": 30,
-      "reason": "the tools and prompt the scenario calls are registered by the input-required results of MCP#10"
-    },
-    "input-required-result-basic-sampling": {
-      "issue": 10,
-      "pr": 30,
-      "reason": "the tools and prompt the scenario calls are registered by the input-required results of MCP#10"
-    },
-    "input-required-result-basic-list-roots": {
-      "issue": 10,
-      "pr": 30,
-      "reason": "the tools and prompt the scenario calls are registered by the input-required results of MCP#10"
-    },
     "input-required-result-request-state": {
       "issue": 10,
       "pr": 30,
-      "reason": "the tools and prompt the scenario calls are registered by the input-required results of MCP#10"
+      "reason": "the scenario's tool needs a requestState and the core refuses to write one without the host's key (IR-16), and the conformance application's request frame has no section that carries it; the key section of the application is the open work (MCP#10, INPUT-REQUIRED.md, Not met)"
     },
     "input-required-result-multiple-input-requests": {
       "issue": 10,
       "pr": 30,
-      "reason": "the tools and prompt the scenario calls are registered by the input-required results of MCP#10"
+      "reason": "the scenario's tool needs a requestState and the core refuses to write one without the host's key (IR-16), and the conformance application's request frame has no section that carries it; the key section of the application is the open work (MCP#10, INPUT-REQUIRED.md, Not met)"
     },
     "input-required-result-multi-round": {
       "issue": 10,
       "pr": 30,
-      "reason": "the tools and prompt the scenario calls are registered by the input-required results of MCP#10"
-    },
-    "input-required-result-non-tool-request": {
-      "issue": 10,
-      "pr": 30,
-      "reason": "the tools and prompt the scenario calls are registered by the input-required results of MCP#10"
-    },
-    "input-required-result-result-type": {
-      "issue": 10,
-      "pr": 30,
-      "reason": "the tools and prompt the scenario calls are registered by the input-required results of MCP#10"
+      "reason": "the scenario's tool needs a requestState and the core refuses to write one without the host's key (IR-16), and the conformance application's request frame has no section that carries it; the key section of the application is the open work (MCP#10, INPUT-REQUIRED.md, Not met)"
     },
     "input-required-result-tampered-state": {
       "issue": 10,
       "pr": 30,
-      "reason": "the tools and prompt the scenario calls are registered by the input-required results of MCP#10"
+      "reason": "the scenario's tool needs a requestState and the core refuses to write one without the host's key (IR-16), and the conformance application's request frame has no section that carries it; the key section of the application is the open work (MCP#10, INPUT-REQUIRED.md, Not met)"
     },
     "input-required-result-capability-check": {
       "issue": 10,
       "pr": 30,
-      "reason": "the tools and prompt the scenario calls are registered by the input-required results of MCP#10"
+      "reason": "the scenario's tool needs a requestState and the core refuses to write one without the host's key (IR-16), and the conformance application's request frame has no section that carries it; the key section of the application is the open work (MCP#10, INPUT-REQUIRED.md, Not met)"
     },
     "tasks-lifecycle": {
       "issue": 12,

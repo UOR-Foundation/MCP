@@ -195,7 +195,7 @@ site is a vector, and that the check identifiers of the file and of the vectors 
 
 A vector the root fails is a defect of the root. A vector it passes shows that this request meets these
 checks in process. It is not the verdict of the suite: the suite run against the conformance build (issue
-#13) is, and it has not been done.
+#13) is, and it is reported under "Not met".
 
 ## Planted defects
 
@@ -219,8 +219,15 @@ packages equal a fresh export, and `cargo test --workspace`, `cargo fmt --all --
 
 ## Not met
 
-* The acceptance of #10 is that the fourteen scenarios pass against the conformance build (#13). That
-  build does not exist yet and the scenarios have not been run. Not met.
+* The acceptance of #10 is that the fourteen scenarios pass against the conformance build (#13). Nine
+  pass in the run of `CONFORMANCE-RUN.md` (`basic-elicitation`, `basic-sampling`, `basic-list-roots`,
+  `missing-input-response`, `non-tool-request`, `result-type`, `unsupported-methods`,
+  `ignore-extra-params`, `validate-input`). Five fail: `request-state`, `multiple-input-requests`,
+  `multi-round`, `tampered-state` and `capability-check`. Their tools ask for a state, the core writes
+  one only with the host's key, and the declaration of the conformance application has one frame
+  section, the count of tool calls, and none for the key, so the core refuses them with an internal
+  error (IR-16, as designed). The scenarios wait in `conformance/waiting.json`. Not met until the
+  application declares a key section and its host supplies the key.
 * The suite validates each request and response against its own wire schema; here every response is
   validated against the specification's JSON Schema by another validator, which is falsifying evidence.
 * Replay: the state is not bound to the arguments, a principal or a time ([The `requestState`](#the-requeststate)).
