@@ -199,7 +199,23 @@ checks in process. It is not the verdict of the suite: the suite run against the
 
 ## Planted defects
 
-PLANTED
+Each defect was planted alone in the sources of a tree on which every gate passed, run on a CI runner
+on a throwaway branch, and never reached this branch: the branch holding the plant was deleted.
+Six are stopped by the kernel, one by the oracle.
+
+| Defect | Planted in | Gate | Command | Diagnostic |
+| --- | --- | --- | --- | --- |
+| a state is tagged without its method | `RequestState.tagOf`: `(context method name)` replaced by `(context 0x name)` | kernel | `lexlean verify src/SealLaws.lex.tex` | `LLV7002`, `Tactic rfl failed` in `a_tag_that_matches_opens_to_its_payload` (`SealLaws.lex.tex:16`). The theorem `a_state_sealed_for_another_method_is_refused` of `ScopeLaws` did not see it: its tag is a literal computed without the defect, so a changed tag is still refused, and `lexlean verify src/ScopeLaws.lex.tex` passed |
+| the outer pad of HMAC is the inner pad | `Hmac.hmacDigest`: `1549556828` (0x5c5c5c5c) replaced by `909522486` (0x36363636) | kernel | `lexlean verify src/Hmac.lex.tex` | `LLV7002`, `Tactic rfl failed` in each of the six RFC 4231 theorems, the last reported being `rfc4231_case_7` (`Hmac.lex.tex:244`) |
+| a key of any length seals a state | `RequestState.minKeyBytes`: `32` replaced by `0` | kernel | `lexlean verify src/RequestState.lex.tex` | `LLV7002`, `Tactic rfl failed` in `a_short_key_does_not_seal` (`RequestState.lex.tex:192`) and in `the_key_floor_is_the_digest_size` (`:208`, goal `minKeyBytes = 32`) |
+| an input-required result with nothing in it is sent | `InputGuard.hasContent`: the empty request list answers `true` | kernel | `lexlean verify src/InputGuard.lex.tex` | `LLV7002`, `Tactic rfl failed` in `an_input_required_result_with_nothing_in_it_is_refused` (`InputGuard.lex.tex:410`) |
+| a request for a capability the client did not declare is sent | `Dispatch.pendingGate`: `(if covered then` replaced by `(if (not covered) then` | kernel | `lexlean verify src/Dispatch.lex.tex` | `LLV7002`, `Tactic rfl failed` in `uncovered_input_request_is_a_missing_capability` (`Dispatch.lex.tex:470`, goal `pendingGate ... needed false`) and in `covered_input_request_is_an_input_required_reply` (`:477`) |
+| a state that fails verification is a server error | `Status.providerStatus`: `invalidRequestState` answers `serverErrorStatus` for `badRequestStatus` | kernel | `lexlean verify src/Status.lex.tex` | `LLV7002`, `Tactic rfl failed` in `a_request_state_that_fails_verification_is_a_bad_request` (`Status.lex.tex:303`, goal `statusOf (...invalidRequestState) = 400`) and in the generated law that ties `statusOf` to the code (`:147`) |
+| the host's key reaches the root 31 bytes long | `lifecycle-oracle` `encode_request`: `put_chunk` of the key cut to its first 31 bytes | oracle | `cargo test -p lifecycle-oracle --test input_required` | passes `lexlean verify` (the root is not exported again); 14 of the 28 tests fail, among them `a_result_that_needs_a_state_is_not_sent_without_a_key_of_at_least_32_bytes_ir_16`, `a_state_that_was_altered_is_refused_with_invalid_params_and_the_tool_does_not_run_ir_11` and `the_frame_carries_the_key_after_the_count_and_a_cut_or_longer_frame_is_the_fixed_error_ir_18` |
+
+Restored result: the plants are not on this branch. On this branch `lexlean verify` passes in CI, the two
+packages equal a fresh export, and `cargo test --workspace`, `cargo fmt --all -- --check` and
+`cargo clippy --workspace --all-targets --locked -- -D warnings` pass.
 
 ## Not met
 
