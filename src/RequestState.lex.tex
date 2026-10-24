@@ -1,0 +1,229 @@
+\begin{lexlean}{RequestState}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Hmac}
+\importmodule{JsonText}
+\title{Tamper-evident request state}
+\begin{semanticmodule}
+definition{name: minKeyBytes, parameters: [], result: Nat, body: 32, executable: true}
+
+definition{
+  name: u32Bytes,
+  parameters: [value : Nat],
+  result: Bytes,
+  body: (prim append (JsonText::byteOf (prim remainder (prim quotient value 16777216 0 : Nat) 256 0 : Nat)) (prim append (JsonText::byteOf (prim remainder (prim quotient value 65536 0 : Nat) 256 0 : Nat)) (prim append (JsonText::byteOf (prim remainder (prim quotient value 256 0 : Nat) 256 0 : Nat)) (JsonText::byteOf (prim remainder value 256 0 : Nat)) : Bytes) : Bytes) : Bytes),
+  executable: true
+}
+
+definition{
+  name: context,
+  parameters: [method : Bytes, name : Bytes],
+  result: Bytes,
+  body: (prim append (u32Bytes (prim length method : Nat)) (prim append method (prim append (u32Bytes (prim length name : Nat)) name : Bytes) : Bytes) : Bytes),
+  executable: true
+}
+
+definition{
+  name: tagOf,
+  parameters: [key : Bytes, method : Bytes, name : Bytes, payload : Bytes],
+  result: Bytes,
+  body: (Hmac::hmac key (prim append (context method name) payload : Bytes)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: hexDigitByte,
+  parameters: [nibble : Nat],
+  result: Bytes,
+  body: (JsonText::byteOf (if (nibble <? 10) then (48 + nibble) else (87 + nibble))),
+  executable: true
+}
+
+definition{
+  name: hexOfByte,
+  parameters: [value : Nat],
+  result: Bytes,
+  body: (prim append (hexDigitByte (prim quotient value 16 0 : Nat)) (hexDigitByte (prim remainder value 16 0 : Nat)) : Bytes),
+  executable: true
+}
+
+definition{
+  name: hexEncode,
+  parameters: [source : Bytes],
+  result: Bytes,
+  body: (second (prim iterate (fun [source] (state : (Nat * Bytes)) => (((first state) + 1), (prim append (second state) (hexOfByte (JsonText::byteAt source (first state))) : Bytes))) (prim length source : Nat) (0, (JsonText::emptyBytes)) : (Nat * Bytes))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: hexValue,
+  parameters: [code : Nat],
+  result: Nat,
+  body: (if (code <? 48) then 16 else (if (code <? 58) then (prim subtract code 48 : Nat) else (if (code <? 97) then 16 else (if (code <? 103) then (prim subtract code 87 : Nat) else 16)))),
+  executable: true
+}
+
+definition{
+  name: hexStep,
+  parameters: [source : Bytes, state : (Nat * (Bytes * Nat))],
+  result: (Nat * (Bytes * Nat)),
+  body: (let high : Nat := (hexValue (JsonText::byteAt source (first state))); (let low : Nat := (hexValue (JsonText::byteAt source ((first state) + 1))); (if ((high <? 16) && (low <? 16)) then (((first state) + 2), ((prim append (first (second state)) (JsonText::byteOf ((prim multiply high 16 : Nat) + low)) : Bytes), (second (second state)))) else (((first state) + 2), ((first (second state)), ((second (second state)) + 1)))))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: hexDecode,
+  parameters: [source : Bytes],
+  result: (Option Bytes),
+  body: (if ((prim remainder (prim length source : Nat) 2 0 : Nat) =? 0) then (let folded : (Nat * (Bytes * Nat)) := (prim iterate (fun [source] (state : (Nat * (Bytes * Nat))) => (hexStep source state)) (prim quotient (prim length source : Nat) 2 0 : Nat) (0, ((JsonText::emptyBytes), 0)) : (Nat * (Bytes * Nat))); (if ((second (second folded)) =? 0) then (ctor Option.some [Bytes] (first (second folded))) else (ctor Option.none [Bytes]))) else (ctor Option.none [Bytes])),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: dotAt,
+  parameters: [source : Bytes],
+  result: Nat,
+  body: (second (prim iterate (fun [source] (state : (Nat * Nat)) => (((first state) + 1), (if ((second state) =? (prim length source : Nat)) then (if ((JsonText::byteAt source (first state)) =? 46) then (first state) else (second state)) else (second state)))) (prim length source : Nat) (0, (prim length source : Nat)) : (Nat * Nat))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: sealBytes,
+  parameters: [key : Bytes, method : Bytes, name : Bytes, payload : Bytes],
+  result: (Option Bytes),
+  body: (if ((minKeyBytes) <=? (prim length key : Nat)) then (ctor Option.some [Bytes] (prim append (hexEncode payload) (prim append 0x2e (hexEncode (tagOf key method name payload)) : Bytes) : Bytes)) else (ctor Option.none [Bytes])),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: openChecked,
+  parameters: [
+    key : Bytes,
+    method : Bytes,
+    name : Bytes,
+    payload : (Option Bytes),
+    tag : (Option Bytes)
+  ],
+  result: (Option Bytes),
+  body: (match payload
+    | Option.none => (ctor Option.none [Bytes])
+    | Option.some given => (match tag
+      | Option.none => (ctor Option.none [Bytes])
+      | Option.some presented => (if (Hmac::sameTag (tagOf key method name given) presented) then (ctor Option.some [Bytes] given) else (ctor Option.none [Bytes])))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: openSplit,
+  parameters: [key : Bytes, method : Bytes, name : Bytes, state : Bytes, dot : Nat],
+  result: (Option Bytes),
+  body: (match (prim slice state 0 dot : (Option Bytes))
+    | Option.none => (ctor Option.none [Bytes])
+    | Option.some payloadHex => (match (prim slice state (dot + 1) (prim subtract (prim length state : Nat) (dot + 1) : Nat) : (Option Bytes))
+      | Option.none => (ctor Option.none [Bytes])
+      | Option.some tagHex => (openChecked key method name (hexDecode payloadHex) (hexDecode tagHex)))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: openBytes,
+  parameters: [key : Bytes, method : Bytes, name : Bytes, state : Bytes],
+  result: (Option Bytes),
+  body: (if ((minKeyBytes) <=? (prim length key : Nat)) then (if ((dotAt state) =? (prim length state : Nat)) then (ctor Option.none [Bytes]) else (openSplit key method name state (dotAt state))) else (ctor Option.none [Bytes])),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: sealState,
+  parameters: [key : Bytes, method : String, name : String, payload : String],
+  result: (Option String),
+  body: (match (sealBytes key (prim utf8_encode method : Bytes) (prim utf8_encode name : Bytes) (prim utf8_encode payload : Bytes))
+    | Option.none => (ctor Option.none [String])
+    | Option.some sealed => (prim utf8_decode sealed : (Option String))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: openState,
+  parameters: [key : Bytes, method : String, name : String, state : String],
+  result: (Option String),
+  body: (match (openBytes key (prim utf8_encode method : Bytes) (prim utf8_encode name : Bytes) (prim utf8_encode state : Bytes))
+    | Option.none => (ctor Option.none [String])
+    | Option.some payload => (prim utf8_decode payload : (Option String))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+theorem{
+  name: the_check_is_the_comparison_of_the_tags,
+  parameters: [key : Bytes, method : Bytes, name : Bytes, payload : Bytes, presented : Bytes],
+  statement: ((openChecked key method name (ctor Option.some [Bytes] payload) (ctor Option.some [Bytes] presented)) = (if (Hmac::sameTag (tagOf key method name payload) presented) then (ctor Option.some [Bytes] payload) else (ctor Option.none [Bytes]))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_state_without_a_dot_is_refused,
+  parameters: [],
+  statement: ((openBytes 0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f 0x746f6f6c732f63616c6c 0x6563686f 0x36313632) = (ctor Option.none [Bytes])),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: an_empty_state_is_refused,
+  parameters: [],
+  statement: ((openBytes 0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f 0x746f6f6c732f63616c6c 0x6563686f 0x) = (ctor Option.none [Bytes])),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_short_key_does_not_seal,
+  parameters: [],
+  statement: ((sealBytes 0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e 0x746f6f6c732f63616c6c 0x6563686f 0x726571756573742d7374617465) = (ctor Option.none [Bytes])),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_short_key_does_not_open,
+  parameters: [],
+  statement: ((openBytes 0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e 0x746f6f6c732f63616c6c 0x6563686f 0x37323635373137353635373337343264373337343631373436352e36366431316431343461393235396231633064396438663035626465326639396330633561313362336135613133646436653136353139396435613732386662) = (ctor Option.none [Bytes])),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: the_key_floor_is_the_digest_size,
+  parameters: [],
+  statement: ((minKeyBytes) = 32),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_four_byte_length_is_big_endian,
+  parameters: [],
+  statement: ((u32Bytes 258) = 0x00000102),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_context_is_the_two_lengths_the_method_and_the_name,
+  parameters: [],
+  statement: ((context 0x6162 0x63) = 0x0000000261620000000163),
+  proof: reflexivity{}
+}
+\end{semanticmodule}
+\end{lexlean}

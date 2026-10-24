@@ -112,6 +112,12 @@ pub struct Request {
     /// and the client identity; the core only compares the count with the limit its
     /// provider declares (`LIFECYCLE.md`, "The boundary encoding").
     pub tool_calls: u32,
+    /// The key the host holds for `requestState` (SEP-2322): the secret reference
+    /// `request-state-key` of issue 10. The core keeps no secret of its own, so the host
+    /// reads the key from its secret store and passes it with every request, the way it
+    /// passes `tool_calls`; the core computes and checks an HMAC with it
+    /// (`INPUT-REQUIRED.md`). An empty key, or one shorter than 32 bytes, is no key.
+    pub state_key: Vec<u8>,
     /// The clock, the identifier for a new task and the task table of this request.
     pub host: TaskHost,
 }
@@ -158,9 +164,21 @@ fn put_chunk(out: &mut Vec<u8>, bytes: &[u8]) {
 
 /// Encode a request as the frame the root reads: a length-prefixed method, a
 /// length-prefixed target, the field count, each field as a length-prefixed name and
-/// value, a length-prefixed body, and the four-byte count of tool calls the host has
-/// already counted for this client, every length and count four bytes big-endian.
+/// value, a length-prefixed body, the four-byte count of tool calls the host has
+/// already counted for this client and, when the host holds one, the length-prefixed
+/// `requestState` key, every length and count four bytes big-endian. A request whose
+/// [`TaskHost`] is not the default also carries the host section of the tasks
+/// extension after the allow-list (`LIFECYCLE.md`); the default writes nothing for it.
 pub fn encode_request(request: &Request) -> Vec<u8> {
+    encode_request_allowing(request, &[])
+}
+
+/// [`encode_request`] with the host's allow-list of `Origin` and `Host` names: a
+/// four-byte count and each name length-prefixed. An empty list writes nothing unless
+/// the host section follows, which it then precedes with a count of 0
+/// (`TRANSPORT.md`, "The allow-list"). The list follows the `requestState` key, which a
+/// frame without a key writes as a zero length when anything follows it.
+pub fn encode_request_allowing(request: &Request, allowed_hosts: &[Vec<u8>]) -> Vec<u8> {
     let mut out = Vec::new();
     put_chunk(&mut out, &request.method);
     put_chunk(&mut out, &request.target);
@@ -171,23 +189,23 @@ pub fn encode_request(request: &Request) -> Vec<u8> {
     }
     put_chunk(&mut out, &request.body);
     put_u32(&mut out, request.tool_calls as usize);
-    out.extend_from_slice(&request.host.now_ms.to_be_bytes());
-    put_chunk(&mut out, request.host.now.as_bytes());
-    put_chunk(&mut out, request.host.fresh_id.as_bytes());
-    put_chunk(&mut out, &request.host.table);
-    out
-}
-
-/// [`encode_request`] followed by the host's allow-list of `Origin` and `Host` names: a
-/// four-byte count and each name length-prefixed. An empty list writes nothing, so the
-/// frame is the one [`encode_request`] writes (`TRANSPORT.md`, "The allow-list").
-pub fn encode_request_allowing(request: &Request, allowed_hosts: &[Vec<u8>]) -> Vec<u8> {
-    let mut out = encode_request(request);
-    if !allowed_hosts.is_empty() {
+    let with_host = request.host != TaskHost::default();
+    if !request.state_key.is_empty() {
+        put_chunk(&mut out, &request.state_key);
+    } else if !allowed_hosts.is_empty() || with_host {
+        put_chunk(&mut out, &[]);
+    }
+    if !allowed_hosts.is_empty() || with_host {
         put_u32(&mut out, allowed_hosts.len());
         for name in allowed_hosts {
             put_chunk(&mut out, name);
         }
+    }
+    if with_host {
+        out.extend_from_slice(&request.host.now_ms.to_be_bytes());
+        put_chunk(&mut out, request.host.now.as_bytes());
+        put_chunk(&mut out, request.host.fresh_id.as_bytes());
+        put_chunk(&mut out, &request.host.table);
     }
     out
 }

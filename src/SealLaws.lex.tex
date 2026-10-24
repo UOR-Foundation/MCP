@@ -1,0 +1,40 @@
+\begin{lexlean}{SealLaws}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{RequestState}
+\title{Sealing laws}
+\begin{semanticmodule}
+theorem{
+  name: a_payload_is_sealed_as_hex_payload_dot_hex_tag,
+  parameters: [],
+  statement: ((RequestState::sealBytes 0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f 0x746f6f6c732f63616c6c 0x6563686f 0x726571756573742d7374617465) = (ctor Option.some [Bytes] 0x37323635373137353635373337343264373337343631373436352e36366431316431343461393235396231633064396438663035626465326639396330633561313362336135613133646436653136353139396435613732386662)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_tag_that_matches_opens_to_its_payload,
+  parameters: [],
+  statement: ((RequestState::openChecked 0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f 0x746f6f6c732f63616c6c 0x6563686f (ctor Option.some [Bytes] 0x726571756573742d7374617465) (ctor Option.some [Bytes] 0x66d11d144a9259b1c0d9d8f05bde2f99c0c5a13b3a5a13dd6e165199d5a728fb)) = (ctor Option.some [Bytes] 0x726571756573742d7374617465)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_state_with_a_changed_tag_is_refused,
+  parameters: [],
+  statement: ((RequestState::openChecked 0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f 0x746f6f6c732f63616c6c 0x6563686f (ctor Option.some [Bytes] 0x726571756573742d7374617465) (ctor Option.some [Bytes] 0x66d11d144a9259b1c0d9d8f05bde2f99c0c5a13b3a5a13dd6e165199d5a728fa)) = (ctor Option.none [Bytes])),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_state_with_a_changed_payload_is_refused,
+  parameters: [],
+  statement: ((RequestState::openChecked 0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f 0x746f6f6c732f63616c6c 0x6563686f (ctor Option.some [Bytes] 0x726571756573742d737461746521) (ctor Option.some [Bytes] 0x66d11d144a9259b1c0d9d8f05bde2f99c0c5a13b3a5a13dd6e165199d5a728fb)) = (ctor Option.none [Bytes])),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+\end{semanticmodule}
+\end{lexlean}

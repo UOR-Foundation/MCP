@@ -2,6 +2,8 @@
 //! generated root, and the pins the register records.
 #![allow(dead_code)]
 
+pub mod application;
+
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -173,8 +175,15 @@ pub fn post(headers: &[(&str, &str)], body: &str) -> Request {
             .collect(),
         body: body.as_bytes().to_vec(),
         tool_calls: 0,
+        state_key: Vec::new(),
         host: lifecycle_oracle::TaskHost::default(),
     }
+}
+
+/// `request`, sent when the host holds `key` as the `requestState` key.
+pub fn keyed(mut request: Request, key: &[u8]) -> Request {
+    request.state_key = key.to_vec();
+    request
 }
 
 /// `request`, sent when the host has already counted `tool_calls` tool calls for the
@@ -213,6 +222,7 @@ pub fn request_of(vector: &Value) -> Request {
         tool_calls: request.get("tool_calls").map_or(0, |n| {
             u32::try_from(n.as_u64().expect("tool_calls")).expect("u32")
         }),
+        state_key: Vec::new(),
         host: lifecycle_oracle::TaskHost::default(),
     }
 }

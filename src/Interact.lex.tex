@@ -1,0 +1,85 @@
+\begin{lexlean}{Interact}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Content}
+\importmodule{Input}
+\importmodule{Methods}
+\importmodule{Refusal}
+\importmodule{Tools}
+\title{Interactive tools}
+\begin{semanticmodule}
+inductive{
+  name: Step,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: finished, fields: [Methods::Progressed]},
+    {name: asks, fields: [Input::InputRequiredResult]}
+  ]
+}
+
+definition{
+  name: stepBody,
+  parameters: [tool : Content::Tool, stepped : (Result Step Refusal::ProviderRefusal)],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match stepped
+    | Result.error refusal => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] refusal)
+    | Result.ok taken => (match taken
+      | Step.finished done => (Tools::checkExecuted tool done)
+      | Step.asks needed => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.inputRequired needed)))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: answerInteractive,
+  parameters: [
+    tools : (List Content::Tool),
+    behave : (Fn (Methods::CallToolParams) (Result Step Refusal::ProviderRefusal)),
+    params : Methods::CallToolParams
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match (Tools::findTool (project params name) tools)
+    | Option.none => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.unknownTool (project params name)))
+    | Option.some tool => (Tools::checkArguments tool params (fun [behave, tool] (given : Methods::CallToolParams) => (stepBody tool (apply behave given))))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+theorem{
+  name: a_tool_that_asks_answers_input_required,
+  parameters: [tool : Content::Tool, needed : Input::InputRequiredResult],
+  statement: ((stepBody tool (ctor Result.ok [Step, Refusal::ProviderRefusal] (ctor Step.asks needed))) = (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.inputRequired needed))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_tool_that_finishes_has_its_result_checked,
+  parameters: [tool : Content::Tool, done : Methods::Progressed],
+  statement: ((stepBody tool (ctor Result.ok [Step, Refusal::ProviderRefusal] (ctor Step.finished done))) = (Tools::checkExecuted tool done)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_refusal_of_the_tool_is_passed_on,
+  parameters: [tool : Content::Tool, refusal : Refusal::ProviderRefusal],
+  statement: ((stepBody tool (ctor Result.error [Step, Refusal::ProviderRefusal] refusal)) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] refusal)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: an_unlisted_interactive_tool_is_an_unknown_tool,
+  parameters: [
+    behave : (Fn (Methods::CallToolParams) (Result Step Refusal::ProviderRefusal)),
+    params : Methods::CallToolParams
+  ],
+  statement: ((answerInteractive (nil Content::Tool) behave params) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.unknownTool (project params name)))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+\end{semanticmodule}
+\end{lexlean}

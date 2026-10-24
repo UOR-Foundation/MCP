@@ -743,6 +743,130 @@
     ]
    },
    "note": "The scenario is listed pending and not scored in requirements/2026-07-28.yaml; the last check is the whole JSON_SCHEMA_2020_12_FIXTURE of the scenario file, member for member."
+  },
+  {
+   "id": "TS-10",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 887,
+   "quote": "const frames = await listenToStream(",
+   "suite_checks": [
+    "sep-2575-http-server-no-independent-requests-on-stream"
+   ],
+   "register": [
+    "TL-19"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ],
+     [
+      "Mcp-Name",
+      "test_streaming_elicitation"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":701,\"method\":\"tools/call\",\"params\":{\"name\":\"test_streaming_elicitation\",\"arguments\":{},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"elicitation\":{}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/method",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/content/0/text",
+      "eq": "Streaming complete"
+     }
+    ]
+   },
+   "note": "The probe reads the response stream and fails on a frame that carries a method other than notifications/*, or on a call that is rejected outright. The tool answers one text result; the id is the scenario's Date.now(), fixed here."
+  },
+  {
+   "id": "TS-11",
+   "scenario": "server-stateless",
+   "file": "src/scenarios/server/stateless.ts",
+   "line": 947,
+   "quote": "const frames = await listenToStream(",
+   "suite_checks": [
+    "sep-2575-server-no-log-without-loglevel"
+   ],
+   "register": [
+    "TL-19"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/call"
+     ],
+     [
+      "Mcp-Name",
+      "test_logging_tool"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":702,\"method\":\"tools/call\",\"params\":{\"name\":\"test_logging_tool\",\"arguments\":{},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/method",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/content/0/text",
+      "eq": "Logging evaluated"
+     }
+    ]
+   },
+   "note": "The request sets no log level, so no notifications/message may be written; the core declares no logging capability and writes none with a level either (TL-19). The id is the scenario's Date.now(), fixed here."
   }
  ],
  "not_run": [

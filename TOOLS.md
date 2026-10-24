@@ -4,7 +4,7 @@ The core lists and calls the tools of a provider's catalog, validates the argume
 call and the result of a tool against their JSON Schema, reports progress, limits the
 rate of calls and sanitizes what it writes, for revision 2026-07-28. It is LexLean
 source in language 1.2 (`src/*.lex.tex`); the host adapter (PrismPM issue 216) moves
-bytes and nothing else. Issue #8; register rows TL-01 to TL-18.
+bytes and nothing else. Issue #8; register rows TL-01 to TL-18; TL-19 (#13) adds the two diagnostic tools of `server-stateless`.
 
 ## Where it lives
 
@@ -22,7 +22,7 @@ bytes and nothing else. Issue #8; register rows TL-01 to TL-18.
 | `src/Methods`, `Dispatch`, `Refusal`, `Status`, `JsonRpc`, `ResultJson`, `RpcWire`, `Http`, `Frame`, `Serve`, `Extension` | extended: progress steps travel with a result, the new refusals have codes and statuses, the result encoders cover every content block, and the frames carry the rate-limit count and the notifications |
 | `crates/lifecycle-oracle/generated/mcp_lifecycle`, `mcp_crowd` | LexLean's exports of the two roots, unedited |
 | `crates/lifecycle-oracle/vectors/tools.json` | the requests of the tool scenarios, with file and line at the pinned suite commit |
-| `crates/lifecycle-oracle/tests/tools.rs`, `stress.rs`, `provenance.rs` | TL-01 to TL-18 |
+| `crates/lifecycle-oracle/tests/tools.rs`, `stress.rs`, `provenance.rs` | TL-01 to TL-19 |
 | `crates/lifecycle-oracle/suite/conformance-232a9014457eaf4c59559916e3d616d2f7f28f05` | now eight vendored suite files: also `tools.ts`, `json-schema-2020-12.ts` and `everything-server.ts` |
 
 Regenerate the packages after any change to the sources, as [LIFECYCLE.md](LIFECYCLE.md)
@@ -178,6 +178,21 @@ with an independent reader of the WHATWG format.
 | `test_tool_with_progress` | steps 0, 50 and 100 of 100 | `tools.ts`, `everything-server.ts` |
 | `json_schema_2020_12_tool` | the focal `inputSchema` | `JSON_SCHEMA_2020_12_FIXTURE` of `json-schema-2020-12.ts` |
 | `test_arguments`, `test_nested_header`, `test_structured_output`, `test_bad_structured_output`, `test_bad_payload`, `test_unsafe_text`, `test_backward_progress` | tools of this repository that the register rows need: a schema with bounds, a nested header, structured output that conforms and that does not, a bad payload, text with controls, progress that goes back | none: not in the suite |
+| `test_streaming_elicitation` | text `Streaming complete`, nothing else on the stream (#13) | `stateless.ts` line 887, `everything-server.ts` |
+| `test_logging_tool` | text `Logging evaluated`; no `notifications/message`, with or without a `logLevel` (#13) | `stateless.ts` line 947, `everything-server.ts` |
+
+The reference server writes a progress notification before the result of `test_streaming_elicitation`
+and a `notifications/message` after a `logLevel` for `test_logging_tool`. The probes check neither: the
+first fails on a frame that carries a method other than `notifications/*`, the second on a
+`notifications/message` when no level was set. The core writes progress only for a request that carries a
+`progressToken` (TL-09), declares no `logging` capability and so writes no log message, and asks nothing of
+the client on the stream: a request for input is an input-required result in the answer (#10). The two
+tools answer a text result in every case. `subscriptions/listen` stays unregistered; the five checks of
+`server-stateless` that need it are skipped by the suite for a server that advertises no list-changed or
+subscribe capability, which the specification schema makes optional (`ServerCapabilities`, `ToolListChangedNotification`:
+"An optional notification").
+
+The catalog also lists the eight tools that ask the client for input (`test_input_required_result_*`), which are described in [INPUT-REQUIRED.md](INPUT-REQUIRED.md#the-fixture-tools); they come after the tools above and share the argument check of `tools/call`.
 
 ## Kernel theorems
 
@@ -208,6 +223,7 @@ covered by the tests of `tests/tools.rs` and `tests/stress.rs`, which run LexLea
 | TL-09 to TL-12, TL-14, TL-15 | `tests/tools.rs` |
 | TL-16, TL-17 | `ToolLaws.lex.tex` (76 theorems) and `Tools.lex.tex` (2, the rate-limit decision), checked by `lexlean verify`, the limits of which are stated in [Kernel theorems](#kernel-theorems), and the tests that name them |
 | TL-18 | `tests/stress.rs`, `tests/provenance.rs` |
+| TL-19 | `tests/tools.rs` over the vectors TS-10 and TS-11 and the probes beyond them |
 
 ## Planted defects
 

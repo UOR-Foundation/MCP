@@ -154,8 +154,8 @@ transport. Their standing now:
 | 1037, 1144 | `subscriptions/listen` | vectors PL-02 and PL-03: the core does not register the method and answers 404 with -32601; the scenario's `listenRejected` (line 1007) reads that as a feature that is absent because PL-01 shows `server/discover` advertises no `listChanged` or `subscribe` capability |
 | 1043, 1150 | the `tools/call` that mutates the tool list once the stream delivers its first frame | not reached: the stream is refused, so no frame arrives (`not_run`) |
 | 1209, 1279 and 1215, 1285 | list-changed streams and their triggers | not reached: the scenario returns `skipped` at lines 1193 and 1263 because the capability is not declared (PL-01) (`not_run`) |
-| 887 | `test_streaming_elicitation` | not run: the fixture does not list the tool, an elicitation call is an input-required result (#10) |
-| 947 | `test_logging_tool` | not run: the fixture does not list the tool and declares no logging capability |
+| 887 | `test_streaming_elicitation` | vector TS-10: the fixture lists the tool (TL-19) and answers a text result; nothing but the result is on the stream |
+| 947 | `test_logging_tool` | vector TS-11: the fixture lists the tool (TL-19), declares no logging capability and writes no `notifications/message` |
 
 This is the suite's own reading of a server that offers no subscription: PL-01 to PL-03 show the
 core gives it the inputs that make the probes skip. Registering `subscriptions/listen`, a stream
@@ -247,8 +247,7 @@ fresh export, and `cargo test --workspace`, `cargo fmt --all -- --check`, `cargo
   `Host` it received being passed in the frame, TLS and authentication (PrismPM#216).
 * `subscriptions/listen`, list-changed notifications and `notifications/message` are not
   registered. The streaming probes of `server-stateless` that need them are not reached by the
-  fixture (it advertises none), and two probes (lines 887 and 947) call diagnostic tools that
-  the fixture does not list. See [the probes](#the-streaming-probes-of-server-stateless).
+  fixture (it advertises none). See [the probes](#the-streaming-probes-of-server-stateless).
 * Whether the suite's `server-sse-multiple-streams` reports `SUCCESS` or `INFO` for its second
   check depends on the answer: with `tools/list` the core answers JSON, which the scenario
   reports as `INFO` ("SSE streaming is optional"); only an answer with notifications is a

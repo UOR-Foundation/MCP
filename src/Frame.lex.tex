@@ -94,20 +94,7 @@ definition{
   name: withHosts,
   parameters: [request : Http::HttpRequest, hosts : (List (List Nat))],
   result: Http::HttpRequest,
-  body: (record Http::HttpRequest {method := (project request method), target := (project request target), fields := (project request fields), body := (project request body), toolCalls := (project request toolCalls), allowedHosts := hosts, host := (project request host)}),
-  executable: true
-}
-
-definition{
-  name: afterCalls,
-  parameters: [source : Bytes, request : Http::HttpRequest, position : Nat],
-  result: (Result Http::HttpRequest FrameFault),
-  body: (if (position =? (prim length source : Nat)) then (ctor Result.ok [Http::HttpRequest, FrameFault] request) else (match (u32At source position)
-    | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated position))
-    | Option.some total => (match (readNames source (position + 4) total (nil (List Nat)))
-      | Result.error fault => (ctor Result.error [Http::HttpRequest, FrameFault] fault)
-      | Result.ok read => (if ((second read) =? (prim length source : Nat)) then (ctor Result.ok [Http::HttpRequest, FrameFault] (withHosts request (first read))) else (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.trailing (second read))))))),
-  axioms: [Quot.sound, propext],
+  body: (record Http::HttpRequest {method := (project request method), target := (project request target), fields := (project request fields), body := (project request body), toolCalls := (project request toolCalls), allowedHosts := hosts, stateKey := (project request stateKey), host := (project request host)}),
   executable: true
 }
 
@@ -203,7 +190,28 @@ definition{
   result: (Result Http::HttpRequest FrameFault),
   body: (match host
     | Result.error fault => (ctor Result.error [Http::HttpRequest, FrameFault] fault)
-    | Result.ok found => (afterCalls source (record Http::HttpRequest {method := (project request method), target := (project request target), fields := (project request fields), body := (project request body), toolCalls := (project request toolCalls), allowedHosts := (project request allowedHosts), host := (first found)}) (second found))),
+    | Result.ok found => (if ((second found) =? (prim length source : Nat)) then (ctor Result.ok [Http::HttpRequest, FrameFault] (record Http::HttpRequest {method := (project request method), target := (project request target), fields := (project request fields), body := (project request body), toolCalls := (project request toolCalls), allowedHosts := (project request allowedHosts), stateKey := (project request stateKey), host := (first found)})) else (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.trailing (second found))))),
+  executable: true
+}
+
+definition{
+  name: afterCalls,
+  parameters: [source : Bytes, request : Http::HttpRequest, position : Nat],
+  result: (Result Http::HttpRequest FrameFault),
+  body: (if (position =? (prim length source : Nat)) then (ctor Result.ok [Http::HttpRequest, FrameFault] request) else (match (u32At source position)
+    | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated position))
+    | Option.some total => (match (readNames source (position + 4) total (nil (List Nat)))
+      | Result.error fault => (ctor Result.error [Http::HttpRequest, FrameFault] fault)
+      | Result.ok read => (finishHost source (withHosts request (first read)) (readHostOrDefault source (second read)))))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: keyChunk,
+  parameters: [source : Bytes, position : Nat],
+  result: (Option Chunk),
+  body: (if (position =? (prim length source : Nat)) then (ctor Option.some [Chunk] (record Chunk {bytes := 0x, next := position})) else (chunkAt source position)),
   axioms: [Quot.sound, propext],
   executable: true
 }
@@ -216,7 +224,9 @@ definition{
     | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated (second read)))
     | Option.some body => (match (u32At source (project body next))
       | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated (project body next)))
-      | Option.some calls => (finishHost source (record Http::HttpRequest {method := (JsonText::bytesToList (project method bytes)), target := (JsonText::bytesToList (project target bytes)), fields := (first read), body := (project body bytes), toolCalls := calls, allowedHosts := (nil (List Nat)), host := (record Tasks::TaskHost {nowMs := (0 : Int), now := "", freshId := "", table := (JsonText::emptyBytes)})}) (readHostOrDefault source ((project body next) + 4))))),
+      | Option.some calls => (match (keyChunk source ((project body next) + 4))
+        | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated ((project body next) + 4)))
+        | Option.some key => (afterCalls source (record Http::HttpRequest {method := (JsonText::bytesToList (project method bytes)), target := (JsonText::bytesToList (project target bytes)), fields := (first read), body := (project body bytes), toolCalls := calls, allowedHosts := (nil (List Nat)), stateKey := (project key bytes), host := (record Tasks::TaskHost {nowMs := (0 : Int), now := "", freshId := "", table := (JsonText::emptyBytes)})}) (project key next))))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }

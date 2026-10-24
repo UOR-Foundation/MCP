@@ -154,6 +154,7 @@ fn only_post_is_served_and_anything_else_is_405_with_allow_post_lc_09() {
             fields: vec![],
             body: discover("1").into_bytes(),
             tool_calls: 0,
+            state_key: Vec::new(),
             host: lifecycle_oracle::TaskHost::default(),
         };
         let response = common::exchange_checked(&request).expect("a response frame");
