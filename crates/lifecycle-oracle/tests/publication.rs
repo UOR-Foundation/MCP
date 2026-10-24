@@ -207,6 +207,9 @@ fn identity(root: &Path) -> Value {
     json(&root.join("conformance/core-identity.json"))
 }
 
+/// A change planted in an extracted archive.
+type Plant<'a> = &'a dyn Fn(&Path);
+
 fn crate_file(out: &Path, version: &str) -> PathBuf {
     out.join(format!("{CRATE}-{version}.crate"))
 }
@@ -505,7 +508,7 @@ fn an_existing_archive_is_checked_against_the_tree_pb_05() {
     succeeded(&script(&tree, &["--release", "--verify", archive_text]));
 
     // Each copy is the made crate with one change, and the made crate is refused for it.
-    let cases: [(&str, &dyn Fn(&Path)); 3] = [
+    let cases: [(&str, Plant); 3] = [
         ("file-tampered", &|dir| {
             let lib = dir.join("src/lib.rs");
             let mut bytes = fs::read(&lib).expect("src/lib.rs");
