@@ -72,6 +72,7 @@ definition{
   parameters: [head : String, tail : String],
   result: String,
   body: (prim join (cons head (cons tail (nil String))) "" : String),
+  axioms: [propext],
   executable: true
 }
 
@@ -124,6 +125,7 @@ definition{
     | List.cons head rest => (match rest
       | List.nil => (if ((project head tag) =? 1) then (rawText (joined "read:" (outcomeText (project head outcome)))) else (rawMismatch))
       | List.cons next more => (rawMismatch))),
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
@@ -138,6 +140,7 @@ definition{
       | List.cons last more => (match more
         | List.nil => (if ((project head tag) =? 1) then (if ((project last tag) =? 2) then (rawText (joined (joined "chain:" (outcomeText (project head outcome))) (joined "|" (outcomeText (project last outcome))))) else (rawMismatch)) else (rawMismatch))
         | List.cons beyond again => (rawMismatch)))),
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
@@ -154,6 +157,7 @@ definition{
   parameters: [completed : (List HostEffect::Completed), params : Methods::CallToolParams],
   result: (Result Methods::Progressed Refusal::ProviderRefusal),
   body: (if (Fixture::isTool params "effect_read") then (readBehaviour completed params) else (if (Fixture::isTool params "effect_chain") then (chainBehaviour completed params) else (if (Fixture::isTool params "effect_edge_ok") then (edgeBehaviour completed 4294967295) else (edgeBehaviour completed 4294967296)))),
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
@@ -174,6 +178,7 @@ definition{
     | List.cons head rest => (match rest
       | List.nil => (if ((project head tag) =? 3) then (ctor Result.ok [Extension::CallOutcome, Refusal::ProviderRefusal] (ctor Extension::CallOutcome.complete (Tools::textResult (joined "call:" (outcomeText (project head outcome))) false))) else (ctor Result.error [Extension::CallOutcome, Refusal::ProviderRefusal] (logMismatch)))
       | List.cons next more => (ctor Result.error [Extension::CallOutcome, Refusal::ProviderRefusal] (logMismatch)))),
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
@@ -194,6 +199,7 @@ definition{
     | List.cons head rest => (match rest
       | List.nil => (if ((project head tag) =? 4) then (ctor Result.ok [Extension::ReadOutcome, Refusal::ProviderRefusal] (ctor Extension::ReadOutcome.complete (itemContents (project params uri) (joined "item:" (outcomeText (project head outcome)))))) else (ctor Result.error [Extension::ReadOutcome, Refusal::ProviderRefusal] (logMismatch)))
       | List.cons next more => (ctor Result.error [Extension::ReadOutcome, Refusal::ProviderRefusal] (logMismatch)))),
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
@@ -214,6 +220,7 @@ definition{
     | List.cons head rest => (match rest
       | List.nil => (if ((project head tag) =? 5) then (ctor Result.ok [Extension::PromptOutcome, Refusal::ProviderRefusal] (ctor Extension::PromptOutcome.complete (promptResult (joined "prompt:" (outcomeText (project head outcome)))))) else (ctor Result.error [Extension::PromptOutcome, Refusal::ProviderRefusal] (logMismatch)))
       | List.cons next more => (ctor Result.error [Extension::PromptOutcome, Refusal::ProviderRefusal] (logMismatch)))),
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
@@ -267,6 +274,7 @@ definition{
   body: (match read
     | Result.error fault => false
     | Result.ok request => (Http::sameBytes (project request target) (Http::asciiOf "/bytes"))),
+  axioms: [Quot.sound, propext],
   executable: true
 }
 

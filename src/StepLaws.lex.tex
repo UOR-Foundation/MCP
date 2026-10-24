@@ -25,21 +25,24 @@ theorem{
   name: a_done_step_is_the_word_zero_and_the_response,
   parameters: [response : (List Nat)],
   statement: ((StepServe::stepList (ctor HostEffect::Step.done response)) = (prim append (Frame::u32List 0) response : (List Nat))),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
 }
 
 theorem{
   name: a_perform_step_is_the_word_one_the_tag_and_the_payload,
   parameters: [request : HostEffect::EffectRequest],
   statement: ((StepServe::stepList (ctor HostEffect::Step.perform request)) = (prim append (Frame::u32List 1) (prim append (Frame::u32List (project request tag)) (JsonText::bytesToList (project request payload)) : (List Nat)) : (List Nat))),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
 }
 
 theorem{
   name: a_turn_with_no_completed_effect_is_read_back,
   parameters: [source : Bytes, position : Nat, built : (List HostEffect::Completed)],
   statement: ((StepServe::readCompleted source position 0 built) = (ctor Result.ok [((List HostEffect::Completed) * Nat), Frame::FrameFault] ((JsonRead::reverseOnto [HostEffect::Completed] built (nil HostEffect::Completed)), position))),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
 }
 
 theorem{
@@ -50,21 +53,24 @@ theorem{
     | Option.some tag => (match (Frame::chunkAt source (position + 4))
       | Option.none => (ctor Result.error [((List HostEffect::Completed) * Nat), Frame::FrameFault] (ctor Frame::FrameFault.truncated (position + 4)))
       | Option.some outcome => (StepServe::readCompleted source (project outcome next) below (cons (record HostEffect::Completed {tag := tag, outcome := (project outcome bytes)}) built))))),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
 }
 
 theorem{
   name: a_turn_cut_inside_the_request_is_a_fault,
   parameters: [input : Bytes],
   statement: ((StepServe::turnAfter input (ctor Option.none [Frame::Chunk])) = (ctor Result.error [StepServe::Turn, Frame::FrameFault] (ctor Frame::FrameFault.truncated 0))),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
 }
 
 theorem{
   name: a_turn_with_no_count_is_a_fault,
   parameters: [source : Bytes, request : Frame::Chunk],
   statement: ((StepServe::afterCount source request (ctor Option.none [Nat])) = (ctor Result.error [StepServe::Turn, Frame::FrameFault] (ctor Frame::FrameFault.truncated (project request next)))),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
 }
 
 theorem{
@@ -119,7 +125,8 @@ theorem{
     refusal : Transport::TransportRefusal
   ],
   statement: ((StepServe::serveGatedStep info answer request (ctor Option.some [Transport::TransportRefusal] refusal)) = (ctor HostEffect::Step.done (Frame::writeResponse (Serve::forbiddenResponse refusal)))),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -135,7 +142,8 @@ theorem{
     key : Bytes
   ],
   statement: ((StepServe::serveOpenStep info answer (record Http::HttpRequest {method := (cons 71 (cons 69 (cons 84 (nil Nat)))), target := target, fields := fields, body := body, toolCalls := calls, allowedHosts := hosts, stateKey := key})) = (ctor HostEffect::Step.done (Frame::writeResponse (Serve::notAllowedResponse)))),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -148,7 +156,8 @@ theorem{
     refusal : JsonText::JsonRefusal
   ],
   statement: ((StepServe::afterParseStep info answer used fields (ctor Result.error [Json::Json, JsonText::JsonRefusal] refusal)) = (ctor HostEffect::Step.done (Frame::writeResponse (Serve::jsonResponse (Status::badRequestStatus) (RpcWire::errorResponse (ctor Option.none [JsonRpc::RequestId]) (RpcWire::faultObject (ctor RpcWire::Fault.parseError))))))),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -161,7 +170,8 @@ theorem{
     fault : RpcWire::Fault
   ],
   statement: ((StepServe::afterDecodeStep info answer used fields (ctor Result.error [JsonRpc::Request, RpcWire::Fault] fault)) = (ctor HostEffect::Step.done (Frame::writeResponse (Serve::jsonResponse (Status::faultStatus fault) (RpcWire::errorResponse (RpcWire::faultId fault) (RpcWire::faultObject fault)))))),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -172,7 +182,8 @@ theorem{
     request : Http::HttpRequest
   ],
   statement: ((StepServe::serveRequestStep info answer request) = (StepServe::serveGatedStep info answer request (Transport::gateOf (project request fields) (project request allowedHosts)))),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -197,7 +208,8 @@ theorem{
   name: a_handled_request_that_ended_in_an_effect_is_a_perform,
   parameters: [accepts : Bool, ident : JsonRpc::RequestId, payload : Bytes],
   statement: ((StepServe::stepOfHandled accepts (record Dispatch::Handled {id := ident, outcome := (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.effectRequested (record HostEffect::EffectRequest {tag := 4294967295, payload := payload}))))})) = (ctor HostEffect::Step.perform (record HostEffect::EffectRequest {tag := 4294967295, payload := payload}))),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -209,14 +221,16 @@ theorem{
     method : String
   ],
   statement: (((StepServe::stepOfHandled accepts (record Dispatch::Handled {id := ident, outcome := (ctor Result.ok [Dispatch::Reply, Refusal::Refusal] reply)})) = (ctor HostEffect::Step.done (Frame::writeResponse (Serve::respond accepts (record Dispatch::Handled {id := ident, outcome := (ctor Result.ok [Dispatch::Reply, Refusal::Refusal] reply)}))))) /\ ((StepServe::stepOfHandled accepts (record Dispatch::Handled {id := ident, outcome := (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound method))})) = (ctor HostEffect::Step.done (Frame::writeResponse (Serve::respond accepts (record Dispatch::Handled {id := ident, outcome := (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound method))})))))),
-  proof: constructor{branches: [reflexivity{}, reflexivity{}]}
+  proof: constructor{branches: [reflexivity{}, reflexivity{}]},
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
   name: a_tag_that_does_not_fit_thirty_two_bits_is_not_a_perform,
   parameters: [accepts : Bool, ident : JsonRpc::RequestId, payload : Bytes],
   statement: ((StepServe::stepOfHandled accepts (record Dispatch::Handled {id := ident, outcome := (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.effectRequested (record HostEffect::EffectRequest {tag := 4294967296, payload := payload}))))})) = (ctor HostEffect::Step.done (Frame::writeResponse (Serve::respond accepts (record Dispatch::Handled {id := ident, outcome := (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (StepServe::tagRefusal))}))))),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -228,7 +242,8 @@ theorem{
     fault : Frame::FrameFault
   ],
   statement: ((StepServe::stepOfTurn info answerWith turn (ctor Result.error [Http::HttpRequest, Frame::FrameFault] fault)) = (ctor HostEffect::Step.done (Frame::writeResponse (Serve::internalResponse)))),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -249,7 +264,8 @@ theorem{
   name: the_byte_serve_answers_an_effect_request_with_the_internal_error,
   parameters: [accepts : Bool, ident : JsonRpc::RequestId, request : HostEffect::EffectRequest],
   statement: ((Serve::respond accepts (record Dispatch::Handled {id := ident, outcome := (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.effectRequested request)))})) = (Serve::jsonResponse 500 (RpcWire::errorResponse (ctor Option.some [JsonRpc::RequestId] ident) (record JsonRpc::ErrorObject {code := (-32603 : Int), message := "Internal error", data := (ctor Option.none [Json::Json])})))),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 \end{semanticmodule}
 \end{lexlean}
