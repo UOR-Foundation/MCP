@@ -517,7 +517,7 @@ pub fn step_response_checked(frame: &[u8]) -> Response {
 /// The frame the byte root writes for a frame: the answer the step root must give when
 /// no effect is requested.
 pub fn byte_root_frame(frame: &[u8]) -> Vec<u8> {
-    exchange_frame(frame)
+    lifecycle_oracle::exchange_frame(frame)
 }
 
 /// Run one request through the second generated root, the one over a catalog of many
