@@ -643,7 +643,10 @@ fn a_frame_cut_inside_the_allow_list_or_followed_by_bytes_is_unreadable_sh_08() 
     let good = encode_request_allowing(&request, &names(&["evil.example.com", "second.test"]));
     assert!(good.len() > base.len() + 8);
     assert_eq!(frame_checked(&good).expect("a response").status, 200);
+    // A frame that ends after the empty key chunk the allow-list follows carries no allow-list:
+    // the frame of a host with a key and no list, which is readable.
     let mut frames: Vec<Vec<u8>> = (base.len() + 1..good.len())
+        .filter(|cut| *cut != base.len() + 4)
         .map(|cut| good[..cut].to_vec())
         .collect();
     let mut trailing = good.clone();
