@@ -208,18 +208,22 @@ reproduced; lexlean-mcp checks the program digest.
 
 ## Planted defects
 
-Each was planted alone in the sources of a clean tree (a `git worktree` of this commit), the
-production build and the host rebuilt, and the run repeated. A reverted tree is the clean run
-above.
+Each was planted alone against the green state (the 19 waiting scenarios failing and every
+other scenario passing, exit 0), the build and the run repeated. A reverted tree is the clean run
+above. "Green" below means the exit status of `server-suite.mjs`, which is the status of step 9a.
 
-| Defect | Planted in | Core digest | Run | Diagnostic |
-| --- | --- | --- | --- | --- |
-| `test_simple_text` answers an empty content array instead of its text block | `src/Fixture.lex.tex`, the `callTool` of the fixture provider | `8f1335055a9149073644484f22f1aa59f6feb1190b647ebe34e0d21b17a1b01c`, not the recorded one | 26 of 37 required pass, `tools-call-simple-text` fails and is `unexplained` in the classification | `tools-call-simple-text: tools-call-simple-text: content array is empty; No text content found` |
+| Defect | Planted in | Run | Diagnostic |
+| --- | --- | --- | --- |
+| `test_simple_text` answers an empty content array instead of its text block | `src/Fixture.lex.tex`, the `callTool` of the fixture provider; production build and host rebuilt, core digest `8f1335055a9149073644484f22f1aa59f6feb1190b647ebe34e0d21b17a1b01c` | exit 1; 26 of 37 required pass; `check_core_identity` fails as well: `the program differs from the committed export mcp_lifecycle` | `FAILING and not named in waiting.json (1): tools-call-simple-text`, then `tools-call-simple-text: tools-call-simple-text: content array is empty; No text content found` |
+| a failing scenario is not listed | `conformance/waiting.json` without `tasks-lifecycle`, same build | exit 1 | `FAILING and not named in waiting.json (1): tasks-lifecycle`, then the suite's check messages, and `the failing scenarios are not the ones .../waiting.json names` |
+| a listed scenario passes (stale) | `conformance/waiting.json` with `caching` added, same build | exit 1 | `named as waiting but not failing (1): caching` |
+| an entry names neither an issue nor a pull request | `conformance/waiting.json`, `tasks-lifecycle` with only a reason | exit 1 | `named as waiting without an issue or a pull request (1): tasks-lifecycle` |
+| the split is broken by dropping `#[ignore]` from `the_schema_oracle_node_tests_pass_cf_04` | `crates/lifecycle-oracle/tests/conformance.rs`; `cargo test -p lifecycle-oracle --test conformance` with `MCP_CONFORMANCE_SUITE_ROOT` unset, as in the SDK image | exit 101; `the_schema_oracle_node_tests_pass_cf_04` fails and so does CF-08 | `MCP_CONFORMANCE_SUITE_ROOT names the installed conformance suite (conformance/oracle/fetch-suite.sh DIR installs it): NotPresent` (the failure that turned `bootstrap` red), and CF-08: `the_schema_oracle_node_tests_pass_cf_04 needs node or the installed suite and is not ignored: the workspace gate runs without them` |
+| the conformance job selects fewer ignored tests than the source ignores | `run_oracle_tests` with the filter `cf_03` after `-- --ignored` | exit 1 | `1 passed of the ignored tests, expected 4` |
 
-The defect passes `lexlean check` and the production build of the conformance project, whose
+The first defect passes `lexlean check` and the production build of the conformance project, whose
 entrypoints are the declaration and the fixture root, and so is found by the suite and by the
-core identity record, not by the kernel. `check_core_identity` fails on it as well, since the
-program digest moves.
+core identity record, not by the kernel.
 
 ## The PrismPM pin, and what slice 3 still needs
 
