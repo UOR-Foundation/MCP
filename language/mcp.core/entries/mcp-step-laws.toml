@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-step-laws"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "StepLaws"
+component = "StepLaws"
+
+[[form]]
+id = "mcp-step-laws"
+channel = "text"
+surface = "MCP step laws"
+canonical_source = true
+features = ["sentence-case", "singular"]

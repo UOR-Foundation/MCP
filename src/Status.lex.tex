@@ -48,7 +48,8 @@ definition{
     | Refusal::ProviderRefusal.badToolOutput reason => (serverErrorStatus)
     | Refusal::ProviderRefusal.rateLimited limit => (tooManyRequestsStatus)
     | Refusal::ProviderRefusal.missingCapability required => (badRequestStatus)
-    | Refusal::ProviderRefusal.internal reason => (serverErrorStatus)),
+    | Refusal::ProviderRefusal.internal reason => (serverErrorStatus)
+    | Refusal::ProviderRefusal.effectRequested request => (serverErrorStatus)),
   executable: true
 }
 
@@ -165,7 +166,8 @@ theorem{
             {proof: reflexivity{}, binders: [reason], constructor: badToolOutput},
             {proof: reflexivity{}, binders: [limit], constructor: rateLimited},
             {proof: reflexivity{}, binders: [required], constructor: missingCapability},
-            {proof: reflexivity{}, binders: [reason], constructor: internal}
+            {proof: reflexivity{}, binders: [reason], constructor: internal},
+            {proof: reflexivity{}, binders: [request], constructor: effectRequested}
           ],
           scrutinee: inner
         },

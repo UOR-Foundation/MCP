@@ -1,0 +1,304 @@
+\begin{lexlean}{StepServe}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Dispatch}
+\importmodule{Frame}
+\importmodule{HostEffect}
+\importmodule{Http}
+\importmodule{Json}
+\importmodule{JsonRead}
+\importmodule{JsonRpc}
+\importmodule{JsonText}
+\importmodule{Methods}
+\importmodule{Refusal}
+\importmodule{RpcWire}
+\importmodule{Serve}
+\importmodule{Status}
+\importmodule{Transport}
+\importmodule{Validation}
+\importmodule{Extension}
+\title{MCP step serving}
+\begin{semanticmodule}
+structure{
+  name: Turn,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: request, type: Bytes}, {name: completed, type: (List HostEffect::Completed)}]
+}
+
+structure{
+  name: Asked,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: completed, type: (List HostEffect::Completed)},
+    {name: request, type: Methods::ClientRequest}
+  ]
+}
+
+definition{
+  name: readCompleted,
+  parameters: [source : Bytes, position : Nat, count : Nat, built : (List HostEffect::Completed)],
+  result: (Result ((List HostEffect::Completed) * Nat) Frame::FrameFault),
+  body: (match count
+    | Nat.zero => (ctor Result.ok [((List HostEffect::Completed) * Nat), Frame::FrameFault] ((JsonRead::reverseOnto [HostEffect::Completed] built (nil HostEffect::Completed)), position))
+    | Nat.succ below => (match (Frame::u32At source position)
+      | Option.none => (ctor Result.error [((List HostEffect::Completed) * Nat), Frame::FrameFault] (ctor Frame::FrameFault.truncated position))
+      | Option.some tag => (match (Frame::chunkAt source (position + 4))
+        | Option.none => (ctor Result.error [((List HostEffect::Completed) * Nat), Frame::FrameFault] (ctor Frame::FrameFault.truncated (position + 4)))
+        | Option.some outcome => (readCompleted source (project outcome next) below (cons (record HostEffect::Completed {tag := tag, outcome := (project outcome bytes)}) built))))),
+  axioms: [Quot.sound, propext],
+  executable: true,
+  recursive_argument: count
+}
+
+definition{
+  name: finishTurn,
+  parameters: [source : Bytes, request : Bytes, read : ((List HostEffect::Completed) * Nat)],
+  result: (Result Turn Frame::FrameFault),
+  body: (if ((second read) =? (prim length source : Nat)) then (ctor Result.ok [Turn, Frame::FrameFault] (record Turn {request := request, completed := (first read)})) else (ctor Result.error [Turn, Frame::FrameFault] (ctor Frame::FrameFault.trailing (second read)))),
+  executable: true
+}
+
+definition{
+  name: afterRequest,
+  parameters: [source : Bytes, request : Frame::Chunk],
+  result: (Result Turn Frame::FrameFault),
+  body: (match (Frame::u32At source (project request next))
+    | Option.none => (ctor Result.error [Turn, Frame::FrameFault] (ctor Frame::FrameFault.truncated (project request next)))
+    | Option.some count => (match (readCompleted source ((project request next) + 4) count (nil HostEffect::Completed))
+      | Result.error fault => (ctor Result.error [Turn, Frame::FrameFault] fault)
+      | Result.ok read => (finishTurn source (project request bytes) read))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: readTurn,
+  parameters: [input : Bytes],
+  result: (Result Turn Frame::FrameFault),
+  body: (match (Frame::chunkAt input 0)
+    | Option.none => (ctor Result.error [Turn, Frame::FrameFault] (ctor Frame::FrameFault.truncated 0))
+    | Option.some request => (afterRequest input request)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: stepList,
+  parameters: [step : HostEffect::Step],
+  result: (List Nat),
+  body: (match step
+    | HostEffect::Step.done response => (prim append (Frame::u32List 0) response : (List Nat))
+    | HostEffect::Step.perform request => (prim append (Frame::u32List 1) (prim append (Frame::u32List (project request tag)) (JsonText::bytesToList (project request payload)) : (List Nat)) : (List Nat))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: effectOfProvider,
+  parameters: [inner : Refusal::ProviderRefusal],
+  result: (Option HostEffect::EffectRequest),
+  body: (match inner
+    | Refusal::ProviderRefusal.unknownTool name => (ctor Option.none [HostEffect::EffectRequest])
+    | Refusal::ProviderRefusal.unknownPrompt name => (ctor Option.none [HostEffect::EffectRequest])
+    | Refusal::ProviderRefusal.resourceNotFound uri => (ctor Option.none [HostEffect::EffectRequest])
+    | Refusal::ProviderRefusal.unknownTask taskId => (ctor Option.none [HostEffect::EffectRequest])
+    | Refusal::ProviderRefusal.invalidArguments reason => (ctor Option.none [HostEffect::EffectRequest])
+    | Refusal::ProviderRefusal.invalidCursor cursor => (ctor Option.none [HostEffect::EffectRequest])
+    | Refusal::ProviderRefusal.badToolOutput reason => (ctor Option.none [HostEffect::EffectRequest])
+    | Refusal::ProviderRefusal.rateLimited limit => (ctor Option.none [HostEffect::EffectRequest])
+    | Refusal::ProviderRefusal.missingCapability required => (ctor Option.none [HostEffect::EffectRequest])
+    | Refusal::ProviderRefusal.internal reason => (ctor Option.none [HostEffect::EffectRequest])
+    | Refusal::ProviderRefusal.effectRequested request => (ctor Option.some [HostEffect::EffectRequest] request)),
+  executable: true
+}
+
+definition{
+  name: effectOf,
+  parameters: [outcome : (Result Dispatch::Reply Refusal::Refusal)],
+  result: (Option HostEffect::EffectRequest),
+  body: (match outcome
+    | Result.ok reply => (ctor Option.none [HostEffect::EffectRequest])
+    | Result.error refusal => (match refusal
+      | Refusal::Refusal.invalidParams problem => (ctor Option.none [HostEffect::EffectRequest])
+      | Refusal::Refusal.unsupportedProtocolVersion requested supported => (ctor Option.none [HostEffect::EffectRequest])
+      | Refusal::Refusal.headerMismatch problem => (ctor Option.none [HostEffect::EffectRequest])
+      | Refusal::Refusal.methodNotFound method => (ctor Option.none [HostEffect::EffectRequest])
+      | Refusal::Refusal.provider inner => (effectOfProvider inner))),
+  executable: true
+}
+
+definition{
+  name: tagRefusal,
+  parameters: [],
+  result: Refusal::Refusal,
+  body: (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.internal "the effect tag does not fit thirty-two bits")),
+  executable: true
+}
+
+definition{
+  name: performed,
+  parameters: [accepts : Bool, handled : Dispatch::Handled, request : HostEffect::EffectRequest],
+  result: HostEffect::Step,
+  body: (if (HostEffect::tagFits (project request tag)) then (ctor HostEffect::Step.perform request) else (ctor HostEffect::Step.done (Frame::writeResponse (Serve::respond accepts (record Dispatch::Handled {id := (project handled id), outcome := (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (tagRefusal))}))))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: stepOfHandled,
+  parameters: [accepts : Bool, handled : Dispatch::Handled],
+  result: HostEffect::Step,
+  body: (match (effectOf (project handled outcome))
+    | Option.some request => (performed accepts handled request)
+    | Option.none => (ctor HostEffect::Step.done (Frame::writeResponse (Serve::respond accepts handled)))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: answerRequestStep,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    used : Nat,
+    fields : (List Http::Field),
+    rpc : JsonRpc::Request
+  ],
+  result: HostEffect::Step,
+  body: (stepOfHandled (Transport::acceptsStream fields) (Dispatch::handleWith info answer used (ctor Option.some [Validation::Headers] (Http::headersOf fields (project info paramRules) (Serve::toolNameOf rpc) (project rpc method))) (Validation::supportedVersions) rpc)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: afterDecodeStep,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    used : Nat,
+    fields : (List Http::Field),
+    decoded : (Result JsonRpc::Request RpcWire::Fault)
+  ],
+  result: HostEffect::Step,
+  body: (match decoded
+    | Result.error fault => (ctor HostEffect::Step.done (Frame::writeResponse (Serve::jsonResponse (Status::faultStatus fault) (RpcWire::errorResponse (RpcWire::faultId fault) (RpcWire::faultObject fault)))))
+    | Result.ok rpc => (answerRequestStep info answer used fields rpc)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: afterParseStep,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    used : Nat,
+    fields : (List Http::Field),
+    parsed : (Result Json::Json JsonText::JsonRefusal)
+  ],
+  result: HostEffect::Step,
+  body: (match parsed
+    | Result.error refusal => (ctor HostEffect::Step.done (Frame::writeResponse (Serve::jsonResponse (Status::badRequestStatus) (RpcWire::errorResponse (ctor Option.none [JsonRpc::RequestId]) (RpcWire::faultObject (ctor RpcWire::Fault.parseError))))))
+    | Result.ok message => (afterDecodeStep info answer used fields (RpcWire::decodeRequest message))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: serveOpenStep,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    request : Http::HttpRequest
+  ],
+  result: HostEffect::Step,
+  body: (if (Http::isPost (project request method)) then (afterParseStep info answer (project request toolCalls) (project request fields) (JsonRead::readJson (project request body))) else (ctor HostEffect::Step.done (Frame::writeResponse (Serve::notAllowedResponse)))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: serveGatedStep,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    request : Http::HttpRequest,
+    gate : (Option Transport::TransportRefusal)
+  ],
+  result: HostEffect::Step,
+  body: (match gate
+    | Option.some refusal => (ctor HostEffect::Step.done (Frame::writeResponse (Serve::forbiddenResponse refusal)))
+    | Option.none => (serveOpenStep info answer request)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: serveRequestStep,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    request : Http::HttpRequest
+  ],
+  result: HostEffect::Step,
+  body: (serveGatedStep info answer request (Transport::gateOf (project request fields) (project request allowedHosts))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: unreadable,
+  parameters: [],
+  result: HostEffect::Step,
+  body: (ctor HostEffect::Step.done (Frame::writeResponse (Serve::internalResponse))),
+  executable: true
+}
+
+definition{
+  name: stepOfTurn,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answerWith : (Fn (Asked) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    turn : Turn,
+    read : (Result Http::HttpRequest Frame::FrameFault)
+  ],
+  result: HostEffect::Step,
+  body: (match read
+    | Result.error fault => (unreadable)
+    | Result.ok request => (serveRequestStep info (fun [answerWith, turn] (typed : Methods::ClientRequest) => (apply answerWith (record Asked {completed := (project turn completed), request := typed}))) request)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: stepOf,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answerWith : (Fn (Asked) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    input : Bytes
+  ],
+  result: HostEffect::Step,
+  body: (match (readTurn input)
+    | Result.error fault => (unreadable)
+    | Result.ok turn => (stepOfTurn info answerWith turn (Frame::readRequest (project turn request)))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: serveStep,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answerWith : (Fn (Asked) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    input : Bytes
+  ],
+  result: (List Nat),
+  body: (stepList (stepOf info answerWith input)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

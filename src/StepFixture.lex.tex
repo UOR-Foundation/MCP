@@ -1,0 +1,293 @@
+\begin{lexlean}{StepFixture}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Common}
+\importmodule{Content}
+\importmodule{Extension}
+\importmodule{Fixture}
+\importmodule{Frame}
+\importmodule{HostEffect}
+\importmodule{Http}
+\importmodule{Json}
+\importmodule{Methods}
+\importmodule{Refusal}
+\importmodule{ResultJson}
+\importmodule{Serve}
+\importmodule{StepServe}
+\importmodule{Tools}
+\title{MCP step fixture}
+\begin{semanticmodule}
+definition{
+  name: keySchema,
+  parameters: [],
+  result: Json::JsonObject,
+  body: (record Json::JsonObject {members := (cons ("type", (ctor Json::Json.text "object")) (cons ("properties", (ctor Json::Json.object (cons ("key", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (cons ("minLength", (ResultJson::natJson 1)) (nil (String * Json::Json)))))) (nil (String * Json::Json))))) (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "key") (nil Json::Json)))) (cons ("additionalProperties", (ctor Json::Json.bool false)) (nil (String * Json::Json))))))}),
+  executable: true
+}
+
+definition{
+  name: chainSchema,
+  parameters: [],
+  result: Json::JsonObject,
+  body: (record Json::JsonObject {members := (cons ("type", (ctor Json::Json.text "object")) (cons ("properties", (ctor Json::Json.object (cons ("first", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (cons ("minLength", (ResultJson::natJson 1)) (nil (String * Json::Json)))))) (cons ("second", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "string")) (cons ("minLength", (ResultJson::natJson 1)) (nil (String * Json::Json)))))) (nil (String * Json::Json)))))) (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "first") (cons (ctor Json::Json.text "second") (nil Json::Json))))) (cons ("additionalProperties", (ctor Json::Json.bool false)) (nil (String * Json::Json))))))}),
+  executable: true
+}
+
+definition{
+  name: effectTools,
+  parameters: [],
+  result: (List Content::Tool),
+  body: (cons (Fixture::plainTool "effect_read" "Reads a key through the host" (keySchema)) (cons (Fixture::plainTool "effect_chain" "Reads two keys through the host, the second after the first" (chainSchema)) (cons (Fixture::plainTool "effect_edge_ok" "Asks for the largest effect tag" (Fixture::emptyObjectSchema)) (cons (Fixture::plainTool "effect_edge_over" "Asks for a tag that does not fit thirty-two bits" (Fixture::emptyObjectSchema)) (nil Content::Tool))))),
+  executable: true
+}
+
+definition{
+  name: argText,
+  parameters: [key : String, params : Methods::CallToolParams],
+  result: String,
+  body: (match (project params arguments)
+    | Option.none => ""
+    | Option.some given => (match (Json::lookup key given)
+      | Json::Lookup.absent => ""
+      | Json::Lookup.present found => (match (Json::asText found)
+        | Option.none => ""
+        | Option.some content => content))),
+  executable: true
+}
+
+definition{
+  name: outcomeText,
+  parameters: [outcome : Bytes],
+  result: String,
+  body: (match (prim utf8_decode outcome : (Option String))
+    | Option.none => ""
+    | Option.some content => content),
+  executable: true
+}
+
+definition{
+  name: joined,
+  parameters: [head : String, tail : String],
+  result: String,
+  body: (prim join (cons head (cons tail (nil String))) "" : String),
+  executable: true
+}
+
+definition{
+  name: asking,
+  parameters: [tag : Nat, payload : String],
+  result: HostEffect::EffectRequest,
+  body: (record HostEffect::EffectRequest {tag := tag, payload := (prim utf8_encode payload : Bytes)}),
+  executable: true
+}
+
+definition{
+  name: logMismatch,
+  parameters: [],
+  result: Refusal::ProviderRefusal,
+  body: (ctor Refusal::ProviderRefusal.internal "the outcomes of the effects do not match the request"),
+  executable: true
+}
+
+definition{
+  name: rawAsk,
+  parameters: [tag : Nat, payload : String],
+  result: (Result Methods::Progressed Refusal::ProviderRefusal),
+  body: (ctor Result.error [Methods::Progressed, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.effectRequested (asking tag payload))),
+  executable: true
+}
+
+definition{
+  name: rawMismatch,
+  parameters: [],
+  result: (Result Methods::Progressed Refusal::ProviderRefusal),
+  body: (ctor Result.error [Methods::Progressed, Refusal::ProviderRefusal] (logMismatch)),
+  executable: true
+}
+
+definition{
+  name: rawText,
+  parameters: [text : String],
+  result: (Result Methods::Progressed Refusal::ProviderRefusal),
+  body: (ctor Result.ok [Methods::Progressed, Refusal::ProviderRefusal] (Fixture::plainOutcome (cons (Fixture::textBlock text) (nil Content::ContentBlock)))),
+  executable: true
+}
+
+definition{
+  name: readBehaviour,
+  parameters: [completed : (List HostEffect::Completed), params : Methods::CallToolParams],
+  result: (Result Methods::Progressed Refusal::ProviderRefusal),
+  body: (match completed
+    | List.nil => (rawAsk 1 (argText "key" params))
+    | List.cons head rest => (match rest
+      | List.nil => (if ((project head tag) =? 1) then (rawText (joined "read:" (outcomeText (project head outcome)))) else (rawMismatch))
+      | List.cons next more => (rawMismatch))),
+  executable: true
+}
+
+definition{
+  name: chainBehaviour,
+  parameters: [completed : (List HostEffect::Completed), params : Methods::CallToolParams],
+  result: (Result Methods::Progressed Refusal::ProviderRefusal),
+  body: (match completed
+    | List.nil => (rawAsk 1 (argText "first" params))
+    | List.cons head rest => (match rest
+      | List.nil => (if ((project head tag) =? 1) then (rawAsk 2 (joined (outcomeText (project head outcome)) (argText "second" params))) else (rawMismatch))
+      | List.cons last more => (match more
+        | List.nil => (if ((project head tag) =? 1) then (if ((project last tag) =? 2) then (rawText (joined (joined "chain:" (outcomeText (project head outcome))) (joined "|" (outcomeText (project last outcome))))) else (rawMismatch)) else (rawMismatch))
+        | List.cons beyond again => (rawMismatch)))),
+  executable: true
+}
+
+definition{
+  name: edgeBehaviour,
+  parameters: [completed : (List HostEffect::Completed), tag : Nat],
+  result: (Result Methods::Progressed Refusal::ProviderRefusal),
+  body: (match completed | List.nil => (rawAsk tag "edge") | List.cons head rest => (rawMismatch)),
+  executable: true
+}
+
+definition{
+  name: behave,
+  parameters: [completed : (List HostEffect::Completed), params : Methods::CallToolParams],
+  result: (Result Methods::Progressed Refusal::ProviderRefusal),
+  body: (if (Fixture::isTool params "effect_read") then (readBehaviour completed params) else (if (Fixture::isTool params "effect_chain") then (chainBehaviour completed params) else (if (Fixture::isTool params "effect_edge_ok") then (edgeBehaviour completed 4294967295) else (edgeBehaviour completed 4294967296)))),
+  executable: true
+}
+
+definition{
+  name: isEffectTool,
+  parameters: [params : Methods::CallToolParams],
+  result: Bool,
+  body: (if (Fixture::isTool params "effect_read") then true else (if (Fixture::isTool params "effect_chain") then true else (if (Fixture::isTool params "effect_edge_ok") then true else (Fixture::isTool params "effect_edge_over")))),
+  executable: true
+}
+
+definition{
+  name: callOutcome,
+  parameters: [completed : (List HostEffect::Completed)],
+  result: (Result Extension::CallOutcome Refusal::ProviderRefusal),
+  body: (match completed
+    | List.nil => (ctor Result.ok [Extension::CallOutcome, Refusal::ProviderRefusal] (ctor Extension::CallOutcome.perform (asking 3 "call")))
+    | List.cons head rest => (match rest
+      | List.nil => (if ((project head tag) =? 3) then (ctor Result.ok [Extension::CallOutcome, Refusal::ProviderRefusal] (ctor Extension::CallOutcome.complete (Tools::textResult (joined "call:" (outcomeText (project head outcome))) false))) else (ctor Result.error [Extension::CallOutcome, Refusal::ProviderRefusal] (logMismatch)))
+      | List.cons next more => (ctor Result.error [Extension::CallOutcome, Refusal::ProviderRefusal] (logMismatch)))),
+  executable: true
+}
+
+definition{
+  name: itemContents,
+  parameters: [uri : String, text : String],
+  result: Methods::ReadResourceResult,
+  body: (record Methods::ReadResourceResult {cache := (Fixture::fixtureCache), contents := (cons (ctor Content::ResourceContents.text (record Content::TextResourceContents {uri := uri, mimeType := (ctor Option.some [String] "text/plain"), text := text, meta := (ctor Option.none [Json::JsonObject])})) (nil Content::ResourceContents))}),
+  executable: true
+}
+
+definition{
+  name: readOutcome,
+  parameters: [completed : (List HostEffect::Completed), params : Methods::ReadResourceParams],
+  result: (Result Extension::ReadOutcome Refusal::ProviderRefusal),
+  body: (match completed
+    | List.nil => (ctor Result.ok [Extension::ReadOutcome, Refusal::ProviderRefusal] (ctor Extension::ReadOutcome.perform (asking 4 (project params uri))))
+    | List.cons head rest => (match rest
+      | List.nil => (if ((project head tag) =? 4) then (ctor Result.ok [Extension::ReadOutcome, Refusal::ProviderRefusal] (ctor Extension::ReadOutcome.complete (itemContents (project params uri) (joined "item:" (outcomeText (project head outcome)))))) else (ctor Result.error [Extension::ReadOutcome, Refusal::ProviderRefusal] (logMismatch)))
+      | List.cons next more => (ctor Result.error [Extension::ReadOutcome, Refusal::ProviderRefusal] (logMismatch)))),
+  executable: true
+}
+
+definition{
+  name: promptResult,
+  parameters: [text : String],
+  result: Methods::GetPromptResult,
+  body: (record Methods::GetPromptResult {description := (ctor Option.none [String]), messages := (cons (record Content::PromptMessage {role := (ctor Common::Role.user), content := (Fixture::textBlock text)}) (nil Content::PromptMessage))}),
+  executable: true
+}
+
+definition{
+  name: promptOutcome,
+  parameters: [completed : (List HostEffect::Completed), params : Methods::GetPromptParams],
+  result: (Result Extension::PromptOutcome Refusal::ProviderRefusal),
+  body: (match completed
+    | List.nil => (ctor Result.ok [Extension::PromptOutcome, Refusal::ProviderRefusal] (ctor Extension::PromptOutcome.perform (asking 5 (project params name))))
+    | List.cons head rest => (match rest
+      | List.nil => (if ((project head tag) =? 5) then (ctor Result.ok [Extension::PromptOutcome, Refusal::ProviderRefusal] (ctor Extension::PromptOutcome.complete (promptResult (joined "prompt:" (outcomeText (project head outcome)))))) else (ctor Result.error [Extension::PromptOutcome, Refusal::ProviderRefusal] (logMismatch)))
+      | List.cons next more => (ctor Result.error [Extension::PromptOutcome, Refusal::ProviderRefusal] (logMismatch)))),
+  executable: true
+}
+
+definition{
+  name: callAnswer,
+  parameters: [
+    completed : (List HostEffect::Completed),
+    request : Methods::ClientRequest,
+    params : Methods::CallToolParams
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (if (isEffectTool params) then (Tools::answerCall (effectTools) (fun [completed] (given : Methods::CallToolParams) => (behave completed given)) params) else (if (Fixture::isTool params "provider_effect") then (Extension::callAnswer (callOutcome completed)) else (Fixture::fixtureAnswer request))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: effectAnswer,
+  parameters: [asked : StepServe::Asked],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match (project asked request)
+    | Methods::ClientRequest.toolsCall params => (callAnswer (project asked completed) (project asked request) params)
+    | Methods::ClientRequest.resourcesRead params => (if (prim equal (project params uri) "effect://item" : Bool) then (Extension::readAnswer (readOutcome (project asked completed) params)) else (Fixture::fixtureAnswer (project asked request)))
+    | Methods::ClientRequest.promptsGet params => (if (prim equal (project params name) "effect_prompt" : Bool) then (Extension::promptAnswer (promptOutcome (project asked completed) params)) else (Fixture::fixtureAnswer (project asked request)))
+    | Methods::ClientRequest.serverDiscover params => (Fixture::fixtureAnswer (project asked request))
+    | Methods::ClientRequest.toolsList params => (Fixture::fixtureAnswer (project asked request))
+    | Methods::ClientRequest.resourcesList params => (Fixture::fixtureAnswer (project asked request))
+    | Methods::ClientRequest.resourcesTemplatesList params => (Fixture::fixtureAnswer (project asked request))
+    | Methods::ClientRequest.promptsList params => (Fixture::fixtureAnswer (project asked request))
+    | Methods::ClientRequest.completionComplete params => (Fixture::fixtureAnswer (project asked request))
+    | Methods::ClientRequest.tasksGet params => (Fixture::fixtureAnswer (project asked request))
+    | Methods::ClientRequest.tasksUpdate params => (Fixture::fixtureAnswer (project asked request))
+    | Methods::ClientRequest.tasksCancel params => (Fixture::fixtureAnswer (project asked request))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: byteAnswer,
+  parameters: [request : Methods::ClientRequest],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (effectAnswer (record StepServe::Asked {completed := (nil HostEffect::Completed), request := request})),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: bytesTarget,
+  parameters: [read : (Result Http::HttpRequest Frame::FrameFault)],
+  result: Bool,
+  body: (match read
+    | Result.error fault => false
+    | Result.ok request => (Http::sameBytes (project request target) (Http::asciiOf "/bytes"))),
+  executable: true
+}
+
+definition{
+  name: routed,
+  parameters: [input : Bytes, turn : StepServe::Turn],
+  result: (List Nat),
+  body: (if (bytesTarget (Frame::readRequest (project turn request))) then (Serve::serve (Fixture::fixtureInfo) (ref byteAnswer) (project turn request)) else (StepServe::serveStep (Fixture::fixtureInfo) (ref effectAnswer) input)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: stepFixtureRun,
+  parameters: [input : Bytes],
+  result: (List Nat),
+  body: (match (StepServe::readTurn input)
+    | Result.error fault => (StepServe::serveStep (Fixture::fixtureInfo) (ref effectAnswer) input)
+    | Result.ok turn => (routed input turn)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true,
+  production: {effects: [allocation, overflow], targets: [rust-std]}
+}
+\end{semanticmodule}
+\end{lexlean}

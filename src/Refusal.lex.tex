@@ -3,6 +3,7 @@
 \useglossary{lexlean.std.nat@1.2.0}
 \useglossary{mcp.core@1.0.0}
 \importmodule{Capabilities}
+\importmodule{HostEffect}
 \importmodule{Json}
 \importmodule{JsonRpc}
 \importmodule{Numeric}
@@ -70,7 +71,8 @@ inductive{
     {name: badToolOutput, fields: [String]},
     {name: rateLimited, fields: [Nat]},
     {name: missingCapability, fields: [Capabilities::ClientCapabilities]},
-    {name: internal, fields: [String]}
+    {name: internal, fields: [String]},
+    {name: effectRequested, fields: [HostEffect::EffectRequest]}
   ]
 }
 
@@ -101,7 +103,8 @@ definition{
     | ProviderRefusal.badToolOutput reason => (JsonRpc::internalErrorCode)
     | ProviderRefusal.rateLimited limit => (JsonRpc::rateLimitedCode)
     | ProviderRefusal.missingCapability required => (JsonRpc::missingRequiredClientCapabilityCode)
-    | ProviderRefusal.internal reason => (JsonRpc::internalErrorCode)),
+    | ProviderRefusal.internal reason => (JsonRpc::internalErrorCode)
+    | ProviderRefusal.effectRequested request => (JsonRpc::internalErrorCode)),
   executable: true
 }
 
@@ -216,7 +219,8 @@ definition{
       | ProviderRefusal.badToolOutput reason => (ctor Option.none [Json::Json])
       | ProviderRefusal.rateLimited limit => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("limit", (ctor Json::Json.number (record Json::Decimal {mantissa := (Numeric::natToInt limit (0 : Int)), exponent := (0 : Int)}))) (nil (String * Json::Json)))))
       | ProviderRefusal.missingCapability required => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("requiredCapabilities", (capabilitiesJson required)) (nil (String * Json::Json)))))
-      | ProviderRefusal.internal reason => (ctor Option.none [Json::Json]))),
+      | ProviderRefusal.internal reason => (ctor Option.none [Json::Json])
+      | ProviderRefusal.effectRequested request => (ctor Option.none [Json::Json]))),
   executable: true
 }
 
@@ -239,7 +243,8 @@ definition{
       | ProviderRefusal.badToolOutput reason => "Internal error"
       | ProviderRefusal.rateLimited limit => "Rate limit exceeded: too many tool calls"
       | ProviderRefusal.missingCapability required => "Missing required client capability"
-      | ProviderRefusal.internal reason => "Internal error")),
+      | ProviderRefusal.internal reason => "Internal error"
+      | ProviderRefusal.effectRequested request => "Internal error")),
   executable: true
 }
 
