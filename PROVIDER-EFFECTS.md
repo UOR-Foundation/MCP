@@ -21,7 +21,9 @@ needs. Issue #39; register rows PE-01 to PE-09.
 
 `src/Fixture.lex.tex` and `src/Serve.lex.tex` are not changed. The conformance fixture
 requests no effect, `Serve.serve` is the byte root it was, and the core identity of
-`UorMcp.Fixture.fixtureRun` moves only because `Refusal` and `Status` gained a constructor.
+`UorMcp.Fixture.fixtureRun` moves only because the types it is compiled with gained constructors:
+`Refusal` and `Status` gained `effectRequested`, and `CallOutcome`, `ReadOutcome` and
+`PromptOutcome` gained `perform`. The functions over those types gained only the arm for the new constructor.
 
 ## The typed outcome
 
@@ -101,6 +103,22 @@ vector.
 The tests are falsifying evidence. The theorems in `StepLaws` are the kernel-checked part:
 they are about the step and the wire as data, the pre-provider checks that end in `done`
 without the provider being applied, and the byte serve's answer to an effect request.
+
+## Planted defects
+
+Each defect was planted alone in a copy of `src/StepServe.lex.tex`, with the lock and the
+check made on the copy, and `lexlean verify --all` run on it. Each fails in `UorMcp.StepLaws`
+with `LLV7002` (Lean rejected the module, the tactic `rfl` failed), at the theorem named. The
+unplanted tree passes `verify --all` (the `verify` job).
+
+| Planted defect | Change | Theorem that fails |
+|---|---|---|
+| the provider is called before a failing check | in `serveGatedStep`, the branch `Option.some refusal` serves the request with `serveOpenStep` instead of ending in `done (forbiddenResponse refusal)` | the law that a request failing the transport gate ends in `done` of the forbidden response (`src/StepLaws.lex.tex`, line 119 of the copy): `serveGatedStep info answer request (some refusal)` is not definitionally `done (writeResponse (forbiddenResponse refusal))` |
+| an effect outcome is dropped on replay | in `readCompleted`, the outcome read for a tag is replaced by `0x` | the law on `readCompleted` at `succ` (line 48): the left side is not the read of the tag and of the length-prefixed outcome |
+| the byte serve and the step serve disagree | in `stepOfHandled`, the case where no effect is requested returns `Serve.internalResponse` instead of `Serve.respond accepts handled` | the law that `stepOfHandled` with no effect requested is `done (writeResponse (respond accepts handled))` (line 215), failing in both the `ok` and the `error` case |
+
+To reproduce one, make the change in a copy, then run `lexlean lock`, `lexlean check` and
+`lexlean verify --all` in it.
 
 ## Limits
 
