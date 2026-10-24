@@ -197,7 +197,7 @@ above.
 
 | Defect | Planted in | Core digest | Run | Diagnostic |
 | --- | --- | --- | --- | --- |
-| `test_simple_text` answers an empty content array instead of its text block | `src/Fixture.lex.tex`, the `callTool` of the fixture provider | `a30a6745963e3f16c5c3245a9a5aa7eb6e2bb5603ad17a4fef173b6b007a5266`, not the recorded one | 25 of 37 required pass, `tools-call-simple-text` fails and is `unexplained` in the classification | `tools-call-simple-text: tools-call-simple-text: content array is empty; No text content found` |
+| `test_simple_text` answers an empty content array instead of its text block | `src/Fixture.lex.tex`, the `callTool` of the fixture provider | `8f1335055a9149073644484f22f1aa59f6feb1190b647ebe34e0d21b17a1b01c`, not the recorded one | 26 of 37 required pass, `tools-call-simple-text` fails and is `unexplained` in the classification | `tools-call-simple-text: tools-call-simple-text: content array is empty; No text content found` |
 
 The defect passes `lexlean check` and the production build of the conformance project, whose
 entrypoints are the declaration and the fixture root, and so is found by the suite and by the
