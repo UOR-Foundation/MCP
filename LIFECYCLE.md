@@ -25,7 +25,7 @@ then params.
 | `src/Fixture.lex.tex` | the production root `fixtureRun` over a tools-only provider |
 | `src/HeaderLaws.lex.tex` | kernel-checked laws for header names, values, sentinels and Base64 |
 | `src/Validation.lex.tex`, `src/Dispatch.lex.tex`, `src/Extension.lex.tex`, `src/Refusal.lex.tex` | extended: `Headers` carries a header fault and the parameter headers, `Dispatch.handleWith` takes the provider's data and answer function, `ProviderInfo` and `ParamRule` |
-| `crates/lifecycle-oracle/generated/mcp_lifecycle` | LexLean's export of `fixtureRun`, unedited |
+| `crates/lifecycle-oracle/generated/prism_mcp` | LexLean's export of `fixtureRun`, unedited |
 | `crates/lifecycle-oracle/vectors/suite.json` | the vectors taken from the pinned scenarios |
 | `crates/lifecycle-oracle/tests/schema.rs`, `tests/common/mod.rs` | LC-15: every response a test produces is validated against the specification's JSON Schema |
 | `crates/lifecycle-oracle/tests/stress.rs` | LC-16: the largest frames the tests build, on a 2 MiB stack |
@@ -46,13 +46,13 @@ names each target by its descriptor digest. `cargo xtask export` reads those val
 `lexlean check`, `lexlean.lock` and `lexlean production targets`, writes them into every
 request, runs `lexlean production build --request` on each (this one names the roots
 `UorMcp.Crowd.crowdRun`, package `mcp_crowd`, and `UorMcp.Fixture.fixtureRun`, package
-`mcp_lifecycle`, both 1.0.0, target `rust-std`) and replaces the packages committed beside
+`prism_mcp`, 1.0.0 and 0.1.0, target `rust-std`) and replaces the packages committed beside
 it with the export. A source edit committed without it is
 refused by `lexlean production build` as `LLC0204`; a hand-edited package is refused by the
 byte comparison (see [CI.md](CI.md)). A re-export of the committed sources
 reproduces the committed package byte for byte (`diff -r
-.lexlean/production/<id>/packages/rust-std/mcp_lifecycle
-crates/lifecycle-oracle/generated/mcp_lifecycle` is empty), and the `lexlean / export`
+.lexlean/production/<id>/packages/rust-std/prism_mcp
+crates/lifecycle-oracle/generated/prism_mcp` is empty), and the `lexlean / export`
 job of CI repeats the comparison for every `generated/request.json`. The package records
 the semantic ID of the sources it states in `provenance.json` (`sources`), which equals
 the `semantic` ID that `lexlean check` prints for the tree. The lock was made

@@ -587,9 +587,35 @@ fn the_upload_is_the_last_step_of_the_release_pb_06() {
         "the script's dry run is the only other publish, and it is the script's"
     );
     let uploading = step(&release, "Upload the checked crate");
-    assert!(uploading.contains("startsWith(github.ref, 'refs/tags/v')"));
-    assert!(uploading.contains("secrets.CARGO_REGISTRY_TOKEN != ''"));
+    assert!(uploading.contains("if: ${{ env.HAS_CARGO_REGISTRY_TOKEN == 'true' }}"));
     assert!(uploading.contains("cargo publish --locked"));
+    assert!(
+        release.contains("HAS_CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN != '' }}"),
+        "the presence of the secret decides the upload"
+    );
+    assert_eq!(
+        release
+            .matches("CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}")
+            .count(),
+        1,
+        "the credential is read once"
+    );
+    assert!(
+        uploading.contains("CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}"),
+        "and only by the step that uploads"
+    );
+    let upload_job = release.find("\n  upload:").expect("an upload job");
+    assert!(
+        release[upload_job..].contains("if: ${{ startsWith(github.ref, 'refs/tags/v') }}")
+            && release[upload_job..].contains("needs: readiness")
+            && release[upload_job..].contains("environment: crates.io"),
+        "the upload job needs the readiness job and runs for a version tag"
+    );
+    assert!(
+        !release[..upload_job].contains("environment:")
+            && !release[..upload_job].contains("secrets."),
+        "the readiness job sees no credential"
+    );
     for line in release.lines().filter(|l| l.contains("secrets.")) {
         assert!(
             line.contains("CARGO_REGISTRY_TOKEN"),

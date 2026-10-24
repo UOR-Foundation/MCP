@@ -22,7 +22,7 @@ scenarios `server-sse-multiple-streams` and `dns-rebinding-protection` of
 | `src/TransportLaws.lex.tex` | kernel-checked theorems about the above and about the gate in front of dispatch; hand-maintained source like `HeaderLaws` |
 | `src/Serve.lex.tex` | `serveRequest` is `serveGated` over `Transport.gateOf`: a refused request is answered by `forbiddenResponse` and the earlier pipeline is `serveOpen`, unchanged; `respond` turns a result with notifications into a stream |
 | `src/Http.lex.tex`, `src/Frame.lex.tex`, `src/Status.lex.tex` | extended: `HttpRequest.allowedHosts`, the optional allow-list after the tool-call count, and the status 403 |
-| `crates/lifecycle-oracle/generated/mcp_lifecycle`, `mcp_crowd` | LexLean's exports of the two roots, unedited |
+| `crates/lifecycle-oracle/generated/prism_mcp`, `mcp_crowd` | LexLean's exports of the two roots, unedited |
 | `crates/lifecycle-oracle/vectors/transport.json` | the requests of the two scenarios and of the streaming probes, with file and line at the pinned suite commit |
 | `crates/lifecycle-oracle/tests/transport.rs` | SH-01 to SH-10 |
 | `crates/lifecycle-oracle/src/lib.rs` | `encode_request_allowing`, `exchange_allowing`, and `parse_event_stream`, an independent reader of the WHATWG format that the tests use to read every stream |

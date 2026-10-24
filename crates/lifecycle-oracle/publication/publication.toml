@@ -1,0 +1,11 @@
+# What the crate prism_mcp says of itself beside its program (MCP#14, PB-01). The name and
+# the version are not here: the name is the package of the export request
+# (crates/lifecycle-oracle/generated/request.json) and the version is the version of the
+# workspace; scripts/package-core-crate.sh refuses a package where any of them disagree.
+# The licence, repository and homepage are the workspace's. LexLean writes `publish = false`
+# into every package it exports, so the packaged manifest is the export's with that line
+# replaced by this metadata.
+spec = "mcp/core-publication/1"
+crate = "prism_mcp"
+root = "UorMcp.Fixture.fixtureRun"
+description = "The MCP 2026-07-28 server protocol core, generated from its LexLean model: run maps an encoded HTTP request frame to an encoded response frame."

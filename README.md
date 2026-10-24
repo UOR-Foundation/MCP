@@ -61,6 +61,10 @@ but the method is not dispatched), server notifications other than progress, and
   2026-07-28 schema are run over the served core, and that file lists, scenario by scenario,
   what passes and what does not. No other protocol capability is registered and none is
   claimed.
+- The protocol core is packaged as the crate `prism_mcp` (#14, PB-01 to PB-06, [CRATE.md](CRATE.md)): `scripts/package-core-crate.sh`
+  makes it offline from the committed export of `UorMcp.Fixture.fixtureRun` and checks it against the core digest
+  `conformance/core-identity.json` records. The upload to crates.io is the last step of the release, at the version
+  tag, and has not been made.
 - The repository is not bound to a PrismPM SDK release (#4): `prismpm.lock` and
   `template.lock` are absent, so `just vv` and the devcontainer cannot run.
 - v0.1.0 is tracked in #16.

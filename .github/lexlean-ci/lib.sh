@@ -433,7 +433,7 @@ check_core_identity() {
     --result "${RUNNER_TEMP:?}/production-result.json" \
     --lock lexlean.conformance.lock \
     --package conformance/mcp_conformance_core \
-    --reference crates/lifecycle-oracle/generated/mcp_lifecycle/provenance.json \
+    --reference crates/lifecycle-oracle/generated/prism_mcp/provenance.json \
     --check conformance/core-identity.json
 }
 

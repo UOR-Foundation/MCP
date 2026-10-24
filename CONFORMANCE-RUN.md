@@ -44,7 +44,7 @@ node conformance/oracle/schema-oracle.mjs --suite-root "$SUITE" \
     crates/lifecycle-oracle/suite/mcp-spec-80041ab0a139a8f4fb3adbc99f7ae9113ea59671/schema/2026-07-28/schema.json out/transcript.json
 node conformance/oracle/identity.mjs --result production-result.json --lock lexlean.conformance.lock \
     --package conformance/mcp_conformance_core \
-    --reference crates/lifecycle-oracle/generated/mcp_lifecycle/provenance.json --check conformance/core-identity.json
+    --reference crates/lifecycle-oracle/generated/prism_mcp/provenance.json --check conformance/core-identity.json
 ```
 
 The `conformance` job of `.github/workflows/lexlean.yml` runs these steps, and
@@ -201,7 +201,7 @@ writes no log message, so both probes pass. The core digest changed with the fix
 `conformance/core-identity.json` records the core by the SHA-256 of its compiled program,
 `5da88084314a27a48dfe69a936f6df4d64c3e936103b625a93e04888da98dfc8`, with the package, its file
 digests, the source and semantic IDs and the lock it was exported from, and the compiler that
-exported it. That program digest is the one the committed export `mcp_lifecycle` of the same root
+exported it. That program digest is the one the committed export `prism_mcp` of the same root
 records: the compiled program does not depend on the compiler that exported it, while the
 generated `src/lib.rs` does. CI rebuilds the core and the job fails unless the record is
 reproduced; lexlean-mcp checks the program digest.
@@ -214,7 +214,7 @@ above. "Green" below means the exit status of `server-suite.mjs`, which is the s
 
 | Defect | Planted in | Run | Diagnostic |
 | --- | --- | --- | --- |
-| `test_simple_text` answers an empty content array instead of its text block | `src/Fixture.lex.tex`, the `callTool` of the fixture provider; production build and host rebuilt, core digest `8f1335055a9149073644484f22f1aa59f6feb1190b647ebe34e0d21b17a1b01c` | exit 1; 26 of 37 required pass; `check_core_identity` fails as well: `the program differs from the committed export mcp_lifecycle` | `FAILING and not named in waiting.json (1): tools-call-simple-text`, then `tools-call-simple-text: tools-call-simple-text: content array is empty; No text content found` |
+| `test_simple_text` answers an empty content array instead of its text block | `src/Fixture.lex.tex`, the `callTool` of the fixture provider; production build and host rebuilt, core digest `8f1335055a9149073644484f22f1aa59f6feb1190b647ebe34e0d21b17a1b01c` | exit 1; 26 of 37 required pass; `check_core_identity` fails as well: `the program differs from the committed export prism_mcp` | `FAILING and not named in waiting.json (1): tools-call-simple-text`, then `tools-call-simple-text: tools-call-simple-text: content array is empty; No text content found` |
 | a failing scenario is not listed | `conformance/waiting.json` without `tasks-lifecycle`, same build | exit 1 | `FAILING and not named in waiting.json (1): tasks-lifecycle`, then the suite's check messages, and `the failing scenarios are not the ones .../waiting.json names` |
 | a listed scenario passes (stale) | `conformance/waiting.json` with `caching` added, same build | exit 1 | `named as waiting but not failing (1): caching` |
 | an entry names neither an issue nor a pull request | `conformance/waiting.json`, `tasks-lifecycle` with only a reason | exit 1 | `named as waiting without an issue or a pull request (1): tasks-lifecycle` |
@@ -236,7 +236,7 @@ development `install_prismpm` builds `prismpm` from a copy of the PrismPM tree w
 compiler that certifies the core is then the compiler both locks were made with, and CI checks that:
 `lexlean.lock` and `lexlean.conformance.lock` record the same `compiler_semantics`, and so does the
 production result of `prismpm build`. The generated `src/lib.rs` of the core is byte for byte the
-`src/lib.rs` of the committed export `mcp_lifecycle`.
+`src/lib.rs` of the committed export `prism_mcp`.
 
 Release: MCP v0.1.0 pins a PrismPM SDK release, and that release must pin a LexLean release that
 contains SM-37 (tracked in MCP#16).

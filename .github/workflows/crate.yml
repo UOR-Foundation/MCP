@@ -1,0 +1,126 @@
+# The protocol core crate, the last step of the release (MCP#14, PB-06).
+#
+# A version tag packages `prism_mcp` from the committed export, checks that it is the core the
+# conformance build records, dry-runs the upload, and uploads it only when a
+# CARGO_REGISTRY_TOKEN secret exists in the `crates.io` environment. With none, the run
+# succeeds and says nothing was uploaded: the first upload of a name is the owner's, and
+# nobody puts a token in this repository. Dispatched by hand, or called from the release
+# workflow of #16, it does the same checks for a development pre-release and never uploads.
+#
+# Everything the checks decide is in scripts/package-core-crate.sh, which pull requests
+# run too (lexlean.yml, step 10), so a tag never meets a check for the first time.
+name: crate
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: never
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  readiness:
+    name: crate / package, identity and dry run
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      crate: ${{ steps.package.outputs.crate }}
+      sha256: ${{ steps.package.outputs.sha256 }}
+    steps:
+      - name: Check out the exact event revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install the pinned Rust toolchain
+        run: |
+          . .github/lexlean-ci/lib.sh
+          gate "install Rust" install_rust
+      - name: Package the core, check its identity and dry-run the upload
+        id: package
+        run: |
+          . .github/lexlean-ci/lib.sh
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            version="$(sed -n '/^\[workspace\.package\]/,/^\[/s/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)"
+            gate "the tag names the workspace version" test "$GITHUB_REF_NAME" = "v$version"
+            mode=(--release)
+          else
+            mode=(--dev auto)
+          fi
+          gate "package the core crate" scripts/package-core-crate.sh "${mode[@]}" --out "$RUNNER_TEMP/crate" --dry-run
+          crate="$(ls "$RUNNER_TEMP"/crate/*.crate)"
+          echo "crate=$(basename "$crate" .crate)" >>"$GITHUB_OUTPUT"
+          echo "sha256=$(cut -d' ' -f1 "$crate.sha256")" >>"$GITHUB_OUTPUT"
+          {
+            echo "## $(basename "$crate")"
+            echo
+            echo '```text'
+            cat "$crate.sha256"
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"
+
+  upload:
+    name: crate / upload
+    needs: readiness
+    # The release's last step: a version tag, and only with a credential.
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: crates.io
+    env:
+      HAS_CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN != '' }}
+    steps:
+      - name: Check out the exact event revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install the pinned Rust toolchain
+        run: |
+          . .github/lexlean-ci/lib.sh
+          gate "install Rust" install_rust
+      - name: No upload credential
+        if: ${{ env.HAS_CARGO_REGISTRY_TOKEN != 'true' }}
+        env:
+          CRATE: ${{ needs.readiness.outputs.crate }}
+          CRATE_SHA256: ${{ needs.readiness.outputs.sha256 }}
+        run: echo "::notice::${CRATE} (sha256 ${CRATE_SHA256}) was packaged, checked and dry-run; there is no CARGO_REGISTRY_TOKEN, so nothing was uploaded"
+      - name: Upload the checked crate
+        if: ${{ env.HAS_CARGO_REGISTRY_TOKEN == 'true' }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CRATE: ${{ needs.readiness.outputs.crate }}
+          CRATE_SHA256: ${{ needs.readiness.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          . .github/lexlean-ci/lib.sh
+          # The same checks again, and the files they packaged kept: the upload is of those.
+          scripts/package-core-crate.sh --release --out "$RUNNER_TEMP/upload" --keep "$RUNNER_TEMP/files"
+          test "$(cut -d' ' -f1 "$RUNNER_TEMP/upload/$CRATE.crate.sha256")" = "$CRATE_SHA256"
+          cd "$RUNNER_TEMP/files"
+          cargo publish --locked --allow-dirty --target-dir "$RUNNER_TEMP/publish"
+          # The crate name holds no hyphen, so the first one separates it from the version.
+          name="${CRATE%%-*}"
+          number="${CRATE#*-}"
+          for attempt in $(seq 1 30); do
+            echo "checking that crates.io serves the same crate (attempt $attempt/30)"
+            if curl --fail --location --silent --show-error \
+                "https://crates.io/api/v1/crates/$name/$number/download" --output "$RUNNER_TEMP/public.crate"; then
+              test "$(sha256sum "$RUNNER_TEMP/public.crate" | cut -d' ' -f1)" = "$CRATE_SHA256"
+              echo "$CRATE is on crates.io with sha256 $CRATE_SHA256"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::$CRATE did not become downloadable" >&2
+          exit 1

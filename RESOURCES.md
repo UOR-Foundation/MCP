@@ -16,7 +16,7 @@ nothing else. Issue #9; register rows RP-01 to RP-19.
 | `src/ResultJson.lex.tex` | extended: the result bodies of the six methods as JSON, with `ttlMs` and `cacheScope` on the four cacheable ones |
 | `src/Refusal.lex.tex`, `src/Status.lex.tex` | extended: `data.uri` of the refusal of an unknown resource, `data.reason` of an invalid prompt argument, and theorems for the codes and statuses |
 | `src/Fixture.lex.tex`, `src/Crowd.lex.tex` | extended: the fixture declares the `resources`, `prompts` and `completions` capabilities and routes the six methods; the crowd root keeps the tools-only capabilities it had |
-| `crates/lifecycle-oracle/generated/mcp_lifecycle`, `mcp_crowd` | LexLean's exports of the two roots, unedited |
+| `crates/lifecycle-oracle/generated/prism_mcp`, `mcp_crowd` | LexLean's exports of the two roots, unedited |
 | `crates/lifecycle-oracle/vectors/resources.json` | the requests of the twelve scenarios, with file and line at the pinned suite commit |
 | `crates/lifecycle-oracle/tests/resources.rs` | RP-01 to RP-19; `provenance.rs` accounts for every request the four new scenario files send |
 | `crates/lifecycle-oracle/suite/conformance-232a9014457eaf4c59559916e3d616d2f7f28f05` | now twelve vendored suite files: also `resources.ts`, `prompts.ts`, `caching.ts` and `utils.ts`, which holds `completion-complete` |

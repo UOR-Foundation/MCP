@@ -44,7 +44,7 @@
     "version": "0.3.0"
   },
   "same_program_as": {
-    "package": "mcp_lifecycle",
+    "package": "prism_mcp",
     "program_sha256": "5da88084314a27a48dfe69a936f6df4d64c3e936103b625a93e04888da98dfc8"
   }
 }

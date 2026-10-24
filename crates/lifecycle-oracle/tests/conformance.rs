@@ -377,12 +377,12 @@ fn the_core_artifact_is_recorded_by_digest_cf_06() {
 
     // The program is the one this repository already exports for the same root: the
     // compiled program does not depend on the compiler that exported it.
-    let provenance = json("crates/lifecycle-oracle/generated/mcp_lifecycle/provenance.json");
+    let provenance = json("crates/lifecycle-oracle/generated/prism_mcp/provenance.json");
     assert_eq!(
         provenance["program"], program,
         "the core is not the committed export of the root"
     );
-    assert_eq!(identity["same_program_as"]["package"], "mcp_lifecycle");
+    assert_eq!(identity["same_program_as"]["package"], "prism_mcp");
     assert_eq!(identity["same_program_as"]["program_sha256"], program);
 
     // The record is of the sources the build was made from.
@@ -465,7 +465,7 @@ fn the_identity_checker_refuses_another_core_cf_06() {
         .arg(&dir)
         .args([
             "--reference",
-            "crates/lifecycle-oracle/generated/mcp_lifecycle/provenance.json",
+            "crates/lifecycle-oracle/generated/prism_mcp/provenance.json",
             "--check",
             "conformance/core-identity.json",
         ])

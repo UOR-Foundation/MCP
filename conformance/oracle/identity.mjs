@@ -7,11 +7,11 @@
 // package, the sources and lock it was built from and the compiler that built it. This
 // reads the compiler's record of the export (`production-result.json`), checks it
 // against the package on disk, the lock and the committed export of the same core
-// (`mcp_lifecycle`), and writes or checks conformance/core-identity.json, which
+// (`prism_mcp`), and writes or checks conformance/core-identity.json, which
 // lexlean-mcp checks.
 //
 // usage: identity.mjs --result production-result.json --lock lexlean.conformance.lock
-//          --package DIR --reference mcp_lifecycle/provenance.json (--write FILE | --check FILE)
+//          --package DIR --reference prism_mcp/provenance.json (--write FILE | --check FILE)
 //
 // Exit 0: the record was written, or equals the one computed. Exit 1: the record
 // differs, or the inputs disagree with each other (the diagnostic names each

@@ -37,7 +37,7 @@
     clippy::infallible_destructuring_match
 )]
 #[rustfmt::skip]
-#[path = "../generated/mcp_lifecycle/src/lib.rs"]
+#[path = "../generated/prism_mcp/src/lib.rs"]
 mod lifecycle;
 
 // The second root, over a catalog of many tools, for the stress tests (`TOOLS.md`).
@@ -64,7 +64,7 @@ mod crowd;
 
 /// The text of the generated package this crate compiled, so a test can hash the
 /// file the oracle ran against the digest the export recorded.
-pub const GENERATED_SOURCE: &str = include_str!("../generated/mcp_lifecycle/src/lib.rs");
+pub const GENERATED_SOURCE: &str = include_str!("../generated/prism_mcp/src/lib.rs");
 
 /// The text of the second generated package, the root `UorMcp.Crowd.crowdRun`.
 pub const CROWD_SOURCE: &str = include_str!("../generated/mcp_crowd/src/lib.rs");

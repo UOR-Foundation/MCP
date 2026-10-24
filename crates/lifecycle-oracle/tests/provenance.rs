@@ -104,11 +104,11 @@ fn the_pinned_requirements_name_the_scenarios_and_their_standing_lc_12() {
 fn the_generated_package_is_the_recorded_export_of_the_lifecycle_root_lc_13() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("generated")
-        .join("mcp_lifecycle");
+        .join("prism_mcp");
     let provenance: Value =
         serde_json::from_slice(&std::fs::read(dir.join("provenance.json")).expect("provenance"))
             .expect("provenance.json is JSON");
-    assert_eq!(provenance["name"], "mcp_lifecycle");
+    assert_eq!(provenance["name"], "prism_mcp");
     assert_eq!(provenance["profile"], "rust-std");
     assert_eq!(provenance["spec"], "lexlean/rust-provenance/1");
     assert_eq!(provenance["exports"].as_array().expect("exports").len(), 1);
@@ -130,7 +130,7 @@ fn the_generated_package_is_the_recorded_export_of_the_lifecycle_root_lc_13() {
     let roots = request["roots"].as_array().expect("roots");
     assert_eq!(roots.len(), 2, "the stress root and the fixture root");
     assert_eq!(roots[1]["root"], "UorMcp.Fixture.fixtureRun");
-    assert_eq!(roots[1]["package"]["name"], "mcp_lifecycle");
+    assert_eq!(roots[1]["package"]["name"], "prism_mcp");
 
     let source = std::fs::read(dir.join("src").join("lib.rs")).expect("the package source");
     let recorded = provenance["files"]["src/lib.rs"]

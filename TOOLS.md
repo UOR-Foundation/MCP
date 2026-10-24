@@ -20,7 +20,7 @@ bytes and nothing else. Issue #8; register rows TL-01 to TL-18; TL-19 (#13) adds
 | `src/Fixture.lex.tex` | the catalog of the pinned suite's fixture tools and the root `fixtureRun` |
 | `src/Crowd.lex.tex` | a catalog of 60 generated tools and the root `crowdRun`, for the stress tests |
 | `src/Methods`, `Dispatch`, `Refusal`, `Status`, `JsonRpc`, `ResultJson`, `RpcWire`, `Http`, `Frame`, `Serve`, `Extension` | extended: progress steps travel with a result, the new refusals have codes and statuses, the result encoders cover every content block, and the frames carry the rate-limit count and the notifications |
-| `crates/lifecycle-oracle/generated/mcp_lifecycle`, `mcp_crowd` | LexLean's exports of the two roots, unedited |
+| `crates/lifecycle-oracle/generated/prism_mcp`, `mcp_crowd` | LexLean's exports of the two roots, unedited |
 | `crates/lifecycle-oracle/vectors/tools.json` | the requests of the tool scenarios, with file and line at the pinned suite commit |
 | `crates/lifecycle-oracle/tests/tools.rs`, `stress.rs`, `provenance.rs` | TL-01 to TL-19 |
 | `crates/lifecycle-oracle/suite/conformance-232a9014457eaf4c59559916e3d616d2f7f28f05` | now eight vendored suite files: also `tools.ts`, `json-schema-2020-12.ts` and `everything-server.ts` |

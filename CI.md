@@ -23,7 +23,15 @@ ignores (CF-08).
 | `cargo / fmt clippy audits deny test` | `cargo fmt --all -- --check`; `cargo clippy --workspace --all-targets --locked -- -D warnings`; `cargo check --workspace --all-features --all-targets --locked`; `cargo xtask check-model`, `audit-limits`, `audit-deferral` and `audit-dependency-updates`; `cargo deny --all-features check`; `cargo test --workspace --locked --no-fail-fast`, run as the SDK gate runs it, with no installed conformance suite |
 | `lexlean / verify` | `lexlean fmt --check`, `lexlean lock --check`, `lexlean check`, `lexlean verify` |
 | `lexlean / export <crate>` | one job per `crates/*/generated/request.json`, found by `find` and never listed: `lexlean production build --request <it>` in a clean `.lexlean/production`, which first compares the request's `expect` pins with the project (`LLC0204`, before any Lean process runs) and its target digests with the compiler's (`LLC0203`); then every exported `rust-std` package is compared with `diff -r` against the package committed beside the request, in both directions (a committed package the request no longer exports, or an export nobody committed, fails by name) |
+| `crate / core crate packaged and dry-run` | step 10: `scripts/package-core-crate.sh --dev auto --out ... --dry-run`: the committed export of the protocol core is packaged as `prism_mcp` twice to the same bytes, the package is checked against the export and against the core digest `conformance/core-identity.json` records, and `cargo publish --dry-run` verifies the same files; no credential, nothing uploaded ([CRATE.md](CRATE.md)) |
 | `prepare / compiler and toolchains` | builds `lexlean`, installs the Lean toolchain, checks that the compiler is the one `lexlean.lock` was made with, and publishes the job matrix |
+
+## The release workflow
+
+`.github/workflows/crate.yml` runs for a version tag (and by dispatch, and when called by the release workflow
+of #16). It is the last step of the release: it repeats step 10 for `--release`, and its `upload` job, in the
+`crates.io` environment, uploads only when a `CARGO_REGISTRY_TOKEN` secret exists. No pull request sees the
+secret; with none, the tag's run succeeds and says that nothing was uploaded ([CRATE.md](CRATE.md)).
 
 ## Not run here
 
