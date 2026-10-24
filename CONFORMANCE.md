@@ -170,7 +170,7 @@ Never re-derived, vendored, or gated on.
 | `A-JSON-SCHEMA-2020-12` | https://json-schema.org/draft/2020-12/json-schema-core and https://json-schema.org/draft/2020-12/json-schema-validation, sections 8 (the schema, $ref, $anchor, $defs), 10 (applicators), and 6 (validation keywords) | `TL-02`, `TL-10`, `TL-11`, `TL-16` |
 | `A-RFC6901` | P. Bryan, K. Zyp, M. Nottingham (eds.), RFC 6901, April 2013, section 3 (syntax) and section 5 (the escapes ~0 and ~1), https://www.rfc-editor.org/rfc/rfc6901 | `TL-10` |
 | `A-WHATWG-SSE` | WHATWG, HTML Living Standard, section 9.2 (Server-sent events), 9.2.5 (the text/event-stream MIME type and its authoring notes) and 9.2.6 (interpreting an event stream), https://html.spec.whatwg.org/multipage/server-sent-events.html | `SH-01` |
-| `A-PRISMPM-SERVER-APPLICATION` | https://github.com/UOR-Foundation/PrismPM at commit f5927bf46b92179d807ee6bf987f024b2f5a4e7e (pull request 339): stdlib/src/Foundation/Bytes.lex.tex, stdlib/src/Foundation/Server/V1/Model.lex.tex and the lexicon package language/prism.arch, copied under conformance/src/Foundation and language/prism.arch; the revision that builds the application is the one .github/prismpm.rev names | `CF-01`, `CF-02`, `CF-06`, `CF-07` |
+| `A-PRISMPM-SERVER-APPLICATION` | https://github.com/UOR-Foundation/PrismPM at commit f5927bf46b92179d807ee6bf987f024b2f5a4e7e (pull request 339): stdlib/src/Foundation/Bytes.lex.tex, stdlib/src/Foundation/Server/V1/Model.lex.tex and the lexicon package language/prism.arch, copied under conformance/src/Foundation and language/prism.arch; .github/prismpm.rev pins this commit | `CF-01`, `CF-02`, `CF-06`, `CF-07` |
 
 ## Claims that are not conformance IDs
 

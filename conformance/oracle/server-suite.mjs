@@ -40,7 +40,8 @@ const FROZEN_REQUIREMENTS_SHA256 = 'ae2f4f6210fd729e2e318edd5bbfa31a43cee0bc608e
 const READY_MILLIS = 60000;
 const SUITE_MILLIS = 600000;
 const TAIL_BYTES = 8192;
-const MAX_DIAGNOSTICS = 48;
+const MAX_DIAGNOSTICS = 12;
+const LINE_BYTES = 300;
 
 class Unavailable extends Error {}
 
@@ -103,6 +104,25 @@ function loadRequirements() {
     throw new Unavailable('the frozen requirements do not name distinct server scenarios');
   }
   return { required, unscored };
+}
+
+// `label: a, b, c` cut into lines of at most LINE_BYTES, so that a log tail or an
+// annotation that cuts long lines still names every scenario.
+function wrapped(label, names) {
+  const lines = [];
+  let line = `${label} (${names.length}):`;
+  let fresh = true;
+  for (const name of names) {
+    if (line.length + name.length + 2 > LINE_BYTES) {
+      lines.push(line);
+      line = ' ';
+      fresh = true;
+    }
+    line += `${fresh ? ' ' : ', '}${name}`;
+    fresh = false;
+  }
+  lines.push(line);
+  return lines;
 }
 
 function loadWaiting() {
@@ -224,10 +244,12 @@ async function main() {
     if (failing.length > 0) {
       for (const line of diagnostics.slice(0, MAX_DIAGNOSTICS)) process.stderr.write(`${line}\n`);
       if (diagnostics.length > MAX_DIAGNOSTICS) process.stderr.write(`... ${diagnostics.length - MAX_DIAGNOSTICS} further failing checks\n`);
-      process.stderr.write(`failing scenarios: ${failing.join(', ')}\n`);
-      for (const [label, scenarios] of Object.entries(waits)) process.stderr.write(`${label}: ${scenarios.join(', ')}\n`);
-      if (skipped.length > 0) process.stderr.write(`skipped by the suite: ${skipped.join(', ')}\n`);
-      if (stale.length > 0) process.stderr.write(`named as waiting but not failing: ${stale.join(', ')}\n`);
+      process.stderr.write(`${failing.length} failing scenarios, by what they wait on:\n`);
+      for (const [label, scenarios] of Object.entries(waits)) {
+        for (const line of wrapped(label, scenarios)) process.stderr.write(`${line}\n`);
+      }
+      if (skipped.length > 0) process.stderr.write(`${wrapped('skipped by the suite', skipped).join('\n')}\n`);
+      if (stale.length > 0) process.stderr.write(`${wrapped('named as waiting but not failing', stale).join('\n')}\n`);
       return 1;
     }
     if (stale.length > 0) {

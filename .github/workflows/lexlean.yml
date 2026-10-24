@@ -262,7 +262,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Read the pinned PrismPM revision
+      - name: Read the pinned PrismPM and LexLean revisions
         id: pin
         run: |
           . .github/lexlean-ci/lib.sh
@@ -272,12 +272,12 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.prismpm-bin
-          key: prismpm-${{ runner.os }}-${{ runner.arch }}-${{ steps.pin.outputs.rev }}
+          key: prismpm-${{ runner.os }}-${{ runner.arch }}-${{ steps.pin.outputs.rev }}-${{ steps.pin.outputs.lexlean }}
       - name: Install the pinned Rust toolchain
         run: |
           . .github/lexlean-ci/lib.sh
           gate "install Rust" install_rust
-      - name: Install prismpm at the pinned revision
+      - name: Install prismpm at the pinned revision, built with the pinned LexLean
         run: |
           . .github/lexlean-ci/lib.sh
           gate "install prismpm" install_prismpm
@@ -286,7 +286,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.prismpm-bin
-          key: prismpm-${{ runner.os }}-${{ runner.arch }}-${{ steps.pin.outputs.rev }}
+          key: prismpm-${{ runner.os }}-${{ runner.arch }}-${{ steps.pin.outputs.rev }}-${{ steps.pin.outputs.lexlean }}
       - name: Restore the Lean toolchain
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:

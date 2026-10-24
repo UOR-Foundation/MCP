@@ -256,36 +256,65 @@ prismpm_rev() {
 # The root the workflow caches the SDK binary in.
 PRISMPM_ROOT=${PRISMPM_ROOT:-$HOME/.prismpm-bin}
 
-# output_prismpm_pin: the pinned PrismPM revision as the step output `rev`, the
-# key of the cache that holds the binary built from it.
+# output_prismpm_pin: the pinned PrismPM revision as the step output `rev` and the
+# LexLean revision it is built with as `lexlean`, the key of the cache that holds the
+# binary built from them.
 output_prismpm_pin() {
-  local rev
+  local rev lexlean
   rev=$(prismpm_rev)
+  lexlean=$(lexlean_rev)
   echo "rev=$rev" >>"${GITHUB_OUTPUT:?}"
+  echo "lexlean=$lexlean" >>"${GITHUB_OUTPUT:?}"
 }
 
-# prismpm_installed_at REV: cargo's own record says $PRISMPM_ROOT was built from
-# exactly REV, so a cache restored for another key cannot pass.
+# fetch_rev URL REV DEST: the tree of exactly commit REV of URL in DEST.
+fetch_rev() {
+  local url=$1 rev=$2 dest=$3
+  git init -q "$dest"
+  git -C "$dest" remote add origin "$url"
+  git -C "$dest" fetch -q --depth 1 origin "$rev"
+  git -C "$dest" checkout -q FETCH_HEAD
+  test "$(git -C "$dest" rev-parse HEAD)" = "$rev"
+}
+
+# prismpm_installed_at REV LEXLEAN: the record `install_prismpm` wrote says
+# $PRISMPM_ROOT was built from exactly these two revisions, so a cache restored for
+# another key cannot pass.
 prismpm_installed_at() {
-  grep -qF "UOR-Foundation/PrismPM?rev=$1#$1)" "$PRISMPM_ROOT/.crates.toml" 2>/dev/null &&
-    test -x "$PRISMPM_ROOT/bin/prismpm"
+  test -x "$PRISMPM_ROOT/bin/prismpm" &&
+    test "$(cat "$PRISMPM_ROOT/pins" 2>/dev/null)" == "$(printf 'prismpm %s\nlexlean %s' "$1" "$2")"
 }
 
-# install_prismpm: build `prismpm` at the pinned revision from the PrismPM
-# workspace's binary crate, unless $PRISMPM_ROOT already holds exactly that revision.
-# The build is the debug profile: PrismPM's release profile (thin LTO, one codegen
-# unit) is killed for memory on the 7 GB runners and on the machines this was
-# developed on, and `prismpm build` spends its time in the LexLean checker, which
-# the debug profile of the binary does not change.
+# install_prismpm: `prismpm` at the pinned PrismPM revision, built with the LexLean
+# revision of .github/lexlean.rev in place of the LexLean it vendors, unless
+# $PRISMPM_ROOT already holds exactly that pair. One pin drives both tools (R1): the
+# compiler that certifies the core is the compiler lexlean.lock was made with.
+#
+# Nothing in PrismPM changes. The build is a copy of the PrismPM tree at the revision
+# whose vendor/lexlean is the package `cargo package` makes of the LexLean tree at
+# the revision, so Cargo.lock is the one PrismPM committed (--locked). The profile is
+# debug: PrismPM's release profile (thin LTO, one codegen unit) is killed for memory
+# on the 7 GB runners and on the machines this was developed on, and `prismpm build`
+# spends its time in the LexLean checker, which the profile of the binary does not
+# change.
 install_prismpm() {
-  local rev
+  local rev lexlean scratch
   rev=$(prismpm_rev)
-  if ! prismpm_installed_at "$rev"; then
+  lexlean=$(lexlean_rev)
+  if ! prismpm_installed_at "$rev" "$lexlean"; then
     rm -rf "$PRISMPM_ROOT"
-    cargo install --git https://github.com/UOR-Foundation/PrismPM \
-      --rev "$rev" --locked --debug --root "$PRISMPM_ROOT" prismpm
+    scratch=$(mktemp -d)
+    fetch_rev https://github.com/UOR-Foundation/LexLean "$lexlean" "$scratch/lexlean"
+    fetch_rev https://github.com/UOR-Foundation/PrismPM "$rev" "$scratch/prismpm"
+    (cd "$scratch/lexlean" && cargo package -p lexlean --no-verify --allow-dirty)
+    tar -xzf "$scratch"/lexlean/target/package/lexlean-*.crate -C "$scratch"
+    rm -rf "$scratch/prismpm/vendor/lexlean"
+    mv "$scratch"/lexlean-*/ "$scratch/prismpm/vendor/lexlean"
+    (cd "$scratch/prismpm" && cargo install --path crates/prismpm --locked --debug --root "$PRISMPM_ROOT")
+    printf 'prismpm %s\nlexlean %s' "$rev" "$lexlean" >"$PRISMPM_ROOT/pins"
+    rm -rf "$scratch"
   fi
-  prismpm_installed_at "$rev"
+  prismpm_installed_at "$rev" "$lexlean"
   echo "$PRISMPM_ROOT/bin" >>"${GITHUB_PATH:-/dev/null}"
   "$PRISMPM_ROOT/bin/prismpm" --version
 }
@@ -363,6 +392,15 @@ build_conformance() {
 
 # check_core_identity: a rebuild reproduces the recorded identity of the core.
 check_core_identity() {
+  local main conformance
+  main=$(sed -n 's/^compiler_semantics = "\(.*\)"$/\1/p' lexlean.lock)
+  conformance=$(sed -n 's/^compiler_semantics = "\(.*\)"$/\1/p' lexlean.conformance.lock)
+  echo "lexlean.lock records compiler-semantics $main"
+  echo "lexlean.conformance.lock records       $conformance"
+  if [[ -z $main || $main != "$conformance" ]]; then
+    echo "The two locks were made by different compilers; .github/lexlean.rev is the one pin." >&2
+    return 1
+  fi
   node conformance/oracle/identity.mjs \
     --result "${RUNNER_TEMP:?}/production-result.json" \
     --lock lexlean.conformance.lock \

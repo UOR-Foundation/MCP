@@ -351,6 +351,27 @@ fn the_core_artifact_is_recorded_by_digest_cf_06() {
         hex(&Sha256::digest(&lock)),
         "core-identity.json was not made from this lock: rebuild and `identity.mjs --write`"
     );
+    // One compiler pin: the lock of the conformance project and the lock of the main
+    // project record the same compiler, and the record names it.
+    let semantics = |lock: &str| -> String {
+        read(lock)
+            .lines()
+            .find_map(|line| {
+                line.strip_prefix("compiler_semantics = \"")
+                    .map(|rest| rest.trim_end_matches('"').to_string())
+            })
+            .unwrap_or_else(|| panic!("{lock} records a compiler"))
+    };
+    assert_eq!(
+        semantics("lexlean.conformance.lock"),
+        semantics("lexlean.lock"),
+        "both locks are made by the compiler of .github/lexlean.rev"
+    );
+    assert_eq!(
+        identity["compiler"]["semantics"],
+        semantics("lexlean.lock"),
+        "the core was exported by the compiler of .github/lexlean.rev"
+    );
     let files = identity["package"]["files"].as_array().expect("files");
     let paths: Vec<&str> = files
         .iter()
@@ -467,9 +488,12 @@ fn the_pins_of_the_oracle_run_agree_with_their_authority_records_cf_07() {
         .bytes()
         .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)));
     assert!(
-        pin.contains("moves to the SDK release before MCP v0.1.0")
-            || pin.contains("The pin moves to the PrismPM SDK release before MCP v0.1.0"),
+        pin.contains("The pin moves to the PrismPM SDK release before MCP v0.1.0"),
         "the pin says when it moves"
+    );
+    assert!(
+        pin.contains("pin a LexLean release that contains SM-37"),
+        "the pin says what the release must pin"
     );
     let ci = read(".github/workflows/lexlean.yml") + &read(".github/lexlean-ci/lib.sh");
     assert!(
@@ -480,9 +504,9 @@ fn the_pins_of_the_oracle_run_agree_with_their_authority_records_cf_07() {
     assert!(prismpm
         .citation
         .contains("f5927bf46b92179d807ee6bf987f024b2f5a4e7e"));
-    assert!(
-        pin.contains(&"f5927bf46b92179d807ee6bf987f024b2f5a4e7e"[..12]),
-        "the pin names the commit the authority cites as its base"
+    assert_eq!(
+        revision, "f5927bf46b92179d807ee6bf987f024b2f5a4e7e",
+        "the pin is the commit the authority cites"
     );
     let mut lines = Vec::new();
     for dir in ["conformance/src/Foundation", "language/prism.arch"] {

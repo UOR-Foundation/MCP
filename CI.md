@@ -52,6 +52,39 @@ Every third-party action is pinned by its full commit SHA, and the elan and
 cargo-deny archives are pinned by version and SHA-256 and checked before they
 are unpacked.
 
+## The conformance job and the PrismPM pin
+
+`conformance / server suite and schema oracle` builds the conformance server
+application (`conformance/`, [CONFORMANCE-RUN.md](CONFORMANCE-RUN.md)) and runs the MCP
+project's own oracles over it. Its steps, in order: `prismpm` at `.github/prismpm.rev`;
+the copies of PrismPM's files equal the files at that revision (`sdk_copies_agree`);
+`prismpm build`; the core is the one `conformance/core-identity.json` records; the
+consumer workspace builds and its binding passes `cargo test`, `cargo fmt` and `cargo
+clippy`; the pinned suite is installed (`conformance/oracle/fetch-suite.sh`, `npm ci`);
+the oracle scripts pass their own tests; the suite's server runner is run over loopback;
+the schema oracle validates the recorded transcript against the pinned 2026-07-28
+`schema.json`; the per-scenario table is written to the step summary. The server-suite
+step fails while any scenario fails, and its annotation names the failing scenarios
+and the pull request each waits on (`conformance/waiting.json`).
+
+`.github/prismpm.rev` is the only place the PrismPM revision is written. It names
+PrismPM#339 at its head, and it moves to the PrismPM SDK release before MCP v0.1.0.
+
+**One LexLean pin drives both tools.** PrismPM vendors its own LexLean (`cee0fbade` at
+#339's head), which cannot read this repository's sources and has no `nested_induction`.
+Development imports commits, so `install_prismpm` builds `prismpm` from a copy of the PrismPM
+tree at the pinned revision whose `vendor/lexlean` is the package `cargo package` makes of
+the LexLean tree at `.github/lexlean.rev`. Nothing in PrismPM changes, `Cargo.lock` is
+PrismPM's own (`--locked`), and the binary is accepted only when `$PRISMPM_ROOT/pins` names
+both revisions, which are also the cache key. The profile is debug, because PrismPM's release
+profile is killed for memory on a 7 GB runner. The compiler that certifies the core is then the
+compiler `lexlean.lock` was made with, and CI checks it twice: `lexlean.conformance.lock` and
+`lexlean.lock` record the same `compiler_semantics`, and the production result `prismpm build`
+writes names that same compiler (`conformance/oracle/identity.mjs`).
+
+**Release.** MCP v0.1.0 pins a PrismPM SDK release, and that release must pin a LexLean release
+that contains SM-37. Until then the pair above is a development pin.
+
 ## Request pins and the one regeneration command
 
 Every `crates/*/generated/request.json` pins what its packages were exported

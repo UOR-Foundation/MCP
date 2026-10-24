@@ -45,6 +45,9 @@ export function identity({ result, lock, packageFiles, reference }) {
   expect(output?.package?.name === PACKAGE, `the package must be ${PACKAGE}, found ${output?.package?.name}`);
   expect(output?.certification?.status === 'kernel-checked', `the certification must be kernel-checked, found ${output?.certification?.status}`);
   expect(result?.source?.lock_sha256 === sha256(lock), 'the production result was not made from this lock: lock_sha256 differs from the lock file');
+  // The compiler that built the core is the one the lock was made with.
+  const recorded = /^compiler_semantics = "([0-9a-f]{64})"$/m.exec(lock.toString('utf8'))?.[1];
+  expect(recorded !== undefined && recorded === result?.compiler?.semantics, `the compiler of the production result (${result?.compiler?.semantics}) is not the one the lock records (${recorded})`);
 
   const prefix = `${output?.package?.directory}/`;
   const files = [];

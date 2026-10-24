@@ -34,7 +34,7 @@ The adapter enforces only what PrismPM's model states: loopback, the origins `lo
 
 ```sh
 bash conformance/oracle/fetch-suite.sh "$SUITE"            # the pinned commit, then npm ci
-cargo install --git https://github.com/UOR-Foundation/PrismPM --rev "$(sed -n 's/^rev = //p' .github/prismpm.rev)" --locked --debug --root "$PRISMPM" prismpm
+( . .github/lexlean-ci/lib.sh && PRISMPM_ROOT="$PRISMPM" install_prismpm )   # PrismPM at .github/prismpm.rev, built with the LexLean of .github/lexlean.rev
 PATH="$PRISMPM/bin:$PATH" prismpm build                    # prints: build published: <id>
 bash conformance/lay-out.sh .prism/build/<id> production-result.json
 (cd conformance && cargo build --release --locked)
@@ -194,19 +194,26 @@ entrypoints are the declaration and the fixture root, and so is found by the sui
 core identity record, not by the kernel. `check_core_identity` fails on it as well, since the
 program digest moves.
 
-## What the PrismPM pin is, and what slice 3 still needs
+## The PrismPM pin, and what slice 3 still needs
 
-`.github/prismpm.rev` names PrismPM#339 at its head `f5927bf46b92` with one change, on the branch
-`claude/lexlean-mcp-conformance-compiler`: `vendor/lexlean` is release/v0.4 at `9796067`. The
-vendored `cee0fbade` stops at `LLP2001` on `term_cases` (`src/Json.lex.tex:230`) and cannot read
-this repository's sources. The lock `lexlean.conformance.lock` is made by `9796067`; the main
-project's lock is made by `0b0c95d96`, as `.github/lexlean.rev` says. The pin moves to the
-PrismPM SDK release before MCP v0.1.0.
+`.github/prismpm.rev` names PrismPM#339 at its head, `f5927bf46b92179d807ee6bf987f024b2f5a4e7e`.
+Nothing in PrismPM changes. #339 vendors LexLean `cee0fbade`, which cannot read this repository's
+sources (`LLP2001` on `term_cases`, `src/Json.lex.tex:230`) and has no `nested_induction`, so for
+development `install_prismpm` builds `prismpm` from a copy of the PrismPM tree whose
+`vendor/lexlean` is the package `cargo package` makes of the LexLean tree at `.github/lexlean.rev`
+(`0b0c95d96`, SM-37). One pin drives both tools. `Cargo.lock` is PrismPM's own (`--locked`). The
+compiler that certifies the core is then the compiler both locks were made with, and CI checks that:
+`lexlean.lock` and `lexlean.conformance.lock` record the same `compiler_semantics`, and so does the
+production result of `prismpm build`. The generated `src/lib.rs` of the core is byte for byte the
+`src/lib.rs` of the committed export `mcp_lifecycle`.
+
+Release: MCP v0.1.0 pins a PrismPM SDK release, and that release must pin a LexLean release that
+contains SM-37 (tracked in MCP#16).
 
 For PrismPM slice 3:
 
-* the vendored LexLean has to read MCP's sources: release/v0.4 at `9796067` or later, ideally the
-  `0b0c95d96` line the main project is locked with;
+* the vendored LexLean has to read MCP's sources, which needs SM-37 (`nested_induction`) or a
+  release that contains it;
 * the build controller reads the LexLean build root as `.lexlean`, so `lexlean.conformance.toml`
   sets `build_root = ".lexlean"`;
 * `prismpm verify` of a server application is still PP2014;
