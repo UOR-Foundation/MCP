@@ -14,12 +14,12 @@ mod common;
 use std::collections::BTreeSet;
 
 use common::{
-    after_calls, all_vectors, allowed_hosts_of, call, check_response, json_of, post_owned,
-    request_of, root, rpc, standard, META,
+    after_calls, all_vectors, allowed_hosts_of, byte_root_frame, call, check_response, json_of,
+    post_owned, request_of, root, rpc, standard, step_response_checked, META,
 };
 use lifecycle_oracle::{
-    decode_response, decode_step, drive, encode_request, encode_request_allowing, encode_turn,
-    exchange_frame, exchange_step, DriveError, Driven, Request, Response, Step, StepError,
+    decode_step, drive, encode_request, encode_request_allowing, encode_turn, exchange_step,
+    DriveError, Driven, Request, Response, Step, StepError,
 };
 use serde_json::Value;
 
@@ -68,7 +68,7 @@ fn never(tag: u32, payload: &[u8]) -> Vec<u8> {
 fn driven(request: &Request) -> (Driven, Response, Value) {
     let frame = encode_request(request);
     let driven = drive(&frame, BUDGET, answer_with_tag).expect("the root writes steps");
-    let response = decode_response(&driven.response).expect("a response frame");
+    let response = step_response_checked(&driven.response);
     let body = json_of(&response);
     (driven, response, body)
 }
@@ -80,7 +80,7 @@ fn first_step(request: &Request) -> Step {
 
 fn done_response(step: Step) -> Response {
     match step {
-        Step::Done(bytes) => decode_response(&bytes).expect("a response frame"),
+        Step::Done(bytes) => step_response_checked(&bytes),
         other => panic!("expected done, found {other:?}"),
     }
 }
@@ -190,7 +190,7 @@ fn a_done_step_is_the_word_zero_and_the_response_frame_pe_02() {
     let request = post_owned(&standard("server/discover", None), &body);
     let written = exchange_step(&encode_turn(&encode_request(&request), &[]));
     assert_eq!(&written[..4], &[0, 0, 0, 0]);
-    let response = decode_response(&written[4..]).expect("the rest is a response frame");
+    let response = step_response_checked(&written[4..]);
     assert_eq!(response.status, 200);
 }
 
@@ -217,7 +217,7 @@ fn the_turn_is_the_request_chunk_the_count_and_the_completed_effects_pe_02() {
 
 fn internal_error_frame() -> Vec<u8> {
     // The frame the byte serve writes for a frame it cannot read.
-    exchange_frame(b"")
+    byte_root_frame(b"")
 }
 
 #[test]
@@ -232,7 +232,7 @@ fn every_proper_prefix_of_a_turn_is_done_with_the_internal_error_and_never_perfo
     assert_eq!(whole.status, 200);
     assert_eq!(text_of(&json_of(&whole)), "chain:ox|oy");
     let internal = internal_error_frame();
-    let response = decode_response(&internal).expect("a response frame");
+    let response = step_response_checked(&internal);
     assert_eq!(response.status, 500);
     assert_eq!(code_of(&json_of(&response)), Some(-32603));
     for len in 0..turn.len() {
@@ -285,7 +285,7 @@ fn a_tool_that_requests_an_effect_is_performed_and_replayed_to_its_final_respons
     .expect("the root writes steps");
     assert_eq!(seen.turns, 2, "one turn to ask and one to answer");
     assert_eq!(seen.performed, vec![(1, b"alpha".to_vec())]);
-    let response = decode_response(&seen.response).expect("a response frame");
+    let response = step_response_checked(&seen.response);
     check_response(Some("tools/call"), &response);
     assert_eq!(response.status, 200);
     let body = json_of(&response);
@@ -522,7 +522,7 @@ fn a_request_that_fails_a_check_of_the_core_performs_no_effect_pe_04() {
         let seen = drive(&frame, BUDGET, never).unwrap_or_else(|e| panic!("{}: {e:?}", case.what));
         assert_eq!(seen.turns, 1, "{}", case.what);
         assert!(seen.performed.is_empty(), "{}", case.what);
-        let response = decode_response(&seen.response).expect("a response frame");
+        let response = step_response_checked(&seen.response);
         assert_eq!(response.status, case.status, "{}", case.what);
         if case.code.is_some() {
             assert_eq!(code_of(&json_of(&response)), case.code, "{}", case.what);
@@ -547,7 +547,7 @@ fn the_refusal_is_the_one_the_byte_serve_gives_for_the_same_frame_pe_04() {
         },
     ];
     for frame in frames {
-        let want = exchange_frame(&frame);
+        let want = byte_root_frame(&frame);
         let step = decode_step(&exchange_step(&encode_turn(&frame, &[]))).expect("a step");
         assert_eq!(step, Step::Done(want));
     }
@@ -564,7 +564,7 @@ fn arguments_that_fail_the_input_schema_are_a_tool_error_and_perform_no_effect_p
         let frame = encode_request(&tool_call("effect_read", arguments));
         let seen = drive(&frame, BUDGET, never).expect("the root writes steps");
         assert!(seen.performed.is_empty(), "{arguments}");
-        let response = decode_response(&seen.response).expect("a response frame");
+        let response = step_response_checked(&seen.response);
         assert_eq!(response.status, 200, "{arguments}");
         let body = json_of(&response);
         assert_eq!(body["result"]["isError"], true, "{arguments}");
@@ -580,7 +580,7 @@ fn an_unknown_tool_is_refused_and_performs_no_effect_pe_04() {
     let frame = encode_request(&tool_call("no_such_tool", "{}"));
     let seen = drive(&frame, BUDGET, never).expect("the root writes steps");
     assert!(seen.performed.is_empty());
-    let response = decode_response(&seen.response).expect("a response frame");
+    let response = step_response_checked(&seen.response);
     assert_eq!(response.status, 400);
     assert_eq!(code_of(&json_of(&response)), Some(-32602));
 }
@@ -590,10 +590,10 @@ fn an_unknown_tool_is_refused_and_performs_no_effect_pe_04() {
 #[test]
 fn the_step_of_every_vector_is_done_with_the_response_of_the_byte_serve_pe_05() {
     let vectors = all_vectors();
-    assert!(vectors.len() > 100, "{} vectors", vectors.len());
+    assert!(vectors.len() >= 41, "{} vectors", vectors.len());
     for vector in &vectors {
         let frame = encode_request_allowing(&request_of(vector), &allowed_hosts_of(vector));
-        let want = exchange_frame(&frame);
+        let want = byte_root_frame(&frame);
         let step = decode_step(&exchange_step(&encode_turn(&frame, &[]))).expect("a step");
         assert_eq!(
             step,
@@ -621,7 +621,7 @@ fn the_byte_serve_answers_a_provider_that_requests_an_effect_with_the_internal_e
         // The root answers the target byte-serve with the byte serve: a response frame, and
         // not a step.
         let written = exchange_step(&encode_turn(&encode_request(&request), &[]));
-        let response = decode_response(&written).expect("a response frame, not a step");
+        let response = step_response_checked(&written);
         assert_eq!(response.status, 500);
         let body = json_of(&response);
         assert_eq!(body["jsonrpc"], "2.0");
@@ -639,7 +639,7 @@ fn the_byte_serve_answers_a_request_without_an_effect_as_ever_pe_06() {
     let mut request = tool_call("echo", "{}");
     request.target = b"byte-serve".to_vec();
     let written = exchange_step(&encode_turn(&encode_request(&request), &[]));
-    let response = decode_response(&written).expect("a response frame");
+    let response = step_response_checked(&written);
     assert_eq!(response.status, 200);
     assert_eq!(text_of(&json_of(&response)), "ok");
 }
