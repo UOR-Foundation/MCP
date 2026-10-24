@@ -108,10 +108,10 @@ counted, not excused:
 
 ## What passes today
 
-Run of the core of this commit (core digest below), spec 2026-07-28, 113 HTTP exchanges,
-228 JSON-RPC messages, 67 refused probes, 1 transport refusal, every message valid.
+Run of the core of this commit (core digest below), spec 2026-07-28, 117 HTTP exchanges,
+236 JSON-RPC messages, 60 refused probes, 1 transport refusal, every message valid.
 
-Required: 27 of 37 pass. Not scored: 3 of 13 pass, 1 is skipped by the suite, 9 fail. Every failing scenario waits on #30 or #32.
+Required: 32 of 37 pass. Not scored: 3 of 13 pass, 1 is skipped by the suite, 9 fail. Every failing scenario waits on #30 or #32.
 
 | # | kind | scenario | result | checks | waits on |
 |---|---|---|---|---|---|
@@ -138,19 +138,19 @@ Required: 27 of 37 pass. Not scored: 3 of 13 pass, 1 is skipped by the suite, 9 
 | 21 | required | `prompts-get-with-image` | pass | 2 of 2 |  |
 | 22 | required | `dns-rebinding-protection` | pass | 2 of 2 |  |
 | 23 | required | `caching` | pass | 8 of 8 |  |
-| 24 | required | `input-required-result-basic-elicitation` | **fail** | 1 of 2 | #10 (PR #30) |
-| 25 | required | `input-required-result-basic-sampling` | **fail** | 1 of 2 | #10 (PR #30) |
-| 26 | required | `input-required-result-basic-list-roots` | **fail** | 1 of 2 | #10 (PR #30) |
+| 24 | required | `input-required-result-basic-elicitation` | pass | 3 of 3 |  |
+| 25 | required | `input-required-result-basic-sampling` | pass | 3 of 3 |  |
+| 26 | required | `input-required-result-basic-list-roots` | pass | 3 of 3 |  |
 | 27 | required | `input-required-result-request-state` | **fail** | 1 of 2 | #10 (PR #30) |
 | 28 | required | `input-required-result-multiple-input-requests` | **fail** | 1 of 2 | #10 (PR #30) |
 | 29 | required | `input-required-result-multi-round` | **fail** | 1 of 2 | #10 (PR #30) |
-| 30 | required | `input-required-result-missing-input-response` | pass | 1 of 2 (1 warning) |  |
-| 31 | required | `input-required-result-non-tool-request` | **fail** | 1 of 2 | #10 (PR #30) |
-| 32 | required | `input-required-result-result-type` | **fail** | 1 of 2 | #10 (PR #30) |
+| 30 | required | `input-required-result-missing-input-response` | pass | 2 of 2 |  |
+| 31 | required | `input-required-result-non-tool-request` | pass | 3 of 3 |  |
+| 32 | required | `input-required-result-result-type` | pass | 2 of 2 |  |
 | 33 | required | `input-required-result-unsupported-methods` | pass | 2 of 2 |  |
 | 34 | required | `input-required-result-tampered-state` | **fail** | 1 of 2 | #10 (PR #30) |
 | 35 | required | `input-required-result-capability-check` | **fail** | 1 of 2 | #10 (PR #30) |
-| 36 | required | `input-required-result-ignore-extra-params` | pass | 1 of 2 (1 warning) |  |
+| 36 | required | `input-required-result-ignore-extra-params` | pass | 2 of 2 |  |
 | 37 | required | `input-required-result-validate-input` | pass | 3 of 3 |  |
 | 38 | not scored | `tasks-lifecycle` | **fail** | 1 of 9 | #12 (PR #32) |
 | 39 | not scored | `tasks-capability-negotiation` | **fail** | 1 of 5 | #12 (PR #32) |
@@ -166,10 +166,7 @@ Required: 27 of 37 pass. Not scored: 3 of 13 pass, 1 is skipped by the suite, 9 
 | 49 | not scored | `http-header-validation` | pass | 14 of 14 |  |
 | 50 | not scored | `http-custom-header-server-validation` | pass | 10 of 10 |  |
 
-Four passes need a caution. `input-required-result-missing-input-response` and
-`input-required-result-ignore-extra-params` pass with one warning each, because the tool they
-call is not listed yet and a refusal is an acceptable answer to those probes; they pass
-vacuously until MCP#10 lands. `server-sse-multiple-streams` passes with an info: the core answers
+Two passes need a caution. `server-sse-multiple-streams` passes with an info: the core answers
 JSON, and event streams are optional there. `server-stateless` passes with 5 of its 30 checks skipped by
 the suite: the checks that need a `subscriptions/listen` stream. The suite skips them for a server that
 advertises no `listChanged` or `subscribe` capability (`stateless.ts`, the comment above
@@ -181,8 +178,13 @@ report with their check ids.
 
 ### Not met
 
-* The ten `input-required-result-*` scenarios in the table (required): the tools and the
-  prompt they call are registered by MCP#10, PR #30.
+* Five `input-required-result-*` scenarios in the table (required): `request-state`,
+  `multiple-input-requests`, `multi-round`, `tampered-state` and `capability-check`. Their tools
+  are registered by MCP#10, PR #30, and ask for a `requestState`, which the core writes only
+  with the host's key (`LIFECYCLE.md`, "key"). The conformance application declares one frame
+  section, the count of tool calls, and no key, so the core refuses them with an internal error.
+  The key section of the application is the open work. The other nine `input-required-result-*`
+  scenarios pass.
 * Nine `tasks-*` scenarios (not scored): the tools and the `tasks/*` methods they call are
   registered by MCP#12, PR #32. `tasks-status-notifications` is skipped by the suite.
 
@@ -199,7 +201,7 @@ writes no log message, so both probes pass. The core digest changed with the fix
 ## The identity of the core
 
 `conformance/core-identity.json` records the core by the SHA-256 of its compiled program,
-`5da88084314a27a48dfe69a936f6df4d64c3e936103b625a93e04888da98dfc8`, with the package, its file
+`7cbffcf5422d15c36bdaf4d9284c13df5e7651f5c60fd3b31ca2959943cd7b77`, with the package, its file
 digests, the source and semantic IDs and the lock it was exported from, and the compiler that
 exported it. That program digest is the one the committed export `mcp_lifecycle` of the same root
 records: the compiled program does not depend on the compiler that exported it, while the

@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "interactive-tools"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Interact"
+component = "Interact"
+
+[[form]]
+id = "interactive-tools"
+channel = "text"
+surface = "Interactive tools"
+canonical_source = true
+features = ["sentence-case", "singular"]

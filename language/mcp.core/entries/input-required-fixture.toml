@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "input-required-fixture"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "InputFixture"
+component = "InputFixture"
+
+[[form]]
+id = "input-required-fixture"
+channel = "text"
+surface = "Input-required fixture"
+canonical_source = true
+features = ["sentence-case", "singular"]

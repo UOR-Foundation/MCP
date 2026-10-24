@@ -192,6 +192,8 @@ tools answer a text result in every case. `subscriptions/listen` stays unregiste
 subscribe capability, which the specification schema makes optional (`ServerCapabilities`, `ToolListChangedNotification`:
 "An optional notification").
 
+The catalog also lists the eight tools that ask the client for input (`test_input_required_result_*`), which are described in [INPUT-REQUIRED.md](INPUT-REQUIRED.md#the-fixture-tools); they come after the tools above and share the argument check of `tools/call`.
+
 ## Kernel theorems
 
 `ToolLaws.lex.tex` states, and `lexlean verify` checks, the order of `tools/list`, that an

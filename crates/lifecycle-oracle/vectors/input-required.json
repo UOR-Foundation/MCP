@@ -1,0 +1,1315 @@
+{
+ "spec": "lifecycle-vectors/1",
+ "suite": {
+  "repository": "https://github.com/modelcontextprotocol/conformance",
+  "commit": "232a9014457eaf4c59559916e3d616d2f7f28f05"
+ },
+ "state_key_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+ "vectors": [
+  {
+   "id": "IV-01",
+   "scenario": "input-required-result-basic-elicitation",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 75,
+   "quote": "const r1 = await sendRpc(serverUrl, 'tools/call', {",
+   "suite_checks": [
+    "sep-2322-elicitation-incomplete"
+   ],
+   "register": [
+    "IR-01"
+   ],
+   "request": {
+    "id": 501,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_elicitation",
+     "arguments": {}
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "input_required"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "eq": "mcp-core-fixture"
+     },
+     {
+      "at": "/result/inputRequests",
+      "keys": [
+       "user_name"
+      ]
+     },
+     {
+      "at": "/result/inputRequests/user_name/method",
+      "eq": "elicitation/create"
+     },
+     {
+      "at": "/result/inputRequests/user_name/params/message",
+      "eq": "What is your name?"
+     },
+     {
+      "at": "/result/inputRequests/user_name/params/requestedSchema/required",
+      "eq": [
+       "name"
+      ]
+     },
+     {
+      "at": "/result/requestState",
+      "absent": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-02",
+   "scenario": "input-required-result-basic-elicitation",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 121,
+   "quote": "const r2 = await sendRpc(serverUrl, 'tools/call', {",
+   "suite_checks": [
+    "sep-2322-elicitation-complete"
+   ],
+   "register": [
+    "IR-01"
+   ],
+   "request": {
+    "id": 502,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_elicitation",
+     "arguments": {},
+     "inputResponses": {
+      "$key:IV-01": {
+       "action": "accept",
+       "content": {
+        "name": "Alice"
+       }
+      }
+     }
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/inputRequests",
+      "absent": true
+     },
+     {
+      "at": "/result/content",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/content/0/text",
+      "eq": "Hello, Alice!"
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-03",
+   "scenario": "input-required-result-basic-sampling",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 221,
+   "quote": "const r1 = await sendRpc(serverUrl, 'tools/call', {",
+   "suite_checks": [
+    "sep-2322-sampling-incomplete"
+   ],
+   "register": [
+    "IR-02"
+   ],
+   "request": {
+    "id": 503,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_sampling",
+     "arguments": {}
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "input_required"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "eq": "mcp-core-fixture"
+     },
+     {
+      "at": "/result/inputRequests",
+      "keys": [
+       "capital_question"
+      ]
+     },
+     {
+      "at": "/result/inputRequests/capital_question/method",
+      "eq": "sampling/createMessage"
+     },
+     {
+      "at": "/result/inputRequests/capital_question/params/maxTokens",
+      "eq": 100
+     },
+     {
+      "at": "/result/inputRequests/capital_question/params/messages/0/role",
+      "eq": "user"
+     },
+     {
+      "at": "/result/inputRequests/capital_question/params/messages/0/content/text",
+      "eq": "What is the capital of France?"
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-04",
+   "scenario": "input-required-result-basic-sampling",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 270,
+   "quote": "const r2 = await sendRpc(serverUrl, 'tools/call', {",
+   "suite_checks": [
+    "sep-2322-sampling-complete"
+   ],
+   "register": [
+    "IR-02"
+   ],
+   "request": {
+    "id": 504,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_sampling",
+     "arguments": {},
+     "inputResponses": {
+      "$key:IV-03": {
+       "role": "assistant",
+       "content": {
+        "type": "text",
+        "text": "The capital of France is Paris."
+       },
+       "model": "test-model",
+       "stopReason": "endTurn"
+      }
+     }
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/inputRequests",
+      "absent": true
+     },
+     {
+      "at": "/result/content",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/content/0/text",
+      "eq": "Sampling result: The capital of France is Paris."
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-05",
+   "scenario": "input-required-result-basic-list-roots",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 357,
+   "quote": "const r1 = await sendRpc(serverUrl, 'tools/call', {",
+   "suite_checks": [
+    "sep-2322-list-roots-incomplete"
+   ],
+   "register": [
+    "IR-03"
+   ],
+   "request": {
+    "id": 505,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_list_roots",
+     "arguments": {}
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "input_required"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "eq": "mcp-core-fixture"
+     },
+     {
+      "at": "/result/inputRequests",
+      "keys": [
+       "client_roots"
+      ]
+     },
+     {
+      "at": "/result/inputRequests/client_roots/method",
+      "eq": "roots/list"
+     },
+     {
+      "at": "/result/inputRequests/client_roots/params",
+      "eq": {}
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-06",
+   "scenario": "input-required-result-basic-list-roots",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 406,
+   "quote": "const r2 = await sendRpc(serverUrl, 'tools/call', {",
+   "suite_checks": [
+    "sep-2322-list-roots-complete"
+   ],
+   "register": [
+    "IR-03"
+   ],
+   "request": {
+    "id": 506,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_list_roots",
+     "arguments": {},
+     "inputResponses": {
+      "$key:IV-05": {
+       "roots": [
+        {
+         "uri": "file:///test/root",
+         "name": "Test Root"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/inputRequests",
+      "absent": true
+     },
+     {
+      "at": "/result/content",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/content/0/text",
+      "eq": "Found 1 root(s)"
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-07",
+   "scenario": "input-required-result-request-state",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 501,
+   "quote": "const r1 = await sendRpc(serverUrl, 'tools/call', {",
+   "suite_checks": [
+    "sep-2322-request-state-incomplete"
+   ],
+   "register": [
+    "IR-04"
+   ],
+   "request": {
+    "id": 507,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_request_state",
+     "arguments": {}
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "input_required"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "eq": "mcp-core-fixture"
+     },
+     {
+      "at": "/result/inputRequests",
+      "keys": [
+       "confirm"
+      ]
+     },
+     {
+      "at": "/result/inputRequests/confirm/method",
+      "eq": "elicitation/create"
+     },
+     {
+      "at": "/result/requestState",
+      "state_format": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-08",
+   "scenario": "input-required-result-request-state",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 540,
+   "quote": "const r2 = await sendRpc(serverUrl, 'tools/call', {",
+   "suite_checks": [
+    "sep-2322-request-state-complete"
+   ],
+   "register": [
+    "IR-04"
+   ],
+   "request": {
+    "id": 508,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_request_state",
+     "arguments": {},
+     "inputResponses": {
+      "$key:IV-07": {
+       "action": "accept",
+       "content": {
+        "ok": true
+       }
+      }
+     },
+     "requestState": "$state:IV-07"
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/inputRequests",
+      "absent": true
+     },
+     {
+      "at": "/result/content",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/content/0/text",
+      "contains": "state-ok"
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-09",
+   "scenario": "input-required-result-multiple-input-requests",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 644,
+   "quote": "const r1 = await sendRpc(serverUrl, 'tools/call', {",
+   "suite_checks": [
+    "sep-2322-multiple-inputs-incomplete"
+   ],
+   "register": [
+    "IR-05"
+   ],
+   "request": {
+    "id": 509,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_multiple_inputs",
+     "arguments": {}
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "input_required"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "eq": "mcp-core-fixture"
+     },
+     {
+      "at": "/result/inputRequests",
+      "keys": [
+       "user_name",
+       "greeting",
+       "client_roots"
+      ]
+     },
+     {
+      "at": "/result/inputRequests/user_name/method",
+      "eq": "elicitation/create"
+     },
+     {
+      "at": "/result/inputRequests/greeting/method",
+      "eq": "sampling/createMessage"
+     },
+     {
+      "at": "/result/inputRequests/client_roots/method",
+      "eq": "roots/list"
+     },
+     {
+      "at": "/result/requestState",
+      "state_format": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-10",
+   "scenario": "input-required-result-multiple-input-requests",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 715,
+   "quote": "const r2 = await sendRpc(serverUrl, 'tools/call', {",
+   "suite_checks": [
+    "sep-2322-multiple-inputs-complete"
+   ],
+   "register": [
+    "IR-05"
+   ],
+   "request": {
+    "id": 510,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_multiple_inputs",
+     "arguments": {},
+     "inputResponses": {
+      "user_name": {
+       "action": "accept",
+       "content": {
+        "name": "Alice"
+       }
+      },
+      "greeting": {
+       "role": "assistant",
+       "content": {
+        "type": "text",
+        "text": "Hello there!"
+       },
+       "model": "test-model",
+       "stopReason": "endTurn"
+      },
+      "client_roots": {
+       "roots": [
+        {
+         "uri": "file:///test/root",
+         "name": "Test Root"
+        }
+       ]
+      }
+     },
+     "requestState": "$state:IV-09"
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/inputRequests",
+      "absent": true
+     },
+     {
+      "at": "/result/content",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/content/0/text",
+      "eq": "Name: Alice; Greeting: Hello there!; Roots: 1"
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-11",
+   "scenario": "input-required-result-multi-round",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 830,
+   "quote": "const r1 = await sendRpc(serverUrl, 'tools/call', {",
+   "suite_checks": [
+    "sep-2322-multi-round-r1"
+   ],
+   "register": [
+    "IR-06"
+   ],
+   "request": {
+    "id": 511,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_multi_round",
+     "arguments": {}
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "input_required"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "eq": "mcp-core-fixture"
+     },
+     {
+      "at": "/result/inputRequests",
+      "keys": [
+       "step1"
+      ]
+     },
+     {
+      "at": "/result/requestState",
+      "state_format": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-12",
+   "scenario": "input-required-result-multi-round",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 866,
+   "quote": "const r2 = await sendRpc(serverUrl, 'tools/call', {",
+   "suite_checks": [
+    "sep-2322-multi-round-r2"
+   ],
+   "register": [
+    "IR-06"
+   ],
+   "request": {
+    "id": 512,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_multi_round",
+     "arguments": {},
+     "inputResponses": {
+      "$key:IV-11": {
+       "action": "accept",
+       "content": {
+        "name": "Alice"
+       }
+      }
+     },
+     "requestState": "$state:IV-11"
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "input_required"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "eq": "mcp-core-fixture"
+     },
+     {
+      "at": "/result/inputRequests",
+      "keys": [
+       "step2"
+      ]
+     },
+     {
+      "at": "/result/requestState",
+      "state_format": true
+     },
+     {
+      "at": "/result/requestState",
+      "ne_vector": [
+       "IV-11",
+       "/result/requestState"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-13",
+   "scenario": "input-required-result-multi-round",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 909,
+   "quote": "const r3 = await sendRpc(serverUrl, 'tools/call', {",
+   "suite_checks": [
+    "sep-2322-multi-round-r3"
+   ],
+   "register": [
+    "IR-06"
+   ],
+   "request": {
+    "id": 513,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_multi_round",
+     "arguments": {},
+     "inputResponses": {
+      "$key:IV-12": {
+       "action": "accept",
+       "content": {
+        "color": "blue"
+       }
+      }
+     },
+     "requestState": "$state:IV-12"
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/inputRequests",
+      "absent": true
+     },
+     {
+      "at": "/result/content",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/content/0/text",
+      "eq": "Multi-round complete for Alice who likes blue"
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-14",
+   "scenario": "input-required-result-missing-input-response",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 971,
+   "quote": "const r1 = await sendRpc(serverUrl, 'tools/call', {",
+   "suite_checks": [
+    "sep-2322-missing-response-rerequests"
+   ],
+   "register": [
+    "IR-07"
+   ],
+   "request": {
+    "id": 514,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_elicitation",
+     "arguments": {},
+     "inputResponses": {
+      "wrong_key": {
+       "action": "accept",
+       "content": {
+        "data": "wrong"
+       }
+      }
+     }
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "input_required"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "eq": "mcp-core-fixture"
+     },
+     {
+      "at": "/result/inputRequests",
+      "keys": [
+       "user_name"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-15",
+   "scenario": "input-required-result-non-tool-request",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 1066,
+   "quote": "const r1 = await sendRpc(serverUrl, 'prompts/get', {",
+   "suite_checks": [
+    "sep-2322-non-tool-incomplete"
+   ],
+   "register": [
+    "IR-08"
+   ],
+   "request": {
+    "id": 515,
+    "method": "prompts/get",
+    "params": {
+     "name": "test_input_required_result_prompt"
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "input_required"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "eq": "mcp-core-fixture"
+     },
+     {
+      "at": "/result/inputRequests",
+      "keys": [
+       "user_context"
+      ]
+     },
+     {
+      "at": "/result/inputRequests/user_context/method",
+      "eq": "elicitation/create"
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-16",
+   "scenario": "input-required-result-non-tool-request",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 1096,
+   "quote": "const r2 = await sendRpc(serverUrl, 'prompts/get', {",
+   "suite_checks": [
+    "sep-2322-non-tool-complete"
+   ],
+   "register": [
+    "IR-08"
+   ],
+   "request": {
+    "id": 516,
+    "method": "prompts/get",
+    "params": {
+     "name": "test_input_required_result_prompt",
+     "inputResponses": {
+      "$key:IV-15": {
+       "action": "accept",
+       "content": {
+        "context": "test context"
+       }
+      }
+     }
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/messages",
+      "nonempty_array": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-17",
+   "scenario": "input-required-result-result-type",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 1169,
+   "quote": "const r1 = await sendRpc(serverUrl, 'tools/call', {",
+   "suite_checks": [
+    "sep-2322-result-type-included"
+   ],
+   "register": [
+    "IR-09"
+   ],
+   "request": {
+    "id": 517,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_elicitation",
+     "arguments": {}
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "input_required"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "eq": "mcp-core-fixture"
+     },
+     {
+      "at": "/result/resultType",
+      "present": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-18",
+   "scenario": "input-required-result-unsupported-methods",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 1238,
+   "quote": "const resp = await sendRpc(serverUrl, method, {});",
+   "suite_checks": [
+    "sep-2322-not-on-unsupported-requests"
+   ],
+   "register": [
+    "IR-10"
+   ],
+   "request": {
+    "id": 518,
+    "method": "tools/list",
+    "params": {}
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/tools",
+      "nonempty_array": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-19",
+   "scenario": "input-required-result-unsupported-methods",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 1238,
+   "quote": "const resp = await sendRpc(serverUrl, method, {});",
+   "suite_checks": [
+    "sep-2322-not-on-unsupported-requests"
+   ],
+   "register": [
+    "IR-10"
+   ],
+   "request": {
+    "id": 519,
+    "method": "prompts/list",
+    "params": {}
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/prompts",
+      "nonempty_array": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-20",
+   "scenario": "input-required-result-tampered-state",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 1301,
+   "quote": "const r1 = await sendRpc(serverUrl, 'tools/call', {",
+   "suite_checks": [
+    "sep-2322-reject-tampered-state"
+   ],
+   "register": [
+    "IR-11"
+   ],
+   "request": {
+    "id": 520,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_tampered_state",
+     "arguments": {}
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "input_required"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "eq": "mcp-core-fixture"
+     },
+     {
+      "at": "/result/inputRequests",
+      "keys": [
+       "confirm"
+      ]
+     },
+     {
+      "at": "/result/requestState",
+      "state_format": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-21",
+   "scenario": "input-required-result-tampered-state",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 1338,
+   "quote": "const r2 = await sendRpc(serverUrl, 'tools/call', {",
+   "suite_checks": [
+    "sep-2322-reject-tampered-state"
+   ],
+   "register": [
+    "IR-11"
+   ],
+   "request": {
+    "id": 521,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_tampered_state",
+     "arguments": {},
+     "inputResponses": {
+      "$key:IV-20": {
+       "action": "accept",
+       "content": {
+        "ok": true
+       }
+      }
+     },
+     "requestState": "$tampered:IV-20"
+    }
+   },
+   "expect": {
+    "status": 400,
+    "checks": [
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/error/code",
+      "eq": -32602
+     },
+     {
+      "at": "/error/message",
+      "eq": "Invalid params: requestState failed verification"
+     },
+     {
+      "at": "/error/data",
+      "absent": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-22",
+   "scenario": "input-required-result-capability-check",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 1414,
+   "quote": "const resp = await sendRpc(serverUrl, 'tools/call', {",
+   "suite_checks": [
+    "sep-2322-respect-client-capabilities"
+   ],
+   "register": [
+    "IR-12"
+   ],
+   "request": {
+    "id": 522,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_capabilities",
+     "arguments": {}
+    },
+    "meta": {
+     "io.modelcontextprotocol/clientCapabilities": {
+      "sampling": {}
+     }
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "input_required"
+     },
+     {
+      "at": "/result/_meta/io.modelcontextprotocol~1serverInfo/name",
+      "eq": "mcp-core-fixture"
+     },
+     {
+      "at": "/result/inputRequests",
+      "keys": [
+       "sample_input"
+      ]
+     },
+     {
+      "at": "/result/inputRequests/sample_input/method",
+      "eq": "sampling/createMessage"
+     },
+     {
+      "at": "/result/inputRequests/elicit_input",
+      "absent": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-23",
+   "scenario": "input-required-result-ignore-extra-params",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 1497,
+   "quote": "const resp = await sendRpc(serverUrl, 'tools/call', {",
+   "suite_checks": [
+    "sep-2322-ignore-unexpected-params"
+   ],
+   "register": [
+    "IR-13"
+   ],
+   "request": {
+    "id": 523,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_elicitation",
+     "arguments": {},
+     "inputResponses": {
+      "user_name": {
+       "action": "accept",
+       "content": {
+        "name": "Alice"
+       }
+      },
+      "unknown_extra_key": {
+       "action": "accept",
+       "content": {
+        "foo": "bar"
+       }
+      },
+      "another_unexpected": {
+       "action": "accept",
+       "content": {
+        "baz": 123
+       }
+      }
+     }
+    }
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/inputRequests",
+      "absent": true
+     },
+     {
+      "at": "/result/content",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/content/0/text",
+      "eq": "Hello, Alice!"
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-24",
+   "scenario": "input-required-result-validate-input",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 1573,
+   "quote": "const resp = await sendRpc(",
+   "suite_checks": [
+    "sep-2322-validate-input-responses"
+   ],
+   "register": [
+    "IR-14"
+   ],
+   "request": {
+    "id": 524,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_elicitation",
+     "arguments": {},
+     "inputResponses": {
+      "user_name": 12345
+     }
+    },
+    "skip_validation": true
+   },
+   "expect": {
+    "status": 400,
+    "checks": [
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/error/code",
+      "eq": -32602
+     },
+     {
+      "at": "/error/message",
+      "eq": "Invalid params: inputResponses is not a valid InputResponses object"
+     }
+    ]
+   }
+  },
+  {
+   "id": "IV-25",
+   "scenario": "input-required-result-validate-input",
+   "file": "src/scenarios/server/input-required-result.ts",
+   "line": 1611,
+   "quote": "const resp2 = await sendRpc(",
+   "suite_checks": [
+    "sep-2322-error-on-protocol-error"
+   ],
+   "register": [
+    "IR-14"
+   ],
+   "request": {
+    "id": 525,
+    "method": "tools/call",
+    "params": {
+     "name": "test_input_required_result_elicitation",
+     "arguments": {},
+     "inputResponses": null
+    },
+    "skip_validation": true
+   },
+   "expect": {
+    "status": 400,
+    "checks": [
+     {
+      "at": "/result",
+      "absent": true
+     },
+     {
+      "at": "/error/code",
+      "eq": -32602
+     }
+    ]
+   }
+  }
+ ]
+}
