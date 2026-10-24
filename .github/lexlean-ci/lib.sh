@@ -319,3 +319,95 @@ sdk_copies_agree() {
   rm -rf "$scratch"
   return "$status"
 }
+
+# check_node: the node on the runner satisfies the engines of the pinned
+# conformance suite (^20.19.0 || >=22.12.0), which also runs the oracle scripts.
+check_node() {
+  local version major minor
+  version=$(node --version)
+  version=${version#v}
+  major=${version%%.*}
+  minor=${version#*.}
+  minor=${minor%%.*}
+  echo "node $version"
+  if ((major > 22 || (major == 22 && minor >= 12) || (major == 20 && minor >= 19))); then
+    return 0
+  fi
+  echo "node $version does not satisfy ^20.19.0 || >=22.12.0" >&2
+  return 1
+}
+
+# install_suite DIR: the pinned conformance suite, installed with `npm ci`
+# (conformance/oracle/fetch-suite.sh). The step output `root` and the
+# MCP_CONFORMANCE_SUITE_ROOT variable of later steps name it.
+install_suite() {
+  local dir=${1:?install_suite DIR}
+  bash conformance/oracle/fetch-suite.sh "$dir"
+  echo "MCP_CONFORMANCE_SUITE_ROOT=$dir" >>"${GITHUB_ENV:-/dev/null}"
+}
+
+# build_conformance: `prismpm build` of the conformance server application, then the
+# three generated packages laid beside the binding crate and the compiler's record
+# of the export beside the build. The build id is the step output `build`.
+build_conformance() {
+  local id
+  prismpm build | tee "${RUNNER_TEMP:?}/prismpm-build.log"
+  id=$(sed -n 's/^build published: \([0-9a-f]\{64\}\)$/\1/p' "$RUNNER_TEMP/prismpm-build.log" | tail -n 1)
+  if [[ -z $id ]]; then
+    echo "prismpm build did not print 'build published: <id>'" >&2
+    return 1
+  fi
+  echo "build=$id" >>"${GITHUB_OUTPUT:-/dev/null}"
+  bash conformance/lay-out.sh ".prism/build/$id" "$RUNNER_TEMP/production-result.json"
+}
+
+# check_core_identity: a rebuild reproduces the recorded identity of the core.
+check_core_identity() {
+  node conformance/oracle/identity.mjs \
+    --result "${RUNNER_TEMP:?}/production-result.json" \
+    --lock lexlean.conformance.lock \
+    --package conformance/mcp_conformance_core \
+    --reference crates/lifecycle-oracle/generated/mcp_lifecycle/provenance.json \
+    --check conformance/core-identity.json
+}
+
+# The directory the oracle runs write their reports and transcripts to.
+conformance_out() {
+  printf '%s\n' "${RUNNER_TEMP:?}/conformance-run"
+}
+
+# run_server_suite: the pinned suite's server runner over the served build. Exit 1
+# while any scenario fails; the last lines name the failing scenarios and the pull
+# request each waits on.
+run_server_suite() {
+  local out
+  out=$(conformance_out)
+  mkdir -p "$out"
+  node conformance/oracle/server-suite.mjs \
+    --suite-root "${MCP_CONFORMANCE_SUITE_ROOT:?}" --out "$out" \
+    "$PWD/conformance/target/release/mcp-conformance-host" serve
+}
+
+# run_schema_oracle: every message of the recorded transcript against the pinned
+# 2026-07-28 schema.
+run_schema_oracle() {
+  node conformance/oracle/schema-oracle.mjs \
+    --suite-root "${MCP_CONFORMANCE_SUITE_ROOT:?}" \
+    crates/lifecycle-oracle/suite/mcp-spec-80041ab0a139a8f4fb3adbc99f7ae9113ea59671/schema/2026-07-28/schema.json \
+    "$(conformance_out)/transcript.json"
+}
+
+# conformance_summary: the per-scenario table of the run, to the step summary and the log.
+conformance_summary() {
+  local report
+  report="$(conformance_out)/report.json"
+  test -f "$report" || { echo "no report: the suite did not run" >&2; return 1; }
+  node -e '
+    const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    const lines = ["| kind | scenario | status | checks passed | other |", "|---|---|---|---|---|"];
+    for (const s of r.scenarios) lines.push(`| ${s.kind} | ${s.scenario} | ${s.status} | ${s.passed}/${s.checks} | ${Object.entries(s.other).map(([k, v]) => k + " " + v).join(", ")} |`);
+    lines.push("", `required ${r.required.passing}/${r.required.scenarios}, not scored ${r.not_scored.passing}/${r.not_scored.scenarios}`);
+    for (const [label, names] of Object.entries(r.waits)) lines.push("", `${label}: ${names.join(", ")}`);
+    console.log(lines.join("\n"));
+  ' "$report" | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
+}

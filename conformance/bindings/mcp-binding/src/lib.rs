@@ -34,7 +34,14 @@ impl Native {
             }
             _ => (now, 0),
         };
-        self.window = Some((opened, if counted { calls.saturating_add(1) } else { calls }));
+        self.window = Some((
+            opened,
+            if counted {
+                calls.saturating_add(1)
+            } else {
+                calls
+            },
+        ));
         calls
     }
 }
@@ -79,9 +86,15 @@ mod tests {
         let mut host = Native::default();
         let start = Instant::now();
         assert_eq!(host.answer(true, start), 0);
-        assert_eq!(host.answer(true, start + WINDOW - Duration::from_millis(1)), 1);
+        assert_eq!(
+            host.answer(true, start + WINDOW - Duration::from_millis(1)),
+            1
+        );
         assert_eq!(host.answer(true, start + WINDOW), 0);
-        assert_eq!(host.answer(true, start + WINDOW + Duration::from_secs(1)), 1);
+        assert_eq!(
+            host.answer(true, start + WINDOW + Duration::from_secs(1)),
+            1
+        );
     }
 
     #[test]

@@ -34,8 +34,13 @@ export function verdict({ required, unscored, results, suiteSkipped = {}, waitin
       const skippedBySuite = Object.hasOwn(suiteSkipped, scenario) && checks.length > 0 && checks.every((check) => check.status === 'SKIPPED');
       const status = skippedBySuite ? 'skipped by the suite' : checks.length === 0 ? 'no checks' : failures.length > 0 ? 'fail' : passed === 0 ? 'no passing check' : 'pass';
       const other = {};
-      for (const check of checks) if (check.status !== 'SUCCESS' && check.status !== 'FAILURE') other[check.status] = (other[check.status] ?? 0) + 1;
-      rows.push({ scenario, kind, status, passed, failed: failures.length, checks: checks.length, other });
+      const notes = [];
+      for (const check of checks) {
+        if (check.status === 'SUCCESS' || check.status === 'FAILURE') continue;
+        other[check.status] = (other[check.status] ?? 0) + 1;
+        notes.push(`${check.status} ${check.id}: ${check.errorMessage ?? check.description ?? ''}`.trimEnd());
+      }
+      rows.push({ scenario, kind, status, passed, failed: failures.length, checks: checks.length, other, notes });
       if (checks.length === 0) diagnostics.push(`${scenario}: the scenario produced no checks`);
       for (const check of failures) {
         diagnostics.push(`${scenario}: ${check.id}: ${check.errorMessage ?? check.description ?? 'failed'}`);

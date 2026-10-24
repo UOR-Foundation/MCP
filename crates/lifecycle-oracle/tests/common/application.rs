@@ -56,10 +56,10 @@ fn find(id: &str) -> Value {
         resources_vector_file(),
         transport_vector_file(),
     ]
-        .iter()
-        .flat_map(|file| file["vectors"].as_array().expect("vectors").clone())
-        .find(|vector| vector["id"] == id)
-        .unwrap_or_else(|| panic!("no vector {id}"))
+    .iter()
+    .flat_map(|file| file["vectors"].as_array().expect("vectors").clone())
+    .find(|vector| vector["id"] == id)
+    .unwrap_or_else(|| panic!("no vector {id}"))
 }
 
 /// The vector of the pinned scenarios named `id`, as the adapter would carry it.
@@ -99,8 +99,12 @@ pub fn vector(id: &str) -> Vector {
         "the response frame of {id} carries notifications"
     );
 
-    let mut http_response =
-        format!("HTTP/1.1 {} {}\r\n", response.status, reason(response.status)).into_bytes();
+    let mut http_response = format!(
+        "HTTP/1.1 {} {}\r\n",
+        response.status,
+        reason(response.status)
+    )
+    .into_bytes();
     for (name, value) in &response.fields {
         http_response.extend_from_slice(name);
         http_response.extend_from_slice(b": ");
@@ -227,12 +231,12 @@ pub fn render() -> String {
             ("headerCountMaximum", word(100)),
             ("headerBytesMaximum", word(65_536)),
             ("bodyMaximum", word(1_048_576)),
-            ("origins", list(&format!("{MODEL}::ServingOrigin"), &origins)),
-            ("accept", "(nil String)".to_owned()),
             (
-                "contentTypes",
-                list("String", &[text("application/json")]),
+                "origins",
+                list(&format!("{MODEL}::ServingOrigin"), &origins),
             ),
+            ("accept", "(nil String)".to_owned()),
+            ("contentTypes", list("String", &[text("application/json")])),
             ("enforcedMethods", list("String", &[text("POST")])),
             ("countedField", text("Mcp-Method")),
             ("countedValue", text("tools/call")),
