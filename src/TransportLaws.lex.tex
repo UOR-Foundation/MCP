@@ -8,6 +8,7 @@
 \importmodule{Methods}
 \importmodule{Refusal}
 \importmodule{Serve}
+\importmodule{Tasks}
 \importmodule{Transport}
 \title{MCP transport laws}
 \begin{semanticmodule}
@@ -442,7 +443,7 @@ theorem{
   name: a_refused_gate_is_answered_by_the_refusal_alone,
   parameters: [
     info : Extension::ProviderInfo,
-    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    answer : (Fn (Tasks::TaskHost Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
     request : Http::HttpRequest,
     refusal : Transport::TransportRefusal
   ],
@@ -455,7 +456,7 @@ theorem{
   name: an_open_gate_serves_the_request_as_before,
   parameters: [
     info : Extension::ProviderInfo,
-    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    answer : (Fn (Tasks::TaskHost Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
     request : Http::HttpRequest
   ],
   statement: ((Serve::serveGated info answer request (ctor Option.none [Transport::TransportRefusal])) = (Serve::serveOpen info answer request)),
@@ -467,10 +468,10 @@ theorem{
   name: a_refusal_does_not_depend_on_the_provider_or_the_request,
   parameters: [
     infoA : Extension::ProviderInfo,
-    answerA : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    answerA : (Fn (Tasks::TaskHost Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
     requestA : Http::HttpRequest,
     infoB : Extension::ProviderInfo,
-    answerB : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    answerB : (Fn (Tasks::TaskHost Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
     requestB : Http::HttpRequest,
     refusal : Transport::TransportRefusal
   ],

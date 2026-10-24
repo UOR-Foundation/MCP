@@ -1,0 +1,272 @@
+\begin{lexlean}{TaskFixture}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Common}
+\importmodule{Content}
+\importmodule{Input}
+\importmodule{Json}
+\importmodule{JsonRpc}
+\importmodule{Methods}
+\importmodule{ResultJson}
+\importmodule{TaskServe}
+\importmodule{Tasks}
+\title{MCP task fixture}
+\begin{semanticmodule}
+definition{
+  name: objectOf,
+  parameters: [members : (List (String * Json::Json))],
+  result: Json::JsonObject,
+  body: (record Json::JsonObject {members := members}),
+  executable: true
+}
+
+definition{
+  name: kindProperty,
+  parameters: [kind : String],
+  result: Json::Json,
+  body: (ctor Json::Json.object (cons ("type", (ctor Json::Json.text kind)) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: noArgs,
+  parameters: [],
+  result: Json::JsonObject,
+  body: (objectOf (cons ("type", (ctor Json::Json.text "object")) (cons ("additionalProperties", (ctor Json::Json.bool false)) (nil (String * Json::Json))))),
+  executable: true
+}
+
+definition{
+  name: nameSchema,
+  parameters: [key : String],
+  result: Json::JsonObject,
+  body: (objectOf (cons ("type", (ctor Json::Json.text "object")) (cons ("properties", (ctor Json::Json.object (cons (key, (kindProperty "string")) (nil (String * Json::Json))))) (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text key) (nil Json::Json)))) (nil (String * Json::Json)))))),
+  executable: true
+}
+
+definition{
+  name: slowSchema,
+  parameters: [],
+  result: Json::JsonObject,
+  body: (objectOf (cons ("type", (ctor Json::Json.text "object")) (cons ("properties", (ctor Json::Json.object (cons ("seconds", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "integer")) (cons ("minimum", (ctor Json::Json.number (record Json::Decimal {mantissa := (0 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))))) (cons ("label", (kindProperty "string")) (nil (String * Json::Json)))))) (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text "seconds") (nil Json::Json)))) (nil (String * Json::Json)))))),
+  executable: true
+}
+
+definition{
+  name: taskTool,
+  parameters: [name : String, description : String, schema : Json::JsonObject],
+  result: Content::Tool,
+  body: (record Content::Tool {name := name, title := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)]), description := (ctor Option.some [String] description), inputSchema := schema, outputSchema := (ctor Option.none [Json::JsonObject]), annotations := (ctor Option.none [Content::ToolAnnotations]), meta := (ctor Option.none [Json::JsonObject])}),
+  executable: true
+}
+
+definition{
+  name: taskTools,
+  parameters: [],
+  result: (List Content::Tool),
+  body: (cons (taskTool "greet" "Answers a greeting at once; never a task" (nameSchema "name")) (cons (taskTool "slow_compute" "Computes for a number of seconds; a task for a client that declared the tasks extension" (slowSchema)) (cons (taskTool "failing_job" "Always fails; always a task, so the client must declare the tasks extension" (noArgs)) (cons (taskTool "protocol_error_job" "Ends in a protocol error; a task for a client that declared the tasks extension" (noArgs)) (cons (taskTool "confirm_delete" "Asks the client to confirm a deletion; a task that waits for input" (nameSchema "filename")) (cons (taskTool "multi_input" "Asks the client two questions at once; a task that waits for both answers" (noArgs)) (cons (taskTool "test_tool_with_task" "Asks for a name, then becomes a task; the client must declare the tasks extension" (noArgs)) (nil Content::Tool)))))))),
+  executable: true
+}
+
+definition{
+  name: isTool,
+  parameters: [params : Methods::CallToolParams, name : String],
+  result: Bool,
+  body: (prim equal (project params name) name : Bool),
+  executable: true
+}
+
+definition{
+  name: argumentOf,
+  parameters: [params : Methods::CallToolParams, key : String],
+  result: Json::Lookup,
+  body: (match (project params arguments)
+    | Option.none => (ctor Json::Lookup.absent)
+    | Option.some given => (Json::lookup key given)),
+  executable: true
+}
+
+definition{
+  name: argumentText,
+  parameters: [params : Methods::CallToolParams, key : String, fallback : String],
+  result: String,
+  body: (match (argumentOf params key)
+    | Json::Lookup.absent => fallback
+    | Json::Lookup.present value => (match (Json::asText value)
+      | Option.none => fallback
+      | Option.some text => text)),
+  executable: true
+}
+
+definition{
+  name: argumentSeconds,
+  parameters: [params : Methods::CallToolParams],
+  result: Int,
+  body: (match (argumentOf params "seconds")
+    | Json::Lookup.absent => (0 : Int)
+    | Json::Lookup.present value => (match (Json::asInteger value)
+      | Option.none => (0 : Int)
+      | Option.some whole => whole)),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: textBlock,
+  parameters: [content : String],
+  result: Content::ContentBlock,
+  body: (ctor Content::ContentBlock.text (record Content::TextContent {text := content, annotations := (ctor Option.none [Common::Annotations]), meta := (ctor Option.none [Json::JsonObject])})),
+  executable: true
+}
+
+definition{
+  name: syncResult,
+  parameters: [content : String, failed : Bool],
+  result: Methods::Progressed,
+  body: (record Methods::Progressed {result := (record Methods::CallToolResult {content := (cons (textBlock content) (nil Content::ContentBlock)), structuredContent := (ctor Option.none [Json::Json]), isError := (if failed then (ctor Option.some [Bool] true) else (ctor Option.none [Bool]))}), steps := (nil Methods::ProgressStep)}),
+  executable: true
+}
+
+definition{
+  name: internalFault,
+  parameters: [],
+  result: Tasks::PlanOutcome,
+  body: (ctor Tasks::PlanOutcome.fails (record JsonRpc::ErrorObject {code := (-32603 : Int), message := "Internal error", data := (ctor Option.none [Json::Json])})),
+  executable: true
+}
+
+definition{
+  name: completes,
+  parameters: [content : String, failed : Bool],
+  result: Tasks::PlanOutcome,
+  body: (match (ResultJson::sanitizedMembers (ResultJson::callToolMembers (project (syncResult content failed) result)))
+    | Option.none => (internalFault)
+    | Option.some members => (ctor Tasks::PlanOutcome.completes (record Json::JsonObject {members := members}))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: planOf,
+  parameters: [
+    parkAfterMs : Int,
+    parked : (List (String * Input::InputRequest)),
+    finishAfterMs : Int,
+    outcome : Tasks::PlanOutcome
+  ],
+  result: Tasks::TaskPlan,
+  body: (record Tasks::TaskPlan {parkAfterMs := parkAfterMs, parked := parked, finishAfterMs := finishAfterMs, outcome := outcome}),
+  executable: true
+}
+
+definition{
+  name: formRequest,
+  parameters: [message : String, key : String, kind : String],
+  result: Input::InputRequest,
+  body: (ctor Input::InputRequest.elicitation (ctor Input::ElicitRequestParams.form (record Input::ElicitFormParams {mode := (ctor Option.some [Input::ElicitFormMode] (ctor Input::ElicitFormMode.form)), message := message, requestedSchema := (objectOf (cons ("type", (ctor Json::Json.text "object")) (cons ("properties", (ctor Json::Json.object (cons (key, (kindProperty kind)) (nil (String * Json::Json))))) (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text key) (nil Json::Json)))) (nil (String * Json::Json))))))}))),
+  executable: true
+}
+
+definition{
+  name: slowCall,
+  parameters: [params : Methods::CallToolParams],
+  result: TaskServe::TaskCall,
+  body: (let seconds : Int := (argumentSeconds params); (let text : String := (prim join (cons "slow_compute" (cons (argumentText params "label" "unnamed") (cons "finished after" (cons (prim format_decimal seconds : String) (cons "seconds" (nil String)))))) " " : String); (ctor TaskServe::TaskCall.deferred (ctor TaskServe::TaskSupport.optional) (syncResult text false) (planOf (0 : Int) (nil (String * Input::InputRequest)) (prim multiply seconds (1000 : Int) : Int) (completes text false))))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: confirmCall,
+  parameters: [params : Methods::CallToolParams],
+  result: TaskServe::TaskCall,
+  body: (let text : String := (prim join (cons "Deleted" (cons (argumentText params "filename" "nothing") (nil String))) " " : String); (ctor TaskServe::TaskCall.deferred (ctor TaskServe::TaskSupport.optional) (syncResult text false) (planOf (0 : Int) (cons ("confirm", (formRequest (prim join (cons "Delete" (cons (argumentText params "filename" "nothing") (nil String))) " " : String) "confirm" "boolean")) (nil (String * Input::InputRequest))) (0 : Int) (completes text false)))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: multiCall,
+  parameters: [],
+  result: TaskServe::TaskCall,
+  body: (ctor TaskServe::TaskCall.deferred (ctor TaskServe::TaskSupport.optional) (syncResult "Both inputs received" false) (planOf (0 : Int) (cons ("first", (formRequest "First name" "name" "string")) (cons ("second", (formRequest "Second name" "name" "string")) (nil (String * Input::InputRequest)))) (0 : Int) (completes "Both inputs received" false))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: failingCall,
+  parameters: [],
+  result: TaskServe::TaskCall,
+  body: (ctor TaskServe::TaskCall.deferred (ctor TaskServe::TaskSupport.required) (syncResult "failing_job always fails" true) (planOf (0 : Int) (nil (String * Input::InputRequest)) (1000 : Int) (completes "failing_job always fails" true))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: protocolErrorCall,
+  parameters: [],
+  result: TaskServe::TaskCall,
+  body: (ctor TaskServe::TaskCall.deferred (ctor TaskServe::TaskSupport.optional) (syncResult "protocol_error_job has no result" true) (planOf (0 : Int) (nil (String * Input::InputRequest)) (500 : Int) (ctor Tasks::PlanOutcome.fails (record JsonRpc::ErrorObject {code := (-32603 : Int), message := "protocol_error_job failed", data := (ctor Option.none [Json::Json])})))),
+  executable: true
+}
+
+definition{
+  name: askName,
+  parameters: [],
+  result: TaskServe::TaskCall,
+  body: (ctor TaskServe::TaskCall.needsInput (ctor Input::InputRequiredResult.requests (cons ("user_name", (formRequest "What is your name?" "name" "string")) (nil (String * Input::InputRequest))))),
+  executable: true
+}
+
+definition{
+  name: gatheredName,
+  parameters: [answers : Json::JsonObject],
+  result: (Option String),
+  body: (match (Json::lookup "user_name" answers)
+    | Json::Lookup.absent => (ctor Option.none [String])
+    | Json::Lookup.present response => (match (Json::asObject response)
+      | Option.none => (ctor Option.none [String])
+      | Option.some given => (match (Json::lookup "content" given)
+        | Json::Lookup.absent => (ctor Option.none [String])
+        | Json::Lookup.present content => (match (Json::asObject content)
+          | Option.none => (ctor Option.none [String])
+          | Option.some filled => (match (Json::lookup "name" filled)
+            | Json::Lookup.absent => (ctor Option.none [String])
+            | Json::Lookup.present name => (Json::asText name)))))),
+  executable: true
+}
+
+definition{
+  name: greetedCall,
+  parameters: [name : String],
+  result: TaskServe::TaskCall,
+  body: (let text : String := (prim join (cons "Hello, " (cons name (cons "! (from a task)" (nil String)))) "" : String); (ctor TaskServe::TaskCall.deferred (ctor TaskServe::TaskSupport.required) (syncResult text false) (planOf (0 : Int) (nil (String * Input::InputRequest)) (100 : Int) (completes text false)))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: composedCall,
+  parameters: [params : Methods::CallToolParams],
+  result: TaskServe::TaskCall,
+  body: (match (project params inputResponses)
+    | Option.none => (askName)
+    | Option.some answers => (match (gatheredName answers)
+      | Option.none => (askName)
+      | Option.some name => (greetedCall name))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: taskCall,
+  parameters: [params : Methods::CallToolParams],
+  result: (Option TaskServe::TaskCall),
+  body: (if (isTool params "greet") then (ctor Option.some [TaskServe::TaskCall] (ctor TaskServe::TaskCall.plain (syncResult (prim join (cons "Hello, " (cons (argumentText params "name" "world") (cons "!" (nil String)))) "" : String) false))) else (if (isTool params "slow_compute") then (ctor Option.some [TaskServe::TaskCall] (slowCall params)) else (if (isTool params "confirm_delete") then (ctor Option.some [TaskServe::TaskCall] (confirmCall params)) else (if (isTool params "multi_input") then (ctor Option.some [TaskServe::TaskCall] (multiCall)) else (if (isTool params "failing_job") then (ctor Option.some [TaskServe::TaskCall] (failingCall)) else (if (isTool params "protocol_error_job") then (ctor Option.some [TaskServe::TaskCall] (protocolErrorCall)) else (if (isTool params "test_tool_with_task") then (ctor Option.some [TaskServe::TaskCall] (composedCall params)) else (ctor Option.none [TaskServe::TaskCall])))))))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

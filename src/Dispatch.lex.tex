@@ -106,6 +106,22 @@ definition{
 }
 
 definition{
+  name: storedGate,
+  parameters: [info : Extension::ProviderInfo, found : Tasks::StoredTask, declared : Bool],
+  result: (Result Reply Refusal::Refusal),
+  body: (if declared then (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info (ctor Methods::ResultBody.stored found))) else (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.missingCapability (Capabilities::tasksRequirement))))),
+  executable: true
+}
+
+definition{
+  name: storedReply,
+  parameters: [info : Extension::ProviderInfo, meta : Meta::RequestMeta, found : Tasks::StoredTask],
+  result: (Result Reply Refusal::Refusal),
+  body: (storedGate info found (Capabilities::clientDeclaresTasks (project meta clientCapabilities))),
+  executable: true
+}
+
+definition{
   name: taskReply,
   parameters: [
     info : Extension::ProviderInfo,
@@ -163,7 +179,10 @@ definition{
     | Methods::ResultBody.getTask found => (sameMethod method (ctor Methods::Method.tasksGet))
     | Methods::ResultBody.acknowledged => ((sameMethod method (ctor Methods::Method.tasksUpdate)) || (sameMethod method (ctor Methods::Method.tasksCancel)))
     | Methods::ResultBody.inputRequired needed => (Methods::supportsInputRequired method)
-    | Methods::ResultBody.taskCreated created => (Methods::supportsTaskResult method)),
+    | Methods::ResultBody.taskCreated created => (Methods::supportsTaskResult method)
+    | Methods::ResultBody.stored found => (match (project found shape)
+      | Tasks::StoredShape.read => (sameMethod method (ctor Methods::Method.tasksGet))
+      | Tasks::StoredShape.acked => ((sameMethod method (ctor Methods::Method.tasksUpdate)) || (sameMethod method (ctor Methods::Method.tasksCancel))))),
   executable: true
 }
 
@@ -215,6 +234,7 @@ definition{
   body: (match body
     | Methods::ResultBody.inputRequired needed => (pendingReply info (metaOfRequest request) needed)
     | Methods::ResultBody.taskCreated created => (taskReply info (metaOfRequest request) created)
+    | Methods::ResultBody.stored found => (storedReply info (metaOfRequest request) found)
     | Methods::ResultBody.discover found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))
     | Methods::ResultBody.listTools found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))
     | Methods::ResultBody.callTool found => (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info body))

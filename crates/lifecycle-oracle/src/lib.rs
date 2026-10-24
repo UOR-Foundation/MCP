@@ -79,9 +79,25 @@ pub const STACK_BYTES: usize = 2 * 1024 * 1024;
 /// One header field as the wire carries it: the name and the value as bytes.
 pub type Field = (Vec<u8>, Vec<u8>);
 
+/// What the host tells the core about the instant and the task table of one request
+/// (`TASKS.md`, "The host's side"). The core keeps no state, so the clock, an
+/// identifier for a task this request may create, and the table of tasks the host
+/// holds arrive with the request, and the table the core returns replaces the host's.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TaskHost {
+    /// A monotonic millisecond counter. Only differences between two readings matter.
+    pub now_ms: u64,
+    /// The same instant as ISO 8601 text, written into `createdAt` and `lastUpdatedAt`.
+    pub now: String,
+    /// The identifier a task created by this request receives. The core cannot make one.
+    pub fresh_id: String,
+    /// The table of tasks as the previous response returned it; empty for none.
+    pub table: Vec<u8>,
+}
+
 /// An HTTP request at the core boundary: the method, the target, the header fields
 /// in the order received, and the body.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Request {
     /// The request method, for example `POST`.
     pub method: Vec<u8>,
@@ -96,6 +112,8 @@ pub struct Request {
     /// and the client identity; the core only compares the count with the limit its
     /// provider declares (`LIFECYCLE.md`, "The boundary encoding").
     pub tool_calls: u32,
+    /// The clock, the identifier for a new task and the task table of this request.
+    pub host: TaskHost,
 }
 
 /// An HTTP response at the core boundary: the status, the header fields, the progress
@@ -113,6 +131,9 @@ pub struct Response {
     pub notifications: Vec<Vec<u8>>,
     /// The body bytes.
     pub body: Vec<u8>,
+    /// The task table the host stores from now on, when the core changed it; `None`
+    /// means the host keeps the table it holds.
+    pub tasks: Option<Vec<u8>>,
 }
 
 /// Why a response frame is not a response frame. The root writes well-formed frames,
@@ -150,6 +171,10 @@ pub fn encode_request(request: &Request) -> Vec<u8> {
     }
     put_chunk(&mut out, &request.body);
     put_u32(&mut out, request.tool_calls as usize);
+    out.extend_from_slice(&request.host.now_ms.to_be_bytes());
+    put_chunk(&mut out, request.host.now.as_bytes());
+    put_chunk(&mut out, request.host.fresh_id.as_bytes());
+    put_chunk(&mut out, &request.host.table);
     out
 }
 
@@ -190,8 +215,10 @@ impl Cursor<'_> {
 }
 
 /// Decode the frame the root writes: the status, the field count, each field, the
-/// notification count, each notification as a length-prefixed text, and a
-/// length-prefixed body, with no bytes after it.
+/// notification count, each notification as a length-prefixed text, a
+/// length-prefixed body, and, when the root returns a task table, a flag of 1 and the
+/// table as a length-prefixed chunk; a frame that ends after the body returns none, and
+/// there are no bytes after the table.
 ///
 /// # Errors
 ///
@@ -215,6 +242,14 @@ pub fn decode_response(frame: &[u8]) -> Result<Response, FrameError> {
         notifications.push(cursor.chunk()?);
     }
     let body = cursor.chunk()?;
+    let tasks = if cursor.at == frame.len() {
+        None
+    } else {
+        match cursor.word()? {
+            1 => Some(cursor.chunk()?),
+            _ => return Err(FrameError::Truncated),
+        }
+    };
     if cursor.at != frame.len() {
         return Err(FrameError::Trailing);
     }
@@ -223,6 +258,7 @@ pub fn decode_response(frame: &[u8]) -> Result<Response, FrameError> {
         fields,
         notifications,
         body,
+        tasks,
     })
 }
 

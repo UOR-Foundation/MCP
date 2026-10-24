@@ -76,11 +76,19 @@ u32 field_count
   u32 value_length    value
 u32 body_length       body
 u32 tool_calls                          the host's count of tool calls for this client in the current window
+[u64 now_ms                              the host's monotonic millisecond clock, eight bytes big-endian
+u32 now_length    now                   the same instant as ISO 8601 text, UTF-8
+u32 id_length     fresh_task_id         the identifier of a task this request may create, UTF-8
+u32 table_length  task_table            the host's table of tasks, a JSON array as the previous response returned it, or empty]   the host section, optional
 [u32 name_count, then name_count times u32 name_length and name]   the host's allow-list of Origin and Host names, optional
 ```
 
 and nothing after the allow-list. A frame that ends after the count carries no allow-list, so a
-frame written before issue #11 is still read ([TRANSPORT.md](TRANSPORT.md#the-allow-list)). A response frame:
+frame written before issue #11 is still read ([TRANSPORT.md](TRANSPORT.md#the-allow-list)). The
+host section is optional as a whole: a frame that ends after `tool_calls` is read as clock 0, empty
+text, empty identifier and empty table, which is the frame an adapter that keeps no tasks writes
+([TASKS.md](TASKS.md#the-hosts-side)). A section that is cut short, or whose text is not UTF-8,
+is a server error. A response frame:
 
 ```
 u32 status
@@ -90,7 +98,11 @@ u32 field_count
 u32 notification_count                  always 0 since issue #11 (reserved)
   u32 length          notification      one compact JSON-RPC notification, repeated notification_count times
 u32 body_length       body
+[u32 stored                              1, when the core returned a task table
+u32 table_length  task_table]           the table the host stores from now on
 ```
+
+A response that returns no table ends after the body.
 
 `tool_calls` is the one input the core cannot compute, because it is state: how many
 `tools/call` requests the host has already admitted for this client in the current
@@ -99,10 +111,14 @@ identity (the connection, a token subject or an address); the core only compares
 with `rate.tool_calls`, the limit the provider declares ([TOOLS.md](TOOLS.md#the-rate-limit)).
 An adapter with no limit sends 0.
 
-Progress notifications are in the body. When the request accepts `text/event-stream` and the
-core answers 200 with notifications, the body is an event stream the core encoded (the
-notifications first and the result last) and the `Content-Type` is `text/event-stream`;
-otherwise the body is the single JSON object and no notification is sent
+The clock, the identifier and the table are the state the core cannot keep, and
+[TASKS.md](TASKS.md#the-hosts-side) states what the host owes the core for them. A host that
+runs no tasks sends `0`, empty text and an empty table, and ignores the answer.
+
+Progress notifications and task status notifications are in the body. When the request accepts
+`text/event-stream` and the core answers 200 with notifications, the body is an event stream the
+core encoded (the notifications first and the result last) and the `Content-Type` is
+`text/event-stream`; otherwise the body is the single JSON object and no notification is sent
 ([TRANSPORT.md](TRANSPORT.md)). The adapter writes the body as it is.
 
 The core decides every status and every field of the response. The adapter:
@@ -121,10 +137,13 @@ The core decides every status and every field of the response. The adapter:
   export states no `recursion` effect and no function of the package calls itself except
   as a loop;
 * counts the tool calls it admits per client and window and passes the count in
-  `tool_calls`, passes the host names it was configured with after the count, and writes the
+  `tool_calls`, passes the host names it was configured with after the task fields, and writes the
   response body as it is, closing an event stream after its last event;
+* holds the task table, gives the core the instant and an unused task identifier with every
+  request, and replaces its table with the one a response returns after its body;
 * treats a response with status 500 and the fixed internal-error body as the core's
-  answer to a frame it could not read (a truncated frame or trailing bytes).
+  answer to a frame it could not read (a truncated frame, trailing bytes, or a host section
+  whose text is not UTF-8).
 
 Header names are case-insensitive (RFC 9110 section 5.1). Repeated fields: for each
 header the core reads (`MCP-Protocol-Version`, `Mcp-Method`, `Mcp-Name`, and each

@@ -4,6 +4,7 @@
 \useglossary{mcp.core@1.0.0}
 \importmodule{Input}
 \importmodule{Json}
+\importmodule{JsonRead}
 \importmodule{JsonRpc}
 \title{MCP tasks extension}
 \begin{semanticmodule}
@@ -29,8 +30,8 @@ structure{
     {name: statusMessage, type: (Option String)},
     {name: createdAt, type: String},
     {name: lastUpdatedAt, type: String},
-    {name: ttlMs, type: (Option Nat)},
-    {name: pollIntervalMs, type: (Option Nat)}
+    {name: ttlMs, type: (Option Int)},
+    {name: pollIntervalMs, type: (Option Int)}
   ]
 }
 
@@ -45,13 +46,6 @@ inductive{
     {name: failed, fields: [TaskFields, JsonRpc::ErrorObject]},
     {name: cancelled, fields: [TaskFields]}
   ]
-}
-
-structure{
-  name: CreateTaskResult,
-  type_parameters: [],
-  parameters: [],
-  fields: [{name: status, type: TaskStatus}, {name: fields, type: TaskFields}]
 }
 
 definition{
@@ -145,6 +139,311 @@ theorem{
   parameters: [],
   statement: ((((isTerminal (ctor TaskStatus.completed)) = true) /\ ((isTerminal (ctor TaskStatus.failed)) = true)) /\ ((((isTerminal (ctor TaskStatus.cancelled)) = true) /\ ((isTerminal (ctor TaskStatus.working)) = false)) /\ ((isTerminal (ctor TaskStatus.input_required)) = false))),
   proof: decide{}
+}
+
+inductive{
+  name: PlanOutcome,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: completes, fields: [Json::JsonObject]},
+    {name: fails, fields: [JsonRpc::ErrorObject]}
+  ]
+}
+
+structure{
+  name: TaskPlan,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: parkAfterMs, type: Int},
+    {name: parked, type: (List (String * Input::InputRequest))},
+    {name: finishAfterMs, type: Int},
+    {name: outcome, type: PlanOutcome}
+  ]
+}
+
+structure{
+  name: TaskEntry,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: task, type: DetailedTask},
+    {name: createdMs, type: Int},
+    {name: plan, type: TaskPlan}
+  ]
+}
+
+structure{
+  name: Stepped,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: entry, type: TaskEntry}, {name: changed, type: Bool}]
+}
+
+structure{
+  name: CreateTaskResult,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: status, type: TaskStatus},
+    {name: fields, type: TaskFields},
+    {name: entry, type: TaskEntry}
+  ]
+}
+
+inductive{
+  name: StoredShape,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: read, fields: []}, {name: acked, fields: []}]
+}
+
+structure{
+  name: StoredTask,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: entry, type: TaskEntry},
+    {name: shape, type: StoredShape},
+    {name: changed, type: Bool}
+  ]
+}
+
+structure{
+  name: TaskHost,
+  type_parameters: [],
+  parameters: [],
+  fields: [
+    {name: nowMs, type: Int},
+    {name: now, type: String},
+    {name: freshId, type: String},
+    {name: table, type: Bytes}
+  ]
+}
+
+definition{
+  name: touch,
+  parameters: [fields : TaskFields, now : String],
+  result: TaskFields,
+  body: (record TaskFields {taskId := (project fields taskId), statusMessage := (project fields statusMessage), createdAt := (project fields createdAt), lastUpdatedAt := now, ttlMs := (project fields ttlMs), pollIntervalMs := (project fields pollIntervalMs)}),
+  executable: true
+}
+
+definition{
+  name: due,
+  parameters: [after : Int, createdMs : Int, nowMs : Int],
+  result: Bool,
+  body: (not (prim less_than (prim subtract nowMs createdMs : Int) after : Bool)),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: kept,
+  parameters: [entry : TaskEntry],
+  result: Stepped,
+  body: (record Stepped {entry := entry, changed := false}),
+  executable: true
+}
+
+definition{
+  name: parkedPlan,
+  parameters: [plan : TaskPlan],
+  result: TaskPlan,
+  body: (record TaskPlan {parkAfterMs := (project plan parkAfterMs), parked := (nil (String * Input::InputRequest)), finishAfterMs := (project plan finishAfterMs), outcome := (project plan outcome)}),
+  executable: true
+}
+
+definition{
+  name: concluded,
+  parameters: [outcome : PlanOutcome, fields : TaskFields],
+  result: DetailedTask,
+  body: (match outcome
+    | PlanOutcome.completes found => (ctor DetailedTask.completed fields found)
+    | PlanOutcome.fails error => (ctor DetailedTask.failed fields error)),
+  executable: true
+}
+
+definition{
+  name: moved,
+  parameters: [entry : TaskEntry, task : DetailedTask, plan : TaskPlan],
+  result: Stepped,
+  body: (record Stepped {entry := (record TaskEntry {task := task, createdMs := (project entry createdMs), plan := plan}), changed := true}),
+  executable: true
+}
+
+definition{
+  name: settleWorking,
+  parameters: [entry : TaskEntry, fields : TaskFields, nowMs : Int, now : String],
+  result: Stepped,
+  body: (match (project (project entry plan) parked)
+    | List.nil => (if (due (project (project entry plan) finishAfterMs) (project entry createdMs) nowMs) then (moved entry (concluded (project (project entry plan) outcome) (touch fields now)) (project entry plan)) else (kept entry))
+    | List.cons head rest => (if (due (project (project entry plan) parkAfterMs) (project entry createdMs) nowMs) then (moved entry (ctor DetailedTask.input_required (touch fields now) (project (project entry plan) parked)) (parkedPlan (project entry plan))) else (kept entry))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: settle,
+  parameters: [entry : TaskEntry, nowMs : Int, now : String],
+  result: Stepped,
+  body: (match (project entry task)
+    | DetailedTask.working fields => (settleWorking entry fields nowMs now)
+    | DetailedTask.input_required fields requests => (kept entry)
+    | DetailedTask.completed fields result => (kept entry)
+    | DetailedTask.failed fields error => (kept entry)
+    | DetailedTask.cancelled fields => (kept entry)),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: unansweredOnto,
+  parameters: [
+    requests : (List (String * Input::InputRequest)),
+    answers : Json::JsonObject,
+    built : (List (String * Input::InputRequest))
+  ],
+  result: (List (String * Input::InputRequest)),
+  body: (match requests
+    | List.nil => built
+    | List.cons head rest => (if (Json::hasKey (first head) answers) then (unansweredOnto rest answers built) else (unansweredOnto rest answers (cons head built)))),
+  executable: true,
+  recursive_argument: requests
+}
+
+definition{
+  name: unanswered,
+  parameters: [requests : (List (String * Input::InputRequest)), answers : Json::JsonObject],
+  result: (List (String * Input::InputRequest)),
+  body: (JsonRead::reverseOnto [(String * Input::InputRequest)] (unansweredOnto requests answers (nil (String * Input::InputRequest))) (nil (String * Input::InputRequest))),
+  executable: true
+}
+
+definition{
+  name: resume,
+  parameters: [entry : TaskEntry, fields : TaskFields, nowMs : Int, now : String],
+  result: Stepped,
+  body: (let resumed : TaskEntry := (record TaskEntry {task := (ctor DetailedTask.working (touch fields now)), createdMs := (project entry createdMs), plan := (project entry plan)}); (record Stepped {entry := (project (settle resumed nowMs now) entry), changed := true})),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: answerInput,
+  parameters: [
+    entry : TaskEntry,
+    fields : TaskFields,
+    requests : (List (String * Input::InputRequest)),
+    answers : Json::JsonObject,
+    nowMs : Int,
+    now : String
+  ],
+  result: Stepped,
+  body: (match (unanswered requests answers)
+    | List.nil => (resume entry fields nowMs now)
+    | List.cons head rest => (if ((prim length (cons head rest) : Nat) =? (prim length requests : Nat)) then (kept entry) else (moved entry (ctor DetailedTask.input_required (touch fields now) (cons head rest)) (project entry plan)))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: answer,
+  parameters: [entry : TaskEntry, answers : Json::JsonObject, nowMs : Int, now : String],
+  result: Stepped,
+  body: (match (project entry task)
+    | DetailedTask.working fields => (kept entry)
+    | DetailedTask.input_required fields requests => (answerInput entry fields requests answers nowMs now)
+    | DetailedTask.completed fields result => (kept entry)
+    | DetailedTask.failed fields error => (kept entry)
+    | DetailedTask.cancelled fields => (kept entry)),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: cancelSettled,
+  parameters: [settled : Stepped, now : String],
+  result: Stepped,
+  body: (match (project (project settled entry) task)
+    | DetailedTask.working fields => (moved (project settled entry) (ctor DetailedTask.cancelled (touch fields now)) (project (project settled entry) plan))
+    | DetailedTask.input_required fields requests => (moved (project settled entry) (ctor DetailedTask.cancelled (touch fields now)) (project (project settled entry) plan))
+    | DetailedTask.completed fields result => settled
+    | DetailedTask.failed fields error => settled
+    | DetailedTask.cancelled fields => settled),
+  executable: true
+}
+
+definition{
+  name: cancel,
+  parameters: [entry : TaskEntry, nowMs : Int, now : String],
+  result: Stepped,
+  body: (cancelSettled (settle entry nowMs now) now),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: idOf,
+  parameters: [entry : TaskEntry],
+  result: String,
+  body: (project (fieldsOf (project entry task)) taskId),
+  executable: true
+}
+
+definition{
+  name: isExpired,
+  parameters: [entry : TaskEntry, nowMs : Int],
+  result: Bool,
+  body: (match (project (fieldsOf (project entry task)) ttlMs)
+    | Option.none => false
+    | Option.some limit => (not (prim less_than (prim subtract nowMs (project entry createdMs) : Int) limit : Bool))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: survivorsOnto,
+  parameters: [wanted : String, entries : (List TaskEntry), nowMs : Int, built : (List TaskEntry)],
+  result: (List TaskEntry),
+  body: (match entries
+    | List.nil => built
+    | List.cons head rest => (if ((prim equal (idOf head) wanted : Bool) || (isExpired head nowMs)) then (survivorsOnto wanted rest nowMs built) else (survivorsOnto wanted rest nowMs (cons head built)))),
+  axioms: [propext],
+  executable: true,
+  recursive_argument: entries
+}
+
+definition{
+  name: withEntry,
+  parameters: [entry : TaskEntry, table : (List TaskEntry), nowMs : Int],
+  result: (List TaskEntry),
+  body: (cons entry (JsonRead::reverseOnto [TaskEntry] (survivorsOnto (idOf entry) table nowMs (nil TaskEntry)) (nil TaskEntry))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: findEntry,
+  parameters: [wanted : String, table : (List TaskEntry), nowMs : Int],
+  result: (Option TaskEntry),
+  body: (match table
+    | List.nil => (ctor Option.none [TaskEntry])
+    | List.cons head rest => (if (prim equal (idOf head) wanted : Bool) then (if (isExpired head nowMs) then (ctor Option.none [TaskEntry]) else (ctor Option.some [TaskEntry] head)) else (findEntry wanted rest nowMs))),
+  axioms: [propext],
+  executable: true,
+  recursive_argument: table
+}
+
+definition{
+  name: notifies,
+  parameters: [found : StoredTask],
+  result: Bool,
+  body: ((project found changed) && (match (project found shape)
+    | StoredShape.read => true
+    | StoredShape.acked => true)),
+  executable: true
 }
 \end{semanticmodule}
 \end{lexlean}

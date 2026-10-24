@@ -5,13 +5,19 @@
 \importmodule{Http}
 \importmodule{JsonRead}
 \importmodule{JsonText}
+\importmodule{Numeric}
+\importmodule{Tasks}
 \title{MCP exchange frames}
 \begin{semanticmodule}
 inductive{
   name: FrameFault,
   type_parameters: [],
   parameters: [],
-  constructors: [{name: truncated, fields: [Nat]}, {name: trailing, fields: [Nat]}]
+  constructors: [
+    {name: truncated, fields: [Nat]},
+    {name: trailing, fields: [Nat]},
+    {name: badHost, fields: [Nat]}
+  ]
 }
 
 structure{
@@ -88,7 +94,7 @@ definition{
   name: withHosts,
   parameters: [request : Http::HttpRequest, hosts : (List (List Nat))],
   result: Http::HttpRequest,
-  body: (record Http::HttpRequest {method := (project request method), target := (project request target), fields := (project request fields), body := (project request body), toolCalls := (project request toolCalls), allowedHosts := hosts}),
+  body: (record Http::HttpRequest {method := (project request method), target := (project request target), fields := (project request fields), body := (project request body), toolCalls := (project request toolCalls), allowedHosts := hosts, host := (project request host)}),
   executable: true
 }
 
@@ -106,6 +112,103 @@ definition{
 }
 
 definition{
+  name: shiftIn,
+  parameters: [accumulated : Int, byte : Nat],
+  result: Int,
+  body: (JsonRead::intAdd (prim multiply accumulated (256 : Int) : Int) (Numeric::natToInt byte (0 : Int))),
+  executable: true
+}
+
+definition{
+  name: be64At,
+  parameters: [source : Bytes, position : Nat],
+  result: (Option Int),
+  body: (if ((position + 8) <=? (prim length source : Nat)) then (ctor Option.some [Int] (shiftIn (shiftIn (shiftIn (shiftIn (shiftIn (shiftIn (shiftIn (shiftIn (0 : Int) (JsonText::byteAt source position)) (JsonText::byteAt source (position + 1))) (JsonText::byteAt source (position + 2))) (JsonText::byteAt source (position + 3))) (JsonText::byteAt source (position + 4))) (JsonText::byteAt source (position + 5))) (JsonText::byteAt source (position + 6))) (JsonText::byteAt source (position + 7)))) else (ctor Option.none [Int])),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: textChunk,
+  parameters: [source : Bytes, position : Nat],
+  result: (Result (String * Nat) FrameFault),
+  body: (match (chunkAt source position)
+    | Option.none => (ctor Result.error [(String * Nat), FrameFault] (ctor FrameFault.truncated position))
+    | Option.some found => (match (Http::textOf (JsonText::bytesToList (project found bytes)))
+      | Option.none => (ctor Result.error [(String * Nat), FrameFault] (ctor FrameFault.badHost position))
+      | Option.some text => (ctor Result.ok [(String * Nat), FrameFault] (text, (project found next))))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: hostWith,
+  parameters: [nowMs : Int, now : String, freshId : String, table : Chunk],
+  result: (Result (Tasks::TaskHost * Nat) FrameFault),
+  body: (ctor Result.ok [(Tasks::TaskHost * Nat), FrameFault] ((record Tasks::TaskHost {nowMs := nowMs, now := now, freshId := freshId, table := (project table bytes)}), (project table next))),
+  executable: true
+}
+
+definition{
+  name: readHostTable,
+  parameters: [source : Bytes, nowMs : Int, now : String, freshId : (String * Nat)],
+  result: (Result (Tasks::TaskHost * Nat) FrameFault),
+  body: (match (chunkAt source (second freshId))
+    | Option.none => (ctor Result.error [(Tasks::TaskHost * Nat), FrameFault] (ctor FrameFault.truncated (second freshId)))
+    | Option.some table => (hostWith nowMs now (first freshId) table)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: readHostId,
+  parameters: [source : Bytes, nowMs : Int, now : (String * Nat)],
+  result: (Result (Tasks::TaskHost * Nat) FrameFault),
+  body: (match (textChunk source (second now))
+    | Result.error fault => (ctor Result.error [(Tasks::TaskHost * Nat), FrameFault] fault)
+    | Result.ok freshId => (readHostTable source nowMs (first now) freshId)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: readHost,
+  parameters: [source : Bytes, position : Nat],
+  result: (Result (Tasks::TaskHost * Nat) FrameFault),
+  body: (match (be64At source position)
+    | Option.none => (ctor Result.error [(Tasks::TaskHost * Nat), FrameFault] (ctor FrameFault.truncated position))
+    | Option.some nowMs => (match (textChunk source (position + 8))
+      | Result.error fault => (ctor Result.error [(Tasks::TaskHost * Nat), FrameFault] fault)
+      | Result.ok now => (readHostId source nowMs now))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: readHostOrDefault,
+  parameters: [source : Bytes, position : Nat],
+  result: (Result (Tasks::TaskHost * Nat) FrameFault),
+  body: (if (position =? (prim length source : Nat)) then (ctor Result.ok [(Tasks::TaskHost * Nat), FrameFault] ((record Tasks::TaskHost {nowMs := (0 : Int), now := "", freshId := "", table := (JsonText::emptyBytes)}), position)) else (readHost source position)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: finishHost,
+  parameters: [
+    source : Bytes,
+    request : Http::HttpRequest,
+    host : (Result (Tasks::TaskHost * Nat) FrameFault)
+  ],
+  result: (Result Http::HttpRequest FrameFault),
+  body: (match host
+    | Result.error fault => (ctor Result.error [Http::HttpRequest, FrameFault] fault)
+    | Result.ok found => (afterCalls source (record Http::HttpRequest {method := (project request method), target := (project request target), fields := (project request fields), body := (project request body), toolCalls := (project request toolCalls), allowedHosts := (project request allowedHosts), host := (first found)}) (second found))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
   name: finishRequest,
   parameters: [source : Bytes, method : Chunk, target : Chunk, read : ((List Http::Field) * Nat)],
   result: (Result Http::HttpRequest FrameFault),
@@ -113,8 +216,8 @@ definition{
     | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated (second read)))
     | Option.some body => (match (u32At source (project body next))
       | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated (project body next)))
-      | Option.some calls => (afterCalls source (record Http::HttpRequest {method := (JsonText::bytesToList (project method bytes)), target := (JsonText::bytesToList (project target bytes)), fields := (first read), body := (project body bytes), toolCalls := calls, allowedHosts := (nil (List Nat))}) ((project body next) + 4)))),
-  axioms: [Quot.sound, propext],
+      | Option.some calls => (finishHost source (record Http::HttpRequest {method := (JsonText::bytesToList (project method bytes)), target := (JsonText::bytesToList (project target bytes)), fields := (first read), body := (project body bytes), toolCalls := calls, allowedHosts := (nil (List Nat)), host := (record Tasks::TaskHost {nowMs := (0 : Int), now := "", freshId := "", table := (JsonText::emptyBytes)})}) (readHostOrDefault source ((project body next) + 4))))),
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
@@ -127,7 +230,7 @@ definition{
     | Option.some total => (match (readFields source ((project target next) + 4) total (nil Http::Field))
       | Result.error fault => (ctor Result.error [Http::HttpRequest, FrameFault] fault)
       | Result.ok read => (finishRequest source method target read))),
-  axioms: [Quot.sound, propext],
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
@@ -138,7 +241,7 @@ definition{
   body: (match target
     | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated (project method next)))
     | Option.some found => (afterCount source method found (u32At source (project found next)))),
-  axioms: [Quot.sound, propext],
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
@@ -149,7 +252,7 @@ definition{
   body: (match (chunkAt source 0)
     | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated 0))
     | Option.some method => (afterTarget source method (chunkAt source (project method next)))),
-  axioms: [Quot.sound, propext],
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
@@ -216,10 +319,20 @@ definition{
 }
 
 definition{
+  name: tasksList,
+  parameters: [tasks : (Option (List Nat))],
+  result: (List Nat),
+  body: (match tasks
+    | Option.none => (nil Nat)
+    | Option.some written => (prim append (u32List 1) (prim append (u32List (prim length written : Nat)) written : (List Nat)) : (List Nat))),
+  executable: true
+}
+
+definition{
   name: writeResponse,
   parameters: [response : Http::HttpResponse],
   result: (List Nat),
-  body: (prim append (u32List (project response status)) (prim append (u32List (prim length (project response fields) : Nat)) (prim append (fieldsList (project response fields)) (prim append (u32List (prim length (project response notifications) : Nat)) (prim append (notesList (project response notifications)) (prim append (u32List (prim length (project response body) : Nat)) (project response body) : (List Nat)) : (List Nat)) : (List Nat)) : (List Nat)) : (List Nat)) : (List Nat)),
+  body: (prim append (u32List (project response status)) (prim append (u32List (prim length (project response fields) : Nat)) (prim append (fieldsList (project response fields)) (prim append (u32List (prim length (project response notifications) : Nat)) (prim append (notesList (project response notifications)) (prim append (u32List (prim length (project response body) : Nat)) (prim append (project response body) (tasksList (project response tasks)) : (List Nat)) : (List Nat)) : (List Nat)) : (List Nat)) : (List Nat)) : (List Nat)) : (List Nat)),
   executable: true
 }
 \end{semanticmodule}

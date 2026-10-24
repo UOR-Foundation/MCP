@@ -463,7 +463,7 @@ definition{
   name: streamResponse,
   parameters: [status : Nat, messages : (List (List Nat))],
   result: Http::HttpResponse,
-  body: (record Http::HttpResponse {status := status, fields := (streamFields), notifications := (nil (List Nat)), body := (streamOf messages)}),
+  body: (record Http::HttpResponse {status := status, fields := (streamFields), notifications := (nil (List Nat)), body := (streamOf messages), tasks := (ctor Option.none [(List Nat)])}),
   executable: true
 }
 \end{semanticmodule}

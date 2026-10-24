@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-task-fixture"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "TaskFixture"
+component = "TaskFixture"
+
+[[form]]
+id = "mcp-task-fixture"
+channel = "text"
+surface = "MCP task fixture"
+canonical_source = true
+features = ["sentence-case", "singular"]
