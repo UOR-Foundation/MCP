@@ -2105,28 +2105,7 @@
    }
   }
  ],
- "not_run": [
-  {
-   "line": 887,
-   "quote": "const frames = await listenToStream(",
-   "scenario": "server-stateless",
-   "checks": [
-    "sep-2575-http-server-no-independent-requests-on-stream"
-   ],
-   "reason": "the probe calls the diagnostic tool test_streaming_elicitation, which the fixture does not list, so the suite itself reports the stream as not testable; the tool answers with an input-required result (issue 10). The event-stream framing the probe reads is covered by SH-01",
-   "owner": "#10"
-  },
-  {
-   "line": 947,
-   "quote": "const frames = await listenToStream(",
-   "scenario": "server-stateless",
-   "checks": [
-    "sep-2575-server-no-log-without-loglevel"
-   ],
-   "reason": "the probe calls the diagnostic tool test_logging_tool, which the fixture does not list (it declares no logging capability), so the suite itself reports it as not testable. The event-stream framing the probe reads is covered by SH-01",
-   "owner": "#11"
-  }
- ],
+ "not_run": [],
  "unreached": [
   {
    "id": "sep-2243-server-no-xmcp-tool",

@@ -76,12 +76,12 @@ u32 field_count
   u32 value_length    value
 u32 body_length       body
 u32 tool_calls                          the host's count of tool calls for this client in the current window
-u32 key_length    key                   the host's requestState key, 32 bytes or more (INPUT-REQUIRED.md)
+[u32 key_length  key]                   the host's requestState key, 32 bytes or more, optional (INPUT-REQUIRED.md)
 [u32 name_count, then name_count times u32 name_length and name]   the host's allow-list of Origin and Host names, optional
 ```
 
-and nothing after the allow-list. A frame that ends after the key carries no allow-list, so a
-frame written before issue #11 is still read ([TRANSPORT.md](TRANSPORT.md#the-allow-list)). A response frame:
+and nothing after the allow-list. A frame that ends after the count carries no key and no allow-list, and one that ends after the key carries
+no allow-list, so a frame written before issues #10 and #11 is still read ([TRANSPORT.md](TRANSPORT.md#the-allow-list)). A response frame:
 
 ```
 u32 status
@@ -109,10 +109,11 @@ otherwise the body is the single JSON object and no notification is sent
 `key` is the second input the core cannot hold: the secret reference `request-state-key`. The
 core keeps no secret, so the adapter reads the key from its secret store and sends it with
 every request, and the core computes and checks an HMAC with it over every `requestState` it
-hands out or receives ([INPUT-REQUIRED.md](INPUT-REQUIRED.md)). An adapter with no key sends a
-zero length; a request that needs no state is served, and a result that needs one is refused
-as an internal error instead of being sent unprotected. A frame that ends inside the key, or
-has bytes after it, is a frame the core cannot read.
+hands out or receives ([INPUT-REQUIRED.md](INPUT-REQUIRED.md)). An adapter with no key sends
+nothing after the count (a zero length when it sends an allow-list); a request that needs no
+state is served, and a result that needs one is refused as an internal error instead of being
+sent unprotected. A frame that ends inside the key or the allow-list, or has bytes after them,
+is a frame the core cannot read.
 
 The core decides every status and every field of the response. The adapter:
 
@@ -238,9 +239,9 @@ own comment names alpha.10 as its anchor, and between those two commits only lin
 The authority row `A-MCP-CONFORMANCE` records the commit and a manifest checksum over
 the ten vendored files.
 
-Not run, with the owning issue (listed in the vectors files as `not_run`): the probes at
-lines 887 and 947 of `server-stateless`, which call the diagnostic tools
-`test_streaming_elicitation` and `test_logging_tool` that the fixture does not list. The other
+The probes at lines 887 and 947 of `server-stateless` call the diagnostic tools
+`test_streaming_elicitation` and `test_logging_tool`; the fixture lists them (TL-19, #13) and the
+probes are the vectors TS-10 and TS-11 of `vectors/tools.json`. The other
 streaming probes that #7 left to the transport are accounted for in `vectors/transport.json`
 ([TRANSPORT.md](TRANSPORT.md#the-streaming-probes-of-server-stateless)): lines 1037 and 1144 are
 vectors, because `subscriptions/listen` is answered -32601 while `server/discover` advertises no
@@ -388,9 +389,10 @@ and `cargo clippy --workspace --all-targets -- -D warnings` pass.
 * The acceptance of #7 is that the scenarios `server-stateless`, `http-header-validation`
   and `http-custom-header-server-validation` pass against the conformance build (#13).
   That build does not exist yet and the scenarios have not been run. Not met.
-* `server-stateless`: the probes at lines 887 and 947 call diagnostic tools the fixture does
-  not list, and `subscriptions/listen`, list-changed notifications and logging are not
-  registered ([TRANSPORT.md](TRANSPORT.md#not-met)).
+* `server-stateless`: `subscriptions/listen`, list-changed notifications and logging are not
+  registered, so five checks of the scenario are skipped by the suite, which reads a server that
+  advertises no list-changed or subscribe capability as one with nothing to serve there
+  ([TRANSPORT.md](TRANSPORT.md#not-met)).
 * The suite validates each response against its own wire schema before the scenario
   sees it. Here every response is validated against the specification's JSON Schema
   (LC-15) by another validator, which is falsifying evidence; the suite's validator has

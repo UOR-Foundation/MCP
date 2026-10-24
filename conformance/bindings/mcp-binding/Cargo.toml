@@ -1,0 +1,13 @@
+[package]
+name = "mcp-binding"
+description = "The host of the MCP conformance build: the count of tools/call requests the core reads from its request frame."
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+mcp-conformance-host-api = { path = "../../mcp-conformance-host-api" }
+
+[lints.rust]
+missing_docs = "deny"

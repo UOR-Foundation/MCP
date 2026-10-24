@@ -55,11 +55,14 @@ but the method is not dispatched), server notifications other than progress, and
 - The claim registers in `model/` hold the JSON text codec (JC-01 to JC-14) and the
   stateless lifecycle and HTTP header capabilities of #7 (LC-01 to LC-16, HH-01 to HH-13),
   the tools of #8 (TL-01 to TL-18), the resources, resource templates, prompts,
-  completion and caching capabilities of #9 (RP-01 to RP-19) , the Streamable HTTP
+  completion and caching capabilities of #9 (RP-01 to RP-19) the Streamable HTTP
   transport of #11 (SH-01 to SH-10) and the input-required results of #10
   (IR-01 to IR-19).
-  No other protocol capability is registered and none is claimed, and the conformance
-  scenarios have not been run against a conformance build (#13).
+  The conformance build and the oracle run of #13 (CF-01 to CF-07) are in
+  [CONFORMANCE-RUN.md](CONFORMANCE-RUN.md): the pinned suite's server scenarios and the
+  2026-07-28 schema are run over the served core, and that file lists, scenario by scenario,
+  what passes and what does not. No other protocol capability is registered and none is
+  claimed.
 - The repository is not bound to a PrismPM SDK release (#4): `prismpm.lock` and
   `template.lock` are absent, so `just vv` and the devcontainer cannot run.
 - v0.1.0 is tracked in #16.

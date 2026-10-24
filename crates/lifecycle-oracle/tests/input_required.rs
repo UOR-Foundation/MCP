@@ -1245,7 +1245,8 @@ fn an_input_required_result_with_neither_requests_nor_state_is_refused_ir_17() {
 // ---- IR-18: the frame ----
 
 #[test]
-fn the_frame_carries_the_key_after_the_count_and_a_cut_or_longer_frame_is_the_fixed_error_ir_18() {
+fn the_frame_may_carry_the_key_after_the_count_and_a_cut_or_longer_frame_is_the_fixed_error_ir_18()
+{
     let request = stateless(
         "tools/call",
         &tool_call(TAMPER, json!({})),
@@ -1259,12 +1260,30 @@ fn the_frame_carries_the_key_after_the_count_and_a_cut_or_longer_frame_is_the_fi
     assert_eq!(&tail[4..], key().as_slice());
     let ok = common::frame_checked(&frame).expect("a response frame");
     assert_eq!(ok.status, 200);
-    // the frame without the key chunk (the frame of an adapter that forgot it)
+    // a frame that ends after the count carries no key: a request that needs no state is served,
+    // and one that needs state is refused as an internal error instead of being sent unprotected
     let without = &frame[..frame.len() - 36];
-    // and the same cut mid-chunk, and one byte more
+    let refused = common::frame_checked(without).expect("a response frame");
+    assert_eq!(refused.status, 500);
+    assert_eq!(json_of(&refused)["error"]["message"], "Internal error");
+    let stateless_frame = encode_request(&stateless(
+        "tools/call",
+        &tool_call(ELICIT, json!({})),
+        None,
+        916,
+        &[],
+    ));
+    let served = common::frame_checked(&stateless_frame).expect("a response frame");
+    assert_eq!(served.status, 200);
+    assert_eq!(
+        json_of(&served)["result"]["resultType"],
+        "input_required",
+        "a tool that asks for input and needs no state is served without a key"
+    );
+    // the same cut mid-chunk, and one byte more
     let mut longer = frame.clone();
     longer.push(0);
-    for cut in [without.to_vec(), frame[..frame.len() - 1].to_vec(), longer] {
+    for cut in [frame[..frame.len() - 1].to_vec(), longer] {
         let response = common::frame_checked(&cut).expect("a response frame");
         assert_eq!(response.status, 500, "{} bytes", cut.len());
         let body = json_of(&response);

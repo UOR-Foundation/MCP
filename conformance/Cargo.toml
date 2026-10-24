@@ -1,0 +1,18 @@
+# The consumer workspace of the conformance build (`prismpm build` at the repository
+# root, then `conformance/lay-out.sh`): the core package and the two host packages
+# that PrismPM generates, laid beside the binding crate this repository owns. The
+# members are listed exactly, no glob, as PrismPM's `server_host::workspace::verify`
+# requires; the three generated packages are not committed (.gitignore) and exist
+# only after a build. The release profile is the consumer's.
+[workspace]
+resolver = "2"
+members = [
+    "mcp_conformance_core",
+    "mcp-conformance-host-api",
+    "mcp-conformance-host",
+    "bindings/mcp-binding",
+]
+
+[profile.release]
+opt-level = 2
+debug = 0

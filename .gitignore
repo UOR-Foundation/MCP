@@ -27,3 +27,10 @@ criterion/
 
 # `Cargo.lock` is NOT ignored: the resolved version of every oracle is part of
 # the claim made against it (R11).
+
+# The conformance build: what `prismpm build` generates and `conformance/lay-out.sh`
+# copies beside the binding (the consumer workspace, conformance/Cargo.toml).
+/conformance/mcp_conformance_core/
+/conformance/mcp-conformance-host-api/
+/conformance/mcp-conformance-host/
+/conformance/target/

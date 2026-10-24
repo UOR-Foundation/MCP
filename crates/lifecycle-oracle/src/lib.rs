@@ -144,8 +144,8 @@ fn put_chunk(out: &mut Vec<u8>, bytes: &[u8]) {
 /// Encode a request as the frame the root reads: a length-prefixed method, a
 /// length-prefixed target, the field count, each field as a length-prefixed name and
 /// value, a length-prefixed body, the four-byte count of tool calls the host has
-/// already counted for this client and the length-prefixed `requestState` key, every
-/// length and count four bytes big-endian.
+/// already counted for this client and, when the host holds one, the length-prefixed
+/// `requestState` key, every length and count four bytes big-endian.
 pub fn encode_request(request: &Request) -> Vec<u8> {
     let mut out = Vec::new();
     put_chunk(&mut out, &request.method);
@@ -157,7 +157,9 @@ pub fn encode_request(request: &Request) -> Vec<u8> {
     }
     put_chunk(&mut out, &request.body);
     put_u32(&mut out, request.tool_calls as usize);
-    put_chunk(&mut out, &request.state_key);
+    if !request.state_key.is_empty() {
+        put_chunk(&mut out, &request.state_key);
+    }
     out
 }
 
@@ -167,6 +169,9 @@ pub fn encode_request(request: &Request) -> Vec<u8> {
 pub fn encode_request_allowing(request: &Request, allowed_hosts: &[Vec<u8>]) -> Vec<u8> {
     let mut out = encode_request(request);
     if !allowed_hosts.is_empty() {
+        if request.state_key.is_empty() {
+            put_chunk(&mut out, &[]);
+        }
         put_u32(&mut out, allowed_hosts.len());
         for name in allowed_hosts {
             put_chunk(&mut out, name);

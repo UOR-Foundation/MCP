@@ -106,6 +106,15 @@ definition{
 }
 
 definition{
+  name: keyChunk,
+  parameters: [source : Bytes, position : Nat],
+  result: (Option Chunk),
+  body: (if (position =? (prim length source : Nat)) then (ctor Option.some [Chunk] (record Chunk {bytes := 0x, next := position})) else (chunkAt source position)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
   name: finishRequest,
   parameters: [source : Bytes, method : Chunk, target : Chunk, read : ((List Http::Field) * Nat)],
   result: (Result Http::HttpRequest FrameFault),
@@ -113,7 +122,7 @@ definition{
     | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated (second read)))
     | Option.some body => (match (u32At source (project body next))
       | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated (project body next)))
-      | Option.some calls => (match (chunkAt source ((project body next) + 4))
+      | Option.some calls => (match (keyChunk source ((project body next) + 4))
         | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated ((project body next) + 4)))
         | Option.some key => (afterCalls source (record Http::HttpRequest {method := (JsonText::bytesToList (project method bytes)), target := (JsonText::bytesToList (project target bytes)), fields := (first read), body := (project body bytes), toolCalls := calls, allowedHosts := (nil (List Nat)), stateKey := (project key bytes)}) (project key next))))),
   axioms: [Quot.sound, propext],
