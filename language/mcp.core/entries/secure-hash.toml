@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "secure-hash"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "Sha256"
+component = "Sha256"
+
+[[form]]
+id = "secure-hash"
+channel = "text"
+surface = "Secure hash"
+canonical_source = true
+features = ["sentence-case", "singular"]

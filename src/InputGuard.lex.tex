@@ -1,0 +1,447 @@
+\begin{lexlean}{InputGuard}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Input}
+\importmodule{Json}
+\importmodule{Methods}
+\importmodule{Refusal}
+\importmodule{RequestState}
+\importmodule{Tools}
+\title{Input-required guard}
+\begin{semanticmodule}
+definition{
+  name: stateVerdict,
+  parameters: [opened : (Option String)],
+  result: (Result (Option String) Refusal::ProviderRefusal),
+  body: (match opened
+    | Option.none => (ctor Result.error [(Option String), Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidRequestState))
+    | Option.some payload => (ctor Result.ok [(Option String), Refusal::ProviderRefusal] (ctor Option.some [String] payload))),
+  executable: true
+}
+
+definition{
+  name: openWith,
+  parameters: [key : Bytes, method : String, name : String, state : (Option String)],
+  result: (Result (Option String) Refusal::ProviderRefusal),
+  body: (match state
+    | Option.none => (ctor Result.ok [(Option String), Refusal::ProviderRefusal] (ctor Option.none [String]))
+    | Option.some given => (stateVerdict (RequestState::openState key method name given))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: allObjects,
+  parameters: [members : (List (String * Json::Json))],
+  result: Bool,
+  body: (match members
+    | List.nil => true
+    | List.cons entry rest => (match (Json::asObject (second entry))
+      | Option.none => false
+      | Option.some found => (allObjects rest))),
+  executable: true,
+  recursive_argument: members
+}
+
+definition{
+  name: responsesOk,
+  parameters: [responses : (Option Json::JsonObject)],
+  result: Bool,
+  body: (match responses
+    | Option.none => true
+    | Option.some given => (allObjects (project given members))),
+  executable: true
+}
+
+definition{
+  name: shapeVerdict,
+  parameters: [opened : (Result (Option String) Refusal::ProviderRefusal), shaped : Bool],
+  result: (Result (Option String) Refusal::ProviderRefusal),
+  body: (match opened
+    | Result.error refusal => (ctor Result.error [(Option String), Refusal::ProviderRefusal] refusal)
+    | Result.ok payload => (if shaped then (ctor Result.ok [(Option String), Refusal::ProviderRefusal] payload) else (ctor Result.error [(Option String), Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidInputResponses)))),
+  executable: true
+}
+
+definition{
+  name: verified,
+  parameters: [
+    key : Bytes,
+    method : String,
+    name : String,
+    state : (Option String),
+    responses : (Option Json::JsonObject)
+  ],
+  result: (Result (Option String) Refusal::ProviderRefusal),
+  body: (shapeVerdict (openWith key method name state) (responsesOk responses)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: openTool,
+  parameters: [key : Bytes, params : Methods::CallToolParams],
+  result: (Result Methods::ClientRequest Refusal::ProviderRefusal),
+  body: (match (verified key "tools/call" (project params name) (project params requestState) (project params inputResponses))
+    | Result.error refusal => (ctor Result.error [Methods::ClientRequest, Refusal::ProviderRefusal] refusal)
+    | Result.ok payload => (ctor Result.ok [Methods::ClientRequest, Refusal::ProviderRefusal] (ctor Methods::ClientRequest.toolsCall (record Methods::CallToolParams {meta := (project params meta), name := (project params name), arguments := (project params arguments), inputResponses := (project params inputResponses), requestState := payload})))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: openRead,
+  parameters: [key : Bytes, params : Methods::ReadResourceParams],
+  result: (Result Methods::ClientRequest Refusal::ProviderRefusal),
+  body: (match (verified key "resources/read" (project params uri) (project params requestState) (project params inputResponses))
+    | Result.error refusal => (ctor Result.error [Methods::ClientRequest, Refusal::ProviderRefusal] refusal)
+    | Result.ok payload => (ctor Result.ok [Methods::ClientRequest, Refusal::ProviderRefusal] (ctor Methods::ClientRequest.resourcesRead (record Methods::ReadResourceParams {meta := (project params meta), uri := (project params uri), inputResponses := (project params inputResponses), requestState := payload})))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: openPrompt,
+  parameters: [key : Bytes, params : Methods::GetPromptParams],
+  result: (Result Methods::ClientRequest Refusal::ProviderRefusal),
+  body: (match (verified key "prompts/get" (project params name) (project params requestState) (project params inputResponses))
+    | Result.error refusal => (ctor Result.error [Methods::ClientRequest, Refusal::ProviderRefusal] refusal)
+    | Result.ok payload => (ctor Result.ok [Methods::ClientRequest, Refusal::ProviderRefusal] (ctor Methods::ClientRequest.promptsGet (record Methods::GetPromptParams {meta := (project params meta), name := (project params name), arguments := (project params arguments), inputResponses := (project params inputResponses), requestState := payload})))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: openRequest,
+  parameters: [key : Bytes, request : Methods::ClientRequest],
+  result: (Result Methods::ClientRequest Refusal::ProviderRefusal),
+  body: (match request
+    | Methods::ClientRequest.toolsCall params => (openTool key params)
+    | Methods::ClientRequest.resourcesRead params => (openRead key params)
+    | Methods::ClientRequest.promptsGet params => (openPrompt key params)
+    | Methods::ClientRequest.serverDiscover params => (ctor Result.ok [Methods::ClientRequest, Refusal::ProviderRefusal] request)
+    | Methods::ClientRequest.toolsList params => (ctor Result.ok [Methods::ClientRequest, Refusal::ProviderRefusal] request)
+    | Methods::ClientRequest.resourcesList params => (ctor Result.ok [Methods::ClientRequest, Refusal::ProviderRefusal] request)
+    | Methods::ClientRequest.resourcesTemplatesList params => (ctor Result.ok [Methods::ClientRequest, Refusal::ProviderRefusal] request)
+    | Methods::ClientRequest.promptsList params => (ctor Result.ok [Methods::ClientRequest, Refusal::ProviderRefusal] request)
+    | Methods::ClientRequest.completionComplete params => (ctor Result.ok [Methods::ClientRequest, Refusal::ProviderRefusal] request)
+    | Methods::ClientRequest.tasksGet params => (ctor Result.ok [Methods::ClientRequest, Refusal::ProviderRefusal] request)
+    | Methods::ClientRequest.tasksUpdate params => (ctor Result.ok [Methods::ClientRequest, Refusal::ProviderRefusal] request)
+    | Methods::ClientRequest.tasksCancel params => (ctor Result.ok [Methods::ClientRequest, Refusal::ProviderRefusal] request)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: nameOfRequest,
+  parameters: [request : Methods::ClientRequest],
+  result: String,
+  body: (match request
+    | Methods::ClientRequest.toolsCall params => (project params name)
+    | Methods::ClientRequest.resourcesRead params => (project params uri)
+    | Methods::ClientRequest.promptsGet params => (project params name)
+    | Methods::ClientRequest.serverDiscover params => ""
+    | Methods::ClientRequest.toolsList params => ""
+    | Methods::ClientRequest.resourcesList params => ""
+    | Methods::ClientRequest.resourcesTemplatesList params => ""
+    | Methods::ClientRequest.promptsList params => ""
+    | Methods::ClientRequest.completionComplete params => ""
+    | Methods::ClientRequest.tasksGet params => ""
+    | Methods::ClientRequest.tasksUpdate params => ""
+    | Methods::ClientRequest.tasksCancel params => ""),
+  executable: true
+}
+
+definition{
+  name: hasContent,
+  parameters: [needed : Input::InputRequiredResult],
+  result: Bool,
+  body: (match needed
+    | Input::InputRequiredResult.requests pending => (match pending
+      | List.nil => false
+      | List.cons entry rest => true)
+    | Input::InputRequiredResult.state token => true
+    | Input::InputRequiredResult.requestsAndState pending token => true),
+  executable: true
+}
+
+definition{
+  name: sealed,
+  parameters: [sealedState : (Option String), requests : (List (String * Input::InputRequest))],
+  result: (Result Input::InputRequiredResult Refusal::ProviderRefusal),
+  body: (match sealedState
+    | Option.none => (ctor Result.error [Input::InputRequiredResult, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.requestStateKeyMissing))
+    | Option.some token => (match requests
+      | List.nil => (ctor Result.ok [Input::InputRequiredResult, Refusal::ProviderRefusal] (ctor Input::InputRequiredResult.state token))
+      | List.cons entry rest => (ctor Result.ok [Input::InputRequiredResult, Refusal::ProviderRefusal] (ctor Input::InputRequiredResult.requestsAndState requests token)))),
+  executable: true
+}
+
+definition{
+  name: sealNeeded,
+  parameters: [key : Bytes, method : String, name : String, needed : Input::InputRequiredResult],
+  result: (Result Input::InputRequiredResult Refusal::ProviderRefusal),
+  body: (match needed
+    | Input::InputRequiredResult.requests pending => (ctor Result.ok [Input::InputRequiredResult, Refusal::ProviderRefusal] needed)
+    | Input::InputRequiredResult.state token => (sealed (RequestState::sealState key method name token) (nil (String * Input::InputRequest)))
+    | Input::InputRequiredResult.requestsAndState pending token => (sealed (RequestState::sealState key method name token) pending)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: placed,
+  parameters: [
+    key : Bytes,
+    method : Methods::Method,
+    name : String,
+    needed : Input::InputRequiredResult
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (if (Methods::supportsInputRequired method) then (if (hasContent needed) then (match (sealNeeded key (Methods::methodWire method) name needed)
+    | Result.error refusal => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] refusal)
+    | Result.ok protected => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.inputRequired protected))) else (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.emptyInputRequired))) else (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.misplacedInputRequired (Methods::methodWire method)))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: settleBody,
+  parameters: [key : Bytes, method : Methods::Method, name : String, body : Methods::ResultBody],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match body
+    | Methods::ResultBody.inputRequired needed => (placed key method name needed)
+    | Methods::ResultBody.discover found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)
+    | Methods::ResultBody.listTools found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)
+    | Methods::ResultBody.callTool found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)
+    | Methods::ResultBody.progressed found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)
+    | Methods::ResultBody.listResources found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)
+    | Methods::ResultBody.readResource found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)
+    | Methods::ResultBody.listResourceTemplates found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)
+    | Methods::ResultBody.listPrompts found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)
+    | Methods::ResultBody.getPrompt found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)
+    | Methods::ResultBody.complete found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)
+    | Methods::ResultBody.getTask found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)
+    | Methods::ResultBody.acknowledged => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)
+    | Methods::ResultBody.taskCreated found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: settleAnswer,
+  parameters: [
+    key : Bytes,
+    request : Methods::ClientRequest,
+    answered : (Result Methods::ResultBody Refusal::ProviderRefusal)
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match answered
+    | Result.error refusal => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] refusal)
+    | Result.ok body => (settleBody key (Methods::methodOfRequest request) (nameOfRequest request) body)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: afterOpen,
+  parameters: [
+    key : Bytes,
+    limit : Nat,
+    used : Nat,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    request : Methods::ClientRequest,
+    opened : (Result Methods::ClientRequest Refusal::ProviderRefusal)
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match opened
+    | Result.error refusal => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] refusal)
+    | Result.ok admitted => (settleAnswer key request (Tools::gate limit used answer admitted))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: guardedGate,
+  parameters: [
+    key : Bytes,
+    limit : Nat,
+    used : Nat,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    request : Methods::ClientRequest
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (afterOpen key limit used answer request (openRequest key request)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: placedOk,
+  parameters: [
+    method : Methods::Method,
+    outcome : (Result Methods::ResultBody Refusal::ProviderRefusal)
+  ],
+  result: Bool,
+  body: (if (Methods::supportsInputRequired method) then true else (match outcome
+    | Result.error refusal => true
+    | Result.ok body => (not (Methods::isInputRequired body)))),
+  executable: true
+}
+
+theorem{
+  name: a_state_that_fails_verification_is_refused,
+  parameters: [],
+  statement: ((stateVerdict (ctor Option.none [String])) = (ctor Result.error [(Option String), Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidRequestState))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_state_that_verifies_is_passed_on_as_its_payload,
+  parameters: [payload : String],
+  statement: ((stateVerdict (ctor Option.some [String] payload)) = (ctor Result.ok [(Option String), Refusal::ProviderRefusal] (ctor Option.some [String] payload))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_request_without_state_passes_the_guard_untouched,
+  parameters: [key : Bytes, method : String, name : String],
+  statement: ((openWith key method name (ctor Option.none [String])) = (ctor Result.ok [(Option String), Refusal::ProviderRefusal] (ctor Option.none [String]))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_refused_request_never_reaches_the_tool,
+  parameters: [
+    key : Bytes,
+    limit : Nat,
+    used : Nat,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    request : Methods::ClientRequest,
+    refusal : Refusal::ProviderRefusal
+  ],
+  statement: ((afterOpen key limit used answer request (ctor Result.error [Methods::ClientRequest, Refusal::ProviderRefusal] refusal)) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] refusal)),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_request_that_is_admitted_is_gated_answered_and_then_settled,
+  parameters: [
+    key : Bytes,
+    limit : Nat,
+    used : Nat,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    request : Methods::ClientRequest,
+    admitted : Methods::ClientRequest
+  ],
+  statement: ((afterOpen key limit used answer request (ctor Result.ok [Methods::ClientRequest, Refusal::ProviderRefusal] admitted)) = (settleAnswer key request (Tools::gate limit used answer admitted))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: input_responses_that_are_not_objects_are_refused,
+  parameters: [payload : (Option String)],
+  statement: ((shapeVerdict (ctor Result.ok [(Option String), Refusal::ProviderRefusal] payload) false) = (ctor Result.error [(Option String), Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidInputResponses))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_number_among_the_input_responses_is_refused,
+  parameters: [],
+  statement: ((responsesOk (ctor Option.some [Json::JsonObject] (record Json::JsonObject {members := (cons ("user_name", (ctor Json::Json.number (record Json::Decimal {mantissa := (12345 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))}))) = false),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: unknown_keys_among_input_responses_are_ignored_when_they_are_objects,
+  parameters: [],
+  statement: ((responsesOk (ctor Option.some [Json::JsonObject] (record Json::JsonObject {members := (cons ("unknown_extra_key", (ctor Json::Json.object (nil (String * Json::Json)))) (cons ("another_unexpected", (ctor Json::Json.object (nil (String * Json::Json)))) (nil (String * Json::Json))))}))) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: absent_input_responses_are_well_formed,
+  parameters: [],
+  statement: ((responsesOk (ctor Option.none [Json::JsonObject])) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: input_required_is_never_sent_on_a_method_that_does_not_support_it,
+  parameters: [
+    key : Bytes,
+    name : String,
+    needed : Input::InputRequiredResult,
+    method : Methods::Method
+  ],
+  statement: ((placedOk method (settleBody key method name (ctor Methods::ResultBody.inputRequired needed))) = true),
+  proof: cases{
+    branches: [
+      {proof: reflexivity{}, binders: [], constructor: serverDiscover},
+      {proof: reflexivity{}, binders: [], constructor: toolsList},
+      {proof: reflexivity{}, binders: [], constructor: toolsCall},
+      {proof: reflexivity{}, binders: [], constructor: resourcesList},
+      {proof: reflexivity{}, binders: [], constructor: resourcesRead},
+      {proof: reflexivity{}, binders: [], constructor: resourcesTemplatesList},
+      {proof: reflexivity{}, binders: [], constructor: promptsList},
+      {proof: reflexivity{}, binders: [], constructor: promptsGet},
+      {proof: reflexivity{}, binders: [], constructor: completionComplete},
+      {proof: reflexivity{}, binders: [], constructor: tasksGet},
+      {proof: reflexivity{}, binders: [], constructor: tasksUpdate},
+      {proof: reflexivity{}, binders: [], constructor: tasksCancel}
+    ],
+    scrutinee: method
+  },
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: tools_list_never_answers_input_required,
+  parameters: [key : Bytes, name : String, needed : Input::InputRequiredResult],
+  statement: ((settleBody key (ctor Methods::Method.toolsList) name (ctor Methods::ResultBody.inputRequired needed)) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.misplacedInputRequired "tools/list"))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: an_input_required_result_with_nothing_in_it_is_refused,
+  parameters: [key : Bytes, name : String],
+  statement: ((settleBody key (ctor Methods::Method.toolsCall) name (ctor Methods::ResultBody.inputRequired (ctor Input::InputRequiredResult.requests (nil (String * Input::InputRequest))))) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.emptyInputRequired))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: state_without_a_key_is_refused_not_sent_unprotected,
+  parameters: [name : String, token : String],
+  statement: ((settleBody 0x (ctor Methods::Method.toolsCall) name (ctor Methods::ResultBody.inputRequired (ctor Input::InputRequiredResult.state token))) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.requestStateKeyMissing))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: requests_without_state_need_no_key,
+  parameters: [name : String, pending : (List (String * Input::InputRequest))],
+  statement: ((sealNeeded 0x name name (ctor Input::InputRequiredResult.requests pending)) = (ctor Result.ok [Input::InputRequiredResult, Refusal::ProviderRefusal] (ctor Input::InputRequiredResult.requests pending))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_complete_result_is_never_touched,
+  parameters: [
+    key : Bytes,
+    method : Methods::Method,
+    name : String,
+    found : Methods::CallToolResult
+  ],
+  statement: ((settleBody key method name (ctor Methods::ResultBody.callTool found)) = (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.callTool found))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+\end{semanticmodule}
+\end{lexlean}

@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "scope-laws"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "ScopeLaws"
+component = "ScopeLaws"
+
+[[form]]
+id = "scope-laws"
+channel = "text"
+surface = "Scope laws"
+canonical_source = true
+features = ["sentence-case", "singular"]

@@ -88,7 +88,7 @@ definition{
   name: withHosts,
   parameters: [request : Http::HttpRequest, hosts : (List (List Nat))],
   result: Http::HttpRequest,
-  body: (record Http::HttpRequest {method := (project request method), target := (project request target), fields := (project request fields), body := (project request body), toolCalls := (project request toolCalls), allowedHosts := hosts}),
+  body: (record Http::HttpRequest {method := (project request method), target := (project request target), fields := (project request fields), body := (project request body), toolCalls := (project request toolCalls), allowedHosts := hosts, stateKey := (project request stateKey)}),
   executable: true
 }
 
@@ -113,7 +113,9 @@ definition{
     | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated (second read)))
     | Option.some body => (match (u32At source (project body next))
       | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated (project body next)))
-      | Option.some calls => (afterCalls source (record Http::HttpRequest {method := (JsonText::bytesToList (project method bytes)), target := (JsonText::bytesToList (project target bytes)), fields := (first read), body := (project body bytes), toolCalls := calls, allowedHosts := (nil (List Nat))}) ((project body next) + 4)))),
+      | Option.some calls => (match (chunkAt source ((project body next) + 4))
+        | Option.none => (ctor Result.error [Http::HttpRequest, FrameFault] (ctor FrameFault.truncated ((project body next) + 4)))
+        | Option.some key => (afterCalls source (record Http::HttpRequest {method := (JsonText::bytesToList (project method bytes)), target := (JsonText::bytesToList (project target bytes)), fields := (first read), body := (project body bytes), toolCalls := calls, allowedHosts := (nil (List Nat)), stateKey := (project key bytes)}) (project key next))))),
   axioms: [Quot.sound, propext],
   executable: true
 }

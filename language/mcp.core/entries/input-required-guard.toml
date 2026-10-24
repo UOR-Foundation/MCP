@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "input-required-guard"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "InputGuard"
+component = "InputGuard"
+
+[[form]]
+id = "input-required-guard"
+channel = "text"
+surface = "Input-required guard"
+canonical_source = true
+features = ["sentence-case", "singular"]

@@ -251,6 +251,14 @@ definition{
 }
 
 definition{
+  name: keyed,
+  parameters: [info : Extension::ProviderInfo, key : Bytes],
+  result: Extension::ProviderInfo,
+  body: (record Extension::ProviderInfo {serverInfo := (project info serverInfo), instructions := (project info instructions), capabilities := (project info capabilities), discoverCache := (project info discoverCache), paramRules := (project info paramRules), toolCallLimit := (project info toolCallLimit), requestStateKey := key}),
+  executable: true
+}
+
+definition{
   name: serveOpen,
   parameters: [
     info : Extension::ProviderInfo,
@@ -258,7 +266,7 @@ definition{
     request : Http::HttpRequest
   ],
   result: Http::HttpResponse,
-  body: (if (Http::isPost (project request method)) then (afterParse info answer (project request toolCalls) (project request fields) (JsonRead::readJson (project request body))) else (notAllowedResponse)),
+  body: (if (Http::isPost (project request method)) then (afterParse (keyed info (project request stateKey)) answer (project request toolCalls) (project request fields) (JsonRead::readJson (project request body))) else (notAllowedResponse)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }

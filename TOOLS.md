@@ -179,6 +179,8 @@ with an independent reader of the WHATWG format.
 | `json_schema_2020_12_tool` | the focal `inputSchema` | `JSON_SCHEMA_2020_12_FIXTURE` of `json-schema-2020-12.ts` |
 | `test_arguments`, `test_nested_header`, `test_structured_output`, `test_bad_structured_output`, `test_bad_payload`, `test_unsafe_text`, `test_backward_progress` | tools of this repository that the register rows need: a schema with bounds, a nested header, structured output that conforms and that does not, a bad payload, text with controls, progress that goes back | none: not in the suite |
 
+The catalog also lists the eight tools that ask the client for input (`test_input_required_result_*`), which are described in [INPUT-REQUIRED.md](INPUT-REQUIRED.md#the-fixture-tools); they come after the tools above and share the argument check of `tools/call`.
+
 ## Kernel theorems
 
 `ToolLaws.lex.tex` states, and `lexlean verify` checks, the order of `tools/list`, that an
