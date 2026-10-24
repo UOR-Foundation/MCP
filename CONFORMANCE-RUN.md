@@ -92,13 +92,13 @@ counted, not excused:
 ## What passes today
 
 Run of the core of this commit (core digest below), spec 2026-07-28, 113 HTTP exchanges,
-228 JSON-RPC messages, 69 refused probes, 1 transport refusal, every message valid.
+228 JSON-RPC messages, 67 refused probes, 1 transport refusal, every message valid.
 
-Required: 26 of 37 pass. Not scored: 3 of 13 pass, 1 is skipped by the suite, 9 fail.
+Required: 27 of 37 pass. Not scored: 3 of 13 pass, 1 is skipped by the suite, 9 fail. Every failing scenario waits on #30 or #32.
 
 | # | kind | scenario | result | checks | waits on |
 |---|---|---|---|---|---|
-| 1 | required | `server-stateless` | **fail** | 23 of 30 (5 skipped) | no delivering PR |
+| 1 | required | `server-stateless` | pass | 25 of 30 (5 skipped) |  |
 | 2 | required | `completion-complete` | pass | 2 of 2 |  |
 | 3 | required | `tools-list` | pass | 3 of 3 |  |
 | 4 | required | `tools-call-simple-text` | pass | 2 of 2 |  |
@@ -149,30 +149,40 @@ Required: 26 of 37 pass. Not scored: 3 of 13 pass, 1 is skipped by the suite, 9 
 | 49 | not scored | `http-header-validation` | pass | 14 of 14 |  |
 | 50 | not scored | `http-custom-header-server-validation` | pass | 10 of 10 |  |
 
-Three passes need a caution. `input-required-result-missing-input-response` and
+Four passes need a caution. `input-required-result-missing-input-response` and
 `input-required-result-ignore-extra-params` pass with one warning each, because the tool they
 call is not listed yet and a refusal is an acceptable answer to those probes; they pass
 vacuously until MCP#10 lands. `server-sse-multiple-streams` passes with an info: the core answers
-JSON, and event streams are optional there.
+JSON, and event streams are optional there. `server-stateless` passes with 5 of its 30 checks skipped by
+the suite: the checks that need a `subscriptions/listen` stream. The suite skips them for a server that
+advertises no `listChanged` or `subscribe` capability (`stateless.ts`, the comment above
+`advertisesSubscriptions`), and the specification schema makes those capabilities and the list-changed
+notifications optional (`ServerCapabilities.tools.listChanged`: "Whether this server supports notifications
+for changes to the tool list"; `ToolListChangedNotification`: "An optional notification"). The core
+advertises none and does not register `subscriptions/listen`, so the skips stand; they are listed in the
+report with their check ids.
 
 ### Not met
 
-* `server-stateless` (required): 23 of 30 checks pass, 2 fail and 5 are skipped by the suite.
-  The two failures are the probes that call the diagnostic tools `test_streaming_elicitation`
-  and `test_logging_tool`, which the fixture does not list, so the suite reports them as not
-  testable. `vectors/suite.json` gives them to #10 and #11. PR #30 does not list
-  `test_streaming_elicitation` and no pull request lists `test_logging_tool` (the fixture
-  declares no logging capability), so this scenario is not waiting on #30 or #32. The five
-  skipped checks need `subscriptions/listen`, which the core does not offer.
 * The ten `input-required-result-*` scenarios in the table (required): the tools and the
   prompt they call are registered by MCP#10, PR #30.
 * Nine `tasks-*` scenarios (not scored): the tools and the `tasks/*` methods they call are
   registered by MCP#12, PR #32. `tasks-status-notifications` is skipped by the suite.
 
+### `server-stateless` and the two diagnostic tools
+
+The scenario calls `test_streaming_elicitation` (line 887) and `test_logging_tool` (line 947) and reports a
+call that is rejected, or a tool the server does not list, as not testable, which fails the check. The
+conformance fixture lists both (TL-19) and each answers one text result, as in the suite's reference server.
+Neither is an input-required tool: the first probe fails only on a frame with a method other than
+`notifications/*`, the second only on a `notifications/message` for a request that set no `logLevel`. The
+core writes progress only for a request that carries a `progressToken`, declares no `logging` capability and
+writes no log message, so both probes pass. The core digest changed with the fixture catalog.
+
 ## The identity of the core
 
 `conformance/core-identity.json` records the core by the SHA-256 of its compiled program,
-`c7211e58650f6be023ffdacd8885b7c686cfaedfa76124218cdbda4ae622bc99`, with the package, its file
+`5da88084314a27a48dfe69a936f6df4d64c3e936103b625a93e04888da98dfc8`, with the package, its file
 digests, the source and semantic IDs and the lock it was exported from, and the compiler that
 exported it. That program digest is the one the committed export `mcp_lifecycle` of the same root
 records: the compiled program does not depend on the compiler that exported it, while the

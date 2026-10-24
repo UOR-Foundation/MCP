@@ -296,13 +296,16 @@ fn every_check_id_a_scenario_emits_is_covered_or_listed_lc_14() {
     }
     // The streaming probes of stateless.ts that issue 11 took over are in the transport
     // vectors, listed with the suite file they cite.
-    let transport = transport_vector_file();
-    for (key, checks) in [("vectors", "suite_checks"), ("not_run", "checks")] {
-        for entry in transport[key].as_array().expect(key) {
-            let cited = entry["file"].as_str().expect("file");
-            if cited.ends_with("stateless.ts") || cited.ends_with("http-standard-headers.ts") {
-                for c in entry[checks].as_array().expect(checks) {
-                    known.insert(c.as_str().expect("id").to_owned());
+    // The diagnostic probes of `stateless.ts` that the fixture's tools (TL-19, issue 13)
+    // answer are in the tools vectors.
+    for other in [transport_vector_file(), tools_vector_file()] {
+        for (key, checks) in [("vectors", "suite_checks"), ("not_run", "checks")] {
+            for entry in other[key].as_array().expect(key) {
+                let cited = entry["file"].as_str().expect("file");
+                if cited.ends_with("stateless.ts") || cited.ends_with("http-standard-headers.ts") {
+                    for c in entry[checks].as_array().expect(checks) {
+                        known.insert(c.as_str().expect("id").to_owned());
+                    }
                 }
             }
         }

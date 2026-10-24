@@ -95,11 +95,6 @@
       "issue": 12,
       "pr": 32,
       "reason": "the tools and methods the scenario calls are registered by the tasks extension of MCP#12"
-    },
-    "server-stateless": {
-      "issue": null,
-      "pr": null,
-      "reason": "two probes call diagnostic tools the fixture does not list: test_streaming_elicitation (answers an input-required result; PR #30 does not list it) and test_logging_tool (the fixture declares no logging capability; owner #11 in vectors/suite.json, merged without it)"
     }
   },
   "suite_skipped": {

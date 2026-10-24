@@ -399,6 +399,12 @@ suite = "tools"
 statement = "Tool calls with a very large arguments object, a very large text argument and a catalog of many tools are answered on the default 2 MiB thread stack, because no function of the generated package recurses except as a loop."
 
 [[id]]
+id = "TL-19"
+level = "build"
+suite = "tools"
+statement = "The conformance fixture lists the two diagnostic tools the pinned server-stateless scenario calls, test_streaming_elicitation and test_logging_tool, and a tools/call of each answers one text content block (Streaming complete, Logging evaluated) with no independent JSON-RPC request and no notifications/message written to the response, with or without a logLevel in the request: the core declares no logging capability and streams no server request."
+
+[[id]]
 id = "RP-01"
 level = "build"
 suite = "resources"
@@ -548,7 +554,7 @@ statement = "A request whose Host is present and names a host outside the allow-
 id = "SH-06"
 level = "build"
 suite = "transport"
-statement = "The streaming probes of server-stateless that issue 7 left to this issue: server/discover advertises no listChanged and no subscribe capability and subscriptions/listen is answered as methodNotFound (-32601, HTTP status 404), which the scenario reads as a feature that is absent, so the probes at lines 1037 and 1144 are vectors and those at 1209 and 1279 are not reached; the probes at lines 887 and 947 need diagnostic tools the fixture does not list and are listed as not run."
+statement = "The streaming probes of server-stateless that issue 7 left to this issue: server/discover advertises no listChanged and no subscribe capability and subscriptions/listen is answered as methodNotFound (-32601, HTTP status 404), which the scenario reads as a feature that is absent, so the probes at lines 1037 and 1144 are vectors and those at 1209 and 1279 are not reached; the probes at lines 887 and 947 call the diagnostic tools that TL-19 lists and are the vectors TS-10 and TS-11."
 
 [[id]]
 id = "SH-07"

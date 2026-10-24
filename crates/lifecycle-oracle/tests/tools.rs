@@ -17,7 +17,7 @@ use lifecycle_oracle::{Request, Response};
 use serde_json::{json, Value};
 
 /// The names of the fixture catalog, in the order `Fixture.fixtureTools` declares them.
-const NAMES: [&str; 18] = [
+const NAMES: [&str; 20] = [
     "echo",
     "execute_sql",
     "test_missing_capability",
@@ -36,6 +36,8 @@ const NAMES: [&str; 18] = [
     "test_bad_payload",
     "test_unsafe_text",
     "test_backward_progress",
+    "test_streaming_elicitation",
+    "test_logging_tool",
 ];
 
 fn list(params: &str) -> Request {
@@ -903,4 +905,75 @@ fn the_vendored_requirements_list_the_tool_scenarios_as_required_tl_17() {
         .find("  - scenario: json-schema-2020-12\n    leg: server\n    reason: pending")
         .expect("json-schema-2020-12 is recorded as pending");
     assert!(at > yaml.find("not_scored:").expect("a not_scored section"));
+}
+
+// ---- TL-19: the diagnostic tools of server-stateless ----
+
+/// A tools/call of `name` whose `_meta` is `meta`, from a client that accepts both a JSON
+/// body and an event stream.
+fn invoke_meta(name: &str, meta: &str) -> Request {
+    let mut headers = standard("tools/call", Some(name));
+    headers.push((
+        "Accept".to_owned(),
+        "application/json, text/event-stream".to_owned(),
+    ));
+    let body = format!(
+        r#"{{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{{"name":"{name}","arguments":{{}},"_meta":{meta}}}}}"#
+    );
+    post_owned(&headers, &body)
+}
+
+#[test]
+fn the_diagnostic_tools_of_server_stateless_are_listed_and_answer_text_tl_19() {
+    assert_eq!(run_register("TL-19"), 2, "the vectors TS-10 and TS-11");
+    let tools = listed();
+    let find = |name: &str| -> &Value {
+        tools
+            .iter()
+            .find(|tool| tool["name"] == name)
+            .unwrap_or_else(|| panic!("{name} is listed"))
+    };
+    assert_eq!(
+        find("test_streaming_elicitation")["description"],
+        "Diagnostic tool validating response progress streams"
+    );
+    assert_eq!(
+        find("test_logging_tool")["description"],
+        "Diagnostic logging validator tool"
+    );
+    for tool in ["test_streaming_elicitation", "test_logging_tool"] {
+        assert_eq!(find(tool)["inputSchema"]["type"], "object");
+    }
+
+    // The metas the pinned scenario sends, and one that sets a log level.
+    let elicitation = META.replace(
+        r#""clientCapabilities":{}"#,
+        r#""clientCapabilities":{"elicitation":{}}"#,
+    );
+    let logged = META.replace(
+        r#""clientCapabilities":{}"#,
+        r#""clientCapabilities":{},"io.modelcontextprotocol/logLevel":"debug""#,
+    );
+    for (tool, text) in [
+        ("test_streaming_elicitation", "Streaming complete"),
+        ("test_logging_tool", "Logging evaluated"),
+    ] {
+        for meta in [META, elicitation.as_str(), logged.as_str()] {
+            let (response, body) = send(&invoke_meta(tool, meta));
+            assert_eq!(response.status, 200, "{tool} {meta}: {body}");
+            assert_eq!(body["result"]["resultType"], "complete", "{body}");
+            assert_ne!(body["result"]["isError"], true, "{body}");
+            assert_eq!(body["result"]["content"].as_array().map(Vec::len), Some(1));
+            assert_eq!(text_of(&body), text, "{body}");
+            // Nothing but the result: no server request and no log notification.
+            assert!(
+                notes(&response).is_empty(),
+                "{tool}: {:?}",
+                notes(&response)
+            );
+            let raw = String::from_utf8_lossy(&response.body).into_owned();
+            assert!(!raw.contains("notifications/message"), "{raw}");
+            assert!(!raw.contains("elicitation/create"), "{raw}");
+        }
+    }
 }

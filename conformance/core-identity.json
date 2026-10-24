@@ -1,7 +1,7 @@
 {
   "spec": "mcp-conformance/core-identity/1",
   "root": "UorMcp.Fixture.fixtureRun",
-  "program_sha256": "c7211e58650f6be023ffdacd8885b7c686cfaedfa76124218cdbda4ae622bc99",
+  "program_sha256": "5da88084314a27a48dfe69a936f6df4d64c3e936103b625a93e04888da98dfc8",
   "package": {
     "name": "mcp_conformance_core",
     "version": "1.0.0",
@@ -18,24 +18,24 @@
       },
       {
         "path": "package.json",
-        "sha256": "4312f6e3052ddffc34c765844b4871acf8d70f94ad1da347a8ba1383f11a5a14",
-        "byte_length": 1149295
+        "sha256": "0a5fd17b5ff8befbcb4d5fbfcfd59638176fcdb4fe707b13cde883cc5c8a26d2",
+        "byte_length": 1151687
       },
       {
         "path": "provenance.json",
-        "sha256": "1472f6f1953257e1035e93f8184cd73f137dd0278c81d05683246753fee17c48",
+        "sha256": "764b6f513423aac7b418fc1561dcf09abd75910c71706ceac0338a51384346ac",
         "byte_length": 673
       },
       {
         "path": "src/lib.rs",
-        "sha256": "e81423faafa44dc678bfeacd30d23cda55f4c94d61ecd6ba7e0ad97b70a7bdf0",
-        "byte_length": 584541
+        "sha256": "789c4901c986cb76ccf73b05f1d2d54e4a254d8ba85d44c47dda57e10cfd62b8",
+        "byte_length": 585553
       }
     ]
   },
   "source": {
-    "source_id": "4e72da8ba3e371d0acd9595c59f3366421a6d9a01711a64d6058107ae478f7ca",
-    "semantic_id": "71bf01f2d8a01f6a44fe46514e43712ae0a59d7a33b7ba82cb2eb8c25095f6af",
+    "source_id": "fa33d518424cef47bddfda77cc4fd2e0c9c920527bba725f505e7ee9e0d32a3b",
+    "semantic_id": "c6a5bda3ca659d497aa724dec2694e3e2f978e4b836671ff051eac40fc683e11",
     "lock_sha256": "c25a235e1aa6a818d3556312c63532be1f99adc9a2b56e91dbdbb120c4cbe711"
   },
   "compiler": {
@@ -45,6 +45,6 @@
   },
   "same_program_as": {
     "package": "mcp_lifecycle",
-    "program_sha256": "c7211e58650f6be023ffdacd8885b7c686cfaedfa76124218cdbda4ae622bc99"
+    "program_sha256": "5da88084314a27a48dfe69a936f6df4d64c3e936103b625a93e04888da98dfc8"
   }
 }
