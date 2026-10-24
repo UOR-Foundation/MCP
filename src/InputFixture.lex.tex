@@ -1,0 +1,680 @@
+\begin{lexlean}{InputFixture}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Capabilities}
+\importmodule{Common}
+\importmodule{Content}
+\importmodule{Input}
+\importmodule{Interact}
+\importmodule{Json}
+\importmodule{JsonRead}
+\importmodule{JsonText}
+\importmodule{Meta}
+\importmodule{Methods}
+\importmodule{Numeric}
+\importmodule{Refusal}
+\title{Input-required fixture}
+\begin{semanticmodule}
+inductive{
+  name: InputKind,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: elicitation, fields: []},
+    {name: sampling, fields: []},
+    {name: roots, fields: []}
+  ]
+}
+
+inductive{
+  name: Got,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: absent, fields: []},
+    {name: malformed, fields: []},
+    {name: answered, fields: [Json::JsonObject]}
+  ]
+}
+
+definition{
+  name: textIs,
+  parameters: [found : Json::Lookup, expected : String],
+  result: Bool,
+  body: (match found
+    | Json::Lookup.absent => false
+    | Json::Lookup.present value => (match (Json::asText value)
+      | Option.none => false
+      | Option.some content => (prim equal content expected : Bool))),
+  executable: true
+}
+
+definition{
+  name: hasText,
+  parameters: [found : Json::Lookup],
+  result: Bool,
+  body: (match found
+    | Json::Lookup.absent => false
+    | Json::Lookup.present value => (match (Json::asText value)
+      | Option.none => false
+      | Option.some content => true)),
+  executable: true
+}
+
+definition{
+  name: actionOk,
+  parameters: [response : Json::JsonObject],
+  result: Bool,
+  body: (if (textIs (Json::lookup "action" response) "accept") then true else (if (textIs (Json::lookup "action" response) "decline") then true else (textIs (Json::lookup "action" response) "cancel"))),
+  executable: true
+}
+
+definition{
+  name: contentIsObject,
+  parameters: [response : Json::JsonObject],
+  result: Bool,
+  body: (match (Json::lookup "content" response)
+    | Json::Lookup.absent => true
+    | Json::Lookup.present value => (match (Json::asObject value)
+      | Option.none => false
+      | Option.some found => true)),
+  executable: true
+}
+
+definition{
+  name: elicitFits,
+  parameters: [response : Json::JsonObject],
+  result: Bool,
+  body: (if (actionOk response) then (contentIsObject response) else false),
+  executable: true
+}
+
+definition{
+  name: contentPresent,
+  parameters: [response : Json::JsonObject],
+  result: Bool,
+  body: (match (Json::lookup "content" response)
+    | Json::Lookup.absent => false
+    | Json::Lookup.present value => (match (Json::asObject value)
+      | Option.some found => true
+      | Option.none => (match (Json::asArray value)
+        | Option.some items => true
+        | Option.none => false))),
+  executable: true
+}
+
+definition{
+  name: roleOk,
+  parameters: [response : Json::JsonObject],
+  result: Bool,
+  body: (if (textIs (Json::lookup "role" response) "user") then true else (textIs (Json::lookup "role" response) "assistant")),
+  executable: true
+}
+
+definition{
+  name: samplingFits,
+  parameters: [response : Json::JsonObject],
+  result: Bool,
+  body: (if (roleOk response) then (if (hasText (Json::lookup "model" response)) then (contentPresent response) else false) else false),
+  executable: true
+}
+
+definition{
+  name: rootsOk,
+  parameters: [items : (List Json::Json)],
+  result: Bool,
+  body: (match items
+    | List.nil => true
+    | List.cons head rest => (match (Json::asObject head)
+      | Option.none => false
+      | Option.some root => (if (hasText (Json::lookup "uri" root)) then (rootsOk rest) else false))),
+  executable: true,
+  recursive_argument: items
+}
+
+definition{
+  name: rootsFits,
+  parameters: [response : Json::JsonObject],
+  result: Bool,
+  body: (match (Json::lookup "roots" response)
+    | Json::Lookup.absent => false
+    | Json::Lookup.present value => (match (Json::asArray value)
+      | Option.none => false
+      | Option.some items => (rootsOk items))),
+  executable: true
+}
+
+definition{
+  name: fits,
+  parameters: [kind : InputKind, response : Json::JsonObject],
+  result: Bool,
+  body: (match kind
+    | InputKind.elicitation => (elicitFits response)
+    | InputKind.sampling => (samplingFits response)
+    | InputKind.roots => (rootsFits response)),
+  executable: true
+}
+
+definition{
+  name: answerOf,
+  parameters: [key : String, kind : InputKind, responses : (Option Json::JsonObject)],
+  result: Got,
+  body: (match responses
+    | Option.none => (ctor Got.absent)
+    | Option.some given => (match (Json::lookup key given)
+      | Json::Lookup.absent => (ctor Got.absent)
+      | Json::Lookup.present value => (match (Json::asObject value)
+        | Option.none => (ctor Got.malformed)
+        | Option.some response => (if (fits kind response) then (ctor Got.answered response) else (ctor Got.malformed))))),
+  executable: true
+}
+
+definition{
+  name: isAbsent,
+  parameters: [found : Got],
+  result: Bool,
+  body: (match found
+    | Got.absent => true
+    | Got.malformed => false
+    | Got.answered response => false),
+  executable: true
+}
+
+definition{
+  name: isMalformed,
+  parameters: [found : Got],
+  result: Bool,
+  body: (match found
+    | Got.absent => false
+    | Got.malformed => true
+    | Got.answered response => false),
+  executable: true
+}
+
+definition{
+  name: valueOf,
+  parameters: [found : Got],
+  result: Json::JsonObject,
+  body: (match found
+    | Got.absent => (Capabilities::noObject)
+    | Got.malformed => (Capabilities::noObject)
+    | Got.answered response => response),
+  executable: true
+}
+
+definition{
+  name: textIn,
+  parameters: [field : String, response : Json::JsonObject, fallback : String],
+  result: String,
+  body: (match (Json::lookup field response)
+    | Json::Lookup.absent => fallback
+    | Json::Lookup.present value => (match (Json::asText value)
+      | Option.none => fallback
+      | Option.some content => content)),
+  executable: true
+}
+
+definition{
+  name: contentText,
+  parameters: [response : Json::JsonObject, field : String, fallback : String],
+  result: String,
+  body: (match (Json::lookup "content" response)
+    | Json::Lookup.absent => fallback
+    | Json::Lookup.present value => (match (Json::asObject value)
+      | Option.none => fallback
+      | Option.some found => (textIn field found fallback))),
+  executable: true
+}
+
+definition{
+  name: okFlag,
+  parameters: [response : Json::JsonObject],
+  result: Bool,
+  body: (match (Json::lookup "content" response)
+    | Json::Lookup.absent => false
+    | Json::Lookup.present value => (match (Json::asObject value)
+      | Option.none => false
+      | Option.some found => (match (Json::lookup "ok" found)
+        | Json::Lookup.absent => false
+        | Json::Lookup.present flag => (match (Json::asBool flag)
+          | Option.none => false
+          | Option.some truth => truth)))),
+  executable: true
+}
+
+definition{
+  name: rootsCount,
+  parameters: [response : Json::JsonObject],
+  result: Nat,
+  body: (match (Json::lookup "roots" response)
+    | Json::Lookup.absent => 0
+    | Json::Lookup.present value => (match (Json::asArray value)
+      | Option.none => 0
+      | Option.some items => (prim length items : Nat))),
+  executable: true
+}
+
+definition{
+  name: natText,
+  parameters: [count : Nat],
+  result: String,
+  body: (prim format_decimal (Numeric::natToInt count (0 : Int)) : String),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: joined,
+  parameters: [parts : (List String)],
+  result: String,
+  body: (prim join parts "" : String),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: keysOnto,
+  parameters: [members : (List (String * Json::Json)), built : (List String)],
+  result: (List String),
+  body: (match members
+    | List.nil => built
+    | List.cons entry rest => (keysOnto rest (cons (first entry) built))),
+  executable: true,
+  recursive_argument: members
+}
+
+definition{
+  name: keysOf,
+  parameters: [members : (List (String * Json::Json))],
+  result: (List String),
+  body: (JsonRead::reverseOnto [String] (keysOnto members (nil String)) (nil String)),
+  executable: true
+}
+
+definition{
+  name: finish,
+  parameters: [content : String],
+  result: (Result Interact::Step Refusal::ProviderRefusal),
+  body: (ctor Result.ok [Interact::Step, Refusal::ProviderRefusal] (ctor Interact::Step.finished (record Methods::Progressed {result := (record Methods::CallToolResult {content := (cons (ctor Content::ContentBlock.text (record Content::TextContent {text := content, annotations := (ctor Option.none [Common::Annotations]), meta := (ctor Option.none [Json::JsonObject])})) (nil Content::ContentBlock)), structuredContent := (ctor Option.none [Json::Json]), isError := (ctor Option.none [Bool])}), steps := (nil Methods::ProgressStep)}))),
+  executable: true
+}
+
+definition{
+  name: asking,
+  parameters: [pending : (List (String * Input::InputRequest))],
+  result: (Result Interact::Step Refusal::ProviderRefusal),
+  body: (ctor Result.ok [Interact::Step, Refusal::ProviderRefusal] (ctor Interact::Step.asks (ctor Input::InputRequiredResult.requests pending))),
+  executable: true
+}
+
+definition{
+  name: askingWithState,
+  parameters: [pending : (List (String * Input::InputRequest)), payload : String],
+  result: (Result Interact::Step Refusal::ProviderRefusal),
+  body: (ctor Result.ok [Interact::Step, Refusal::ProviderRefusal] (ctor Interact::Step.asks (ctor Input::InputRequiredResult.requestsAndState pending payload))),
+  executable: true
+}
+
+definition{
+  name: refuseResponses,
+  parameters: [],
+  result: (Result Interact::Step Refusal::ProviderRefusal),
+  body: (ctor Result.error [Interact::Step, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidInputResponses)),
+  executable: true
+}
+
+definition{
+  name: schemaOf,
+  parameters: [field : String, kind : String],
+  result: Json::JsonObject,
+  body: (record Json::JsonObject {members := (cons ("type", (ctor Json::Json.text "object")) (cons ("properties", (ctor Json::Json.object (cons (field, (ctor Json::Json.object (cons ("type", (ctor Json::Json.text kind)) (nil (String * Json::Json))))) (nil (String * Json::Json))))) (cons ("required", (ctor Json::Json.array (cons (ctor Json::Json.text field) (nil Json::Json)))) (nil (String * Json::Json)))))}),
+  executable: true
+}
+
+definition{
+  name: formRequest,
+  parameters: [message : String, field : String, kind : String],
+  result: Input::InputRequest,
+  body: (ctor Input::InputRequest.elicitation (ctor Input::ElicitRequestParams.form (record Input::ElicitFormParams {mode := (ctor Option.none [Input::ElicitFormMode]), message := message, requestedSchema := (schemaOf field kind)}))),
+  executable: true
+}
+
+definition{
+  name: textMessage,
+  parameters: [content : String],
+  result: Input::SamplingMessage,
+  body: (record Input::SamplingMessage {role := (ctor Common::Role.user), content := (ctor Input::SamplingContent.single (ctor Input::SamplingContentBlock.text (record Content::TextContent {text := content, annotations := (ctor Option.none [Common::Annotations]), meta := (ctor Option.none [Json::JsonObject])}))), meta := (ctor Option.none [Json::JsonObject])}),
+  executable: true
+}
+
+definition{
+  name: samplingRequest,
+  parameters: [content : String, limit : Nat],
+  result: Input::InputRequest,
+  body: (ctor Input::InputRequest.sampling (record Input::CreateMessageParams {messages := (cons (textMessage content) (nil Input::SamplingMessage)), modelPreferences := (ctor Option.none [Input::ModelPreferences]), systemPrompt := (ctor Option.none [String]), includeContext := (ctor Option.none [Input::IncludeContext]), temperature := (ctor Option.none [Json::Decimal]), maxTokens := limit, stopSequences := (ctor Option.none [(List String)]), metadata := (ctor Option.none [Json::JsonObject]), tools := (ctor Option.none [(List Content::Tool)]), toolChoice := (ctor Option.none [Input::ToolChoice])})),
+  executable: true
+}
+
+definition{
+  name: rootsRequest,
+  parameters: [],
+  result: Input::InputRequest,
+  body: (ctor Input::InputRequest.roots (ctor Option.some [Json::JsonObject] (Capabilities::noObject))),
+  executable: true
+}
+
+definition{
+  name: nameRequest,
+  parameters: [],
+  result: Input::InputRequest,
+  body: (formRequest "What is your name?" "name" "string"),
+  executable: true
+}
+
+definition{
+  name: confirmRequest,
+  parameters: [],
+  result: Input::InputRequest,
+  body: (formRequest "Please confirm" "ok" "boolean"),
+  executable: true
+}
+
+definition{
+  name: single,
+  parameters: [key : String, request : Input::InputRequest],
+  result: (List (String * Input::InputRequest)),
+  body: (cons (key, request) (nil (String * Input::InputRequest))),
+  executable: true
+}
+
+definition{
+  name: stateIs,
+  parameters: [params : Methods::CallToolParams, expected : String],
+  result: Bool,
+  body: (match (project params requestState)
+    | Option.none => false
+    | Option.some held => (prim equal held expected : Bool)),
+  executable: true
+}
+
+definition{
+  name: heldText,
+  parameters: [params : Methods::CallToolParams],
+  result: String,
+  body: (match (project params requestState) | Option.none => "" | Option.some held => held),
+  executable: true
+}
+
+definition{
+  name: firstByte,
+  parameters: [content : String],
+  result: Nat,
+  body: (JsonText::byteAt (prim utf8_encode content : Bytes) 0),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: afterFirst,
+  parameters: [content : String],
+  result: String,
+  body: (let raw : Bytes := (prim utf8_encode content : Bytes); (match (prim slice raw 1 (prim subtract (prim length raw : Nat) 1 : Nat) : (Option Bytes))
+    | Option.none => ""
+    | Option.some rest => (match (prim utf8_decode rest : (Option String))
+      | Option.none => ""
+      | Option.some found => found))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: elicitationStep,
+  parameters: [params : Methods::CallToolParams],
+  result: (Result Interact::Step Refusal::ProviderRefusal),
+  body: (match (answerOf "user_name" (ctor InputKind.elicitation) (project params inputResponses))
+    | Got.answered response => (finish (joined (cons "Hello, " (cons (contentText response "name" "unknown") (cons "!" (nil String))))))
+    | Got.absent => (asking (single "user_name" (nameRequest)))
+    | Got.malformed => (refuseResponses)),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: samplingStep,
+  parameters: [params : Methods::CallToolParams],
+  result: (Result Interact::Step Refusal::ProviderRefusal),
+  body: (match (answerOf "capital_question" (ctor InputKind.sampling) (project params inputResponses))
+    | Got.answered response => (finish (joined (cons "Sampling result: " (cons (contentText response "text" "no response") (nil String)))))
+    | Got.absent => (asking (single "capital_question" (samplingRequest "What is the capital of France?" 100)))
+    | Got.malformed => (refuseResponses)),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: rootsStep,
+  parameters: [params : Methods::CallToolParams],
+  result: (Result Interact::Step Refusal::ProviderRefusal),
+  body: (match (answerOf "client_roots" (ctor InputKind.roots) (project params inputResponses))
+    | Got.answered response => (finish (joined (cons "Found " (cons (natText (rootsCount response)) (cons " root(s)" (nil String))))))
+    | Got.absent => (asking (single "client_roots" (rootsRequest)))
+    | Got.malformed => (refuseResponses)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: confirmed,
+  parameters: [params : Methods::CallToolParams, payload : String, done : String],
+  result: (Result Interact::Step Refusal::ProviderRefusal),
+  body: (if (stateIs params payload) then (match (answerOf "confirm" (ctor InputKind.elicitation) (project params inputResponses))
+    | Got.answered response => (if (okFlag response) then (finish done) else (askingWithState (single "confirm" (confirmRequest)) payload))
+    | Got.absent => (askingWithState (single "confirm" (confirmRequest)) payload)
+    | Got.malformed => (refuseResponses)) else (askingWithState (single "confirm" (confirmRequest)) payload)),
+  executable: true
+}
+
+definition{
+  name: requestStateStep,
+  parameters: [params : Methods::CallToolParams],
+  result: (Result Interact::Step Refusal::ProviderRefusal),
+  body: (confirmed params "request-state" "state-ok: requestState validated"),
+  executable: true
+}
+
+definition{
+  name: tamperedStateStep,
+  parameters: [params : Methods::CallToolParams],
+  result: (Result Interact::Step Refusal::ProviderRefusal),
+  body: (confirmed params "tamper-test" "integrity-ok: state verified"),
+  executable: true
+}
+
+definition{
+  name: pendingMultiple,
+  parameters: [named : Got, greeted : Got, rooted : Got],
+  result: (List (String * Input::InputRequest)),
+  body: (prim append (if (isAbsent named) then (single "user_name" (nameRequest)) else (nil (String * Input::InputRequest))) (prim append (if (isAbsent greeted) then (single "greeting" (samplingRequest "Generate a greeting" 50)) else (nil (String * Input::InputRequest))) (if (isAbsent rooted) then (single "client_roots" (rootsRequest)) else (nil (String * Input::InputRequest))) : (List (String * Input::InputRequest))) : (List (String * Input::InputRequest))),
+  executable: true
+}
+
+definition{
+  name: multipleWith,
+  parameters: [named : Got, greeted : Got, rooted : Got],
+  result: (Result Interact::Step Refusal::ProviderRefusal),
+  body: (if ((isMalformed named) || ((isMalformed greeted) || (isMalformed rooted))) then (refuseResponses) else (match (pendingMultiple named greeted rooted)
+    | List.nil => (finish (joined (cons "Name: " (cons (contentText (valueOf named) "name" "unknown") (cons "; Greeting: " (cons (contentText (valueOf greeted) "text" "Hello there!") (cons "; Roots: " (cons (natText (rootsCount (valueOf rooted))) (nil String)))))))))
+    | List.cons entry rest => (askingWithState (pendingMultiple named greeted rooted) "multiple-inputs"))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: multipleStep,
+  parameters: [params : Methods::CallToolParams],
+  result: (Result Interact::Step Refusal::ProviderRefusal),
+  body: (if (stateIs params "multiple-inputs") then (multipleWith (answerOf "user_name" (ctor InputKind.elicitation) (project params inputResponses)) (answerOf "greeting" (ctor InputKind.sampling) (project params inputResponses)) (answerOf "client_roots" (ctor InputKind.roots) (project params inputResponses))) else (askingWithState (pendingMultiple (ctor Got.absent) (ctor Got.absent) (ctor Got.absent)) "multiple-inputs")),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: stepOneRequest,
+  parameters: [],
+  result: Input::InputRequest,
+  body: (formRequest "Step 1: What is your name?" "name" "string"),
+  executable: true
+}
+
+definition{
+  name: stepTwoRequest,
+  parameters: [],
+  result: Input::InputRequest,
+  body: (formRequest "Step 2: What is your favorite color?" "color" "string"),
+  executable: true
+}
+
+definition{
+  name: roundOne,
+  parameters: [params : Methods::CallToolParams],
+  result: (Result Interact::Step Refusal::ProviderRefusal),
+  body: (match (answerOf "step1" (ctor InputKind.elicitation) (project params inputResponses))
+    | Got.answered response => (askingWithState (single "step2" (stepTwoRequest)) (joined (cons "2" (cons (contentText response "name" "unknown") (nil String)))))
+    | Got.absent => (askingWithState (single "step1" (stepOneRequest)) "1")
+    | Got.malformed => (refuseResponses)),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: roundTwo,
+  parameters: [params : Methods::CallToolParams],
+  result: (Result Interact::Step Refusal::ProviderRefusal),
+  body: (match (answerOf "step2" (ctor InputKind.elicitation) (project params inputResponses))
+    | Got.answered response => (finish (joined (cons "Multi-round complete for " (cons (afterFirst (heldText params)) (cons " who likes " (cons (contentText response "color" "unknown") (nil String)))))))
+    | Got.absent => (askingWithState (single "step2" (stepTwoRequest)) (heldText params))
+    | Got.malformed => (refuseResponses)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: multiRoundStep,
+  parameters: [params : Methods::CallToolParams],
+  result: (Result Interact::Step Refusal::ProviderRefusal),
+  body: (let tag : Nat := (firstByte (heldText params)); (if (tag =? 49) then (roundOne params) else (if (tag =? 50) then (roundTwo params) else (askingWithState (single "step1" (stepOneRequest)) "1")))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: capabilityRequests,
+  parameters: [declared : Capabilities::ClientCapabilities],
+  result: (List (String * Input::InputRequest)),
+  body: (prim append (if (Capabilities::isDeclared (project declared elicitation)) then (single "elicit_input" (formRequest "Elicitation input" "value" "string")) else (nil (String * Input::InputRequest))) (if (Capabilities::isDeclared (project declared sampling)) then (single "sample_input" (samplingRequest "Sample request" 50)) else (nil (String * Input::InputRequest))) : (List (String * Input::InputRequest))),
+  executable: true
+}
+
+definition{
+  name: askForCapabilities,
+  parameters: [pending : (List (String * Input::InputRequest))],
+  result: (Result Interact::Step Refusal::ProviderRefusal),
+  body: (match pending
+    | List.nil => (finish "No supported capabilities declared")
+    | List.cons entry rest => (askingWithState pending "capabilities-test")),
+  executable: true
+}
+
+definition{
+  name: capabilitiesStep,
+  parameters: [params : Methods::CallToolParams],
+  result: (Result Interact::Step Refusal::ProviderRefusal),
+  body: (match (project params inputResponses)
+    | Option.none => (askForCapabilities (capabilityRequests (project (project params meta) clientCapabilities)))
+    | Option.some given => (match (project given members)
+      | List.nil => (askForCapabilities (capabilityRequests (project (project params meta) clientCapabilities)))
+      | List.cons entry rest => (finish (joined (cons "capabilities-ok: received " (cons (prim join (keysOf (project given members)) "," : String) (nil String))))))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: toolIs,
+  parameters: [params : Methods::CallToolParams, expected : String],
+  result: Bool,
+  body: (prim equal (project params name) expected : Bool),
+  executable: true
+}
+
+definition{
+  name: interact,
+  parameters: [params : Methods::CallToolParams],
+  result: (Result Interact::Step Refusal::ProviderRefusal),
+  body: (if (toolIs params "test_input_required_result_elicitation") then (elicitationStep params) else (if (toolIs params "test_input_required_result_sampling") then (samplingStep params) else (if (toolIs params "test_input_required_result_list_roots") then (rootsStep params) else (if (toolIs params "test_input_required_result_request_state") then (requestStateStep params) else (if (toolIs params "test_input_required_result_multiple_inputs") then (multipleStep params) else (if (toolIs params "test_input_required_result_multi_round") then (multiRoundStep params) else (if (toolIs params "test_input_required_result_tampered_state") then (tamperedStateStep params) else (if (toolIs params "test_input_required_result_capabilities") then (capabilitiesStep params) else (ctor Result.error [Interact::Step, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "not an input-required tool")))))))))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: isInteractive,
+  parameters: [name : String],
+  result: Bool,
+  body: ((prim equal name "test_input_required_result_elicitation" : Bool) || ((prim equal name "test_input_required_result_sampling" : Bool) || ((prim equal name "test_input_required_result_list_roots" : Bool) || ((prim equal name "test_input_required_result_request_state" : Bool) || ((prim equal name "test_input_required_result_multiple_inputs" : Bool) || ((prim equal name "test_input_required_result_multi_round" : Bool) || ((prim equal name "test_input_required_result_tampered_state" : Bool) || (prim equal name "test_input_required_result_capabilities" : Bool)))))))),
+  executable: true
+}
+
+definition{
+  name: promptName,
+  parameters: [],
+  result: String,
+  body: "test_input_required_result_prompt",
+  executable: true
+}
+
+definition{
+  name: isPrompt,
+  parameters: [name : String],
+  result: Bool,
+  body: (prim equal name (promptName) : Bool),
+  executable: true
+}
+
+definition{
+  name: promptReply,
+  parameters: [context : String],
+  result: Methods::GetPromptResult,
+  body: (record Methods::GetPromptResult {description := (ctor Option.none [String]), messages := (cons (record Content::PromptMessage {role := (ctor Common::Role.user), content := (ctor Content::ContentBlock.text (record Content::TextContent {text := (joined (cons "Prompt with context: " (cons context (nil String)))), annotations := (ctor Option.none [Common::Annotations]), meta := (ctor Option.none [Json::JsonObject])}))}) (nil Content::PromptMessage))}),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: answerPrompt,
+  parameters: [params : Methods::GetPromptParams],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match (answerOf "user_context" (ctor InputKind.elicitation) (project params inputResponses))
+    | Got.answered response => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.getPrompt (promptReply (contentText response "context" "unknown"))))
+    | Got.absent => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.inputRequired (ctor Input::InputRequiredResult.requests (single "user_context" (formRequest "What context should the prompt use?" "context" "string")))))
+    | Got.malformed => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidInputResponses))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: askTool,
+  parameters: [name : String, summary : String],
+  result: Content::Tool,
+  body: (record Content::Tool {name := name, title := (ctor Option.none [String]), icons := (ctor Option.none [(List Common::Icon)]), description := (ctor Option.some [String] summary), inputSchema := (record Json::JsonObject {members := (cons ("type", (ctor Json::Json.text "object")) (cons ("properties", (ctor Json::Json.object (nil (String * Json::Json)))) (nil (String * Json::Json))))}), outputSchema := (ctor Option.none [Json::JsonObject]), annotations := (ctor Option.none [Content::ToolAnnotations]), meta := (ctor Option.none [Json::JsonObject])}),
+  executable: true
+}
+
+definition{
+  name: interactiveTools,
+  parameters: [],
+  result: (List Content::Tool),
+  body: (cons (askTool "test_input_required_result_elicitation" "MRTR: returns InputRequiredResult with elicitation request") (cons (askTool "test_input_required_result_sampling" "MRTR: returns InputRequiredResult with sampling request") (cons (askTool "test_input_required_result_list_roots" "MRTR: returns InputRequiredResult with roots/list request") (cons (askTool "test_input_required_result_request_state" "MRTR: returns InputRequiredResult with requestState") (cons (askTool "test_input_required_result_multiple_inputs" "MRTR: returns InputRequiredResult with multiple input requests") (cons (askTool "test_input_required_result_multi_round" "MRTR: multi-round InputRequiredResult workflow") (cons (askTool "test_input_required_result_tampered_state" "MRTR: HMAC-signed requestState integrity test") (cons (askTool "test_input_required_result_capabilities" "MRTR: respects client capabilities in inputRequests") (nil Content::Tool))))))))),
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

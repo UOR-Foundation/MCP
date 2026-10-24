@@ -133,6 +133,11 @@ definition{
     | Refusal::ProviderRefusal.rateLimited limit => (ctor Option.none [HostEffect::EffectRequest])
     | Refusal::ProviderRefusal.missingCapability required => (ctor Option.none [HostEffect::EffectRequest])
     | Refusal::ProviderRefusal.internal reason => (ctor Option.none [HostEffect::EffectRequest])
+    | Refusal::ProviderRefusal.invalidRequestState => (ctor Option.none [HostEffect::EffectRequest])
+    | Refusal::ProviderRefusal.invalidInputResponses => (ctor Option.none [HostEffect::EffectRequest])
+    | Refusal::ProviderRefusal.misplacedInputRequired method => (ctor Option.none [HostEffect::EffectRequest])
+    | Refusal::ProviderRefusal.emptyInputRequired => (ctor Option.none [HostEffect::EffectRequest])
+    | Refusal::ProviderRefusal.requestStateKeyMissing => (ctor Option.none [HostEffect::EffectRequest])
     | Refusal::ProviderRefusal.effectRequested request => (ctor Option.some [HostEffect::EffectRequest] request)),
   executable: true
 }
@@ -237,7 +242,7 @@ definition{
     request : Http::HttpRequest
   ],
   result: HostEffect::Step,
-  body: (if (Http::isPost (project request method)) then (afterParseStep info answer (project request toolCalls) (project request fields) (JsonRead::readJson (project request body))) else (ctor HostEffect::Step.done (Frame::writeResponse (Serve::notAllowedResponse)))),
+  body: (if (Http::isPost (project request method)) then (afterParseStep (Serve::keyed info (project request stateKey)) answer (project request toolCalls) (project request fields) (JsonRead::readJson (project request body))) else (ctor HostEffect::Step.done (Frame::writeResponse (Serve::notAllowedResponse)))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }

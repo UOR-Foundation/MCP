@@ -7,6 +7,8 @@
 \importmodule{Common}
 \importmodule{Content}
 \importmodule{Extension}
+\importmodule{InputFixture}
+\importmodule{Interact}
 \importmodule{Json}
 \importmodule{Meta}
 \importmodule{Methods}
@@ -146,7 +148,7 @@ definition{
 }
 
 definition{
-  name: fixtureTools,
+  name: baseTools,
   parameters: [],
   result: (List Content::Tool),
   body: (cons (plainTool "echo" "Returns a fixed acknowledgement" (emptyObjectSchema)) (cons (plainTool "execute_sql" "Runs a statement in a region" (sqlSchema)) (cons (plainTool "test_missing_capability" "Requires the client to declare sampling" (emptyObjectSchema)) (cons (plainTool "test_simple_text" "Tests simple text content response" (noArguments)) (cons (plainTool "test_image_content" "Tests image content response" (noArguments)) (cons (plainTool "test_audio_content" "Tests audio content response" (noArguments)) (cons (plainTool "test_embedded_resource" "Tests embedded resource content response" (noArguments)) (cons (plainTool "test_multiple_content_types" "Tests response with multiple content types (text, image, resource)" (noArguments)) (cons (plainTool "test_error_handling" "Tests error response handling" (noArguments)) (cons (plainTool "test_tool_with_progress" "Tests tool that reports progress notifications" (noArguments)) (cons (plainTool "json_schema_2020_12_tool" "Tool with JSON Schema 2020-12 features" (jsonSchemaTool)) (cons (plainTool "test_arguments" "Accepts arguments that its input schema constrains" (argumentsSchema)) (cons (plainTool "test_nested_header" "Mirrors a nested parameter into a header" (nestedHeaderSchema)) (cons (structuredTool "test_structured_output" "Returns structured content that conforms to its output schema" (noArguments) (sumOutput)) (cons (structuredTool "test_bad_structured_output" "Returns structured content that violates its output schema" (noArguments) (sumOutput)) (cons (plainTool "test_bad_payload" "Returns an image whose data is not Base64" (noArguments)) (cons (plainTool "test_unsafe_text" "Returns text with control characters" (noArguments)) (cons (plainTool "test_backward_progress" "Reports progress that does not increase" (noArguments)) (cons (plainTool "test_streaming_elicitation" "Diagnostic tool validating response progress streams" (noArguments)) (cons (plainTool "test_logging_tool" "Diagnostic logging validator tool" (noArguments)) (nil Content::Tool))))))))))))))))))))),
@@ -154,10 +156,18 @@ definition{
 }
 
 definition{
+  name: fixtureTools,
+  parameters: [],
+  result: (List Content::Tool),
+  body: (prim append (baseTools) (InputFixture::interactiveTools) : (List Content::Tool)),
+  executable: true
+}
+
+definition{
   name: fixtureInfo,
   parameters: [],
   result: Extension::ProviderInfo,
-  body: (record Extension::ProviderInfo {serverInfo := (fixtureServerInfo), instructions := (ctor Option.none [String]), capabilities := (fixtureCapabilities), discoverCache := (fixtureCache), paramRules := (Admission::rulesOf (fixtureTools)), toolCallLimit := (callLimit)}),
+  body: (record Extension::ProviderInfo {serverInfo := (fixtureServerInfo), instructions := (ctor Option.none [String]), capabilities := (fixtureCapabilities), discoverCache := (fixtureCache), paramRules := (Admission::rulesOf (fixtureTools)), toolCallLimit := (callLimit), requestStateKey := 0x}),
   axioms: [Quot.sound, propext],
   executable: true
 }
@@ -340,13 +350,13 @@ definition{
   result: (Result Methods::ResultBody Refusal::ProviderRefusal),
   body: (match request
     | Methods::ClientRequest.toolsList params => (Tools::answerList (fixtureCache) (fixtureTools) params)
-    | Methods::ClientRequest.toolsCall params => (Tools::answerCall (fixtureTools) (ref fixtureBehaviour) params)
+    | Methods::ClientRequest.toolsCall params => (if (InputFixture::isInteractive (project params name)) then (Interact::answerInteractive (fixtureTools) (ref InputFixture::interact) params) else (Tools::answerCall (fixtureTools) (ref fixtureBehaviour) params))
     | Methods::ClientRequest.serverDiscover params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
     | Methods::ClientRequest.resourcesList params => (ResourceFixture::answerResourcesList params)
     | Methods::ClientRequest.resourcesRead params => (ResourceFixture::answerResourcesRead params)
     | Methods::ClientRequest.resourcesTemplatesList params => (ResourceFixture::answerTemplatesList params)
     | Methods::ClientRequest.promptsList params => (ResourceFixture::answerPromptsList params)
-    | Methods::ClientRequest.promptsGet params => (ResourceFixture::answerPromptsGet params)
+    | Methods::ClientRequest.promptsGet params => (if (InputFixture::isPrompt (project params name)) then (InputFixture::answerPrompt params) else (ResourceFixture::answerPromptsGet params))
     | Methods::ClientRequest.completionComplete params => (ResourceFixture::answerCompletion params)
     | Methods::ClientRequest.tasksGet params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))
     | Methods::ClientRequest.tasksUpdate params => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.internal "the fixture offers tools only"))

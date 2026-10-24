@@ -76,11 +76,12 @@ u32 field_count
   u32 value_length    value
 u32 body_length       body
 u32 tool_calls                          the host's count of tool calls for this client in the current window
+[u32 key_length  key]                   the host's requestState key, 32 bytes or more, optional (INPUT-REQUIRED.md)
 [u32 name_count, then name_count times u32 name_length and name]   the host's allow-list of Origin and Host names, optional
 ```
 
-and nothing after the allow-list. A frame that ends after the count carries no allow-list, so a
-frame written before issue #11 is still read ([TRANSPORT.md](TRANSPORT.md#the-allow-list)). A response frame:
+and nothing after the allow-list. A frame that ends after the count carries no key and no allow-list, and one that ends after the key carries
+no allow-list, so a frame written before issues #10 and #11 is still read ([TRANSPORT.md](TRANSPORT.md#the-allow-list)). A response frame:
 
 ```
 u32 status
@@ -104,6 +105,15 @@ core answers 200 with notifications, the body is an event stream the core encode
 notifications first and the result last) and the `Content-Type` is `text/event-stream`;
 otherwise the body is the single JSON object and no notification is sent
 ([TRANSPORT.md](TRANSPORT.md)). The adapter writes the body as it is.
+
+`key` is the second input the core cannot hold: the secret reference `request-state-key`. The
+core keeps no secret, so the adapter reads the key from its secret store and sends it with
+every request, and the core computes and checks an HMAC with it over every `requestState` it
+hands out or receives ([INPUT-REQUIRED.md](INPUT-REQUIRED.md)). An adapter with no key sends
+nothing after the count (a zero length when it sends an allow-list); a request that needs no
+state is served, and a result that needs one is refused as an internal error instead of being
+sent unprotected. A frame that ends inside the key or the allow-list, or has bytes after them,
+is a frame the core cannot read.
 
 The core decides every status and every field of the response. The adapter:
 
@@ -145,6 +155,8 @@ horizontal tab; any other byte makes the field malformed, which is `headerMismat
 | a protocol version the server does not support | -32022, `data.supported`, `data.requested` | 400 |
 | a client capability the request needs and the client did not declare | -32021, `data.requiredCapabilities` | 400 |
 | a tool the catalog does not list, a `tools/call` without a text name or with non-object arguments, a cursor | -32602 | 400 |
+| a `requestState` that fails verification, `inputResponses` that are not a valid InputResponses object ([INPUT-REQUIRED.md](INPUT-REQUIRED.md)) | -32602 | 400 |
+| an input-required result the core will not write: on a method that does not support it, with neither requests nor state, or with a state and no key | -32603, no `data` | 500 |
 | a tool result the core will not write: `structuredContent` missing or not conforming to the `outputSchema`, a payload that is not canonical Base64, progress that does not increase | -32603, no `data` | 500 |
 | a `tools/call` when the host's count is at or over the limit | 429, `data.limit` | 429 |
 | a method the server does not offer | -32601 | 404 |

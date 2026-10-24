@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "sealing-laws"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "SealLaws"
+component = "SealLaws"
+
+[[form]]
+id = "sealing-laws"
+channel = "text"
+surface = "Sealing laws"
+canonical_source = true
+features = ["sentence-case", "singular"]

@@ -72,6 +72,11 @@ inductive{
     {name: rateLimited, fields: [Nat]},
     {name: missingCapability, fields: [Capabilities::ClientCapabilities]},
     {name: internal, fields: [String]},
+    {name: invalidRequestState, fields: []},
+    {name: invalidInputResponses, fields: []},
+    {name: misplacedInputRequired, fields: [String]},
+    {name: emptyInputRequired, fields: []},
+    {name: requestStateKeyMissing, fields: []},
     {name: effectRequested, fields: [HostEffect::EffectRequest]}
   ]
 }
@@ -104,6 +109,11 @@ definition{
     | ProviderRefusal.rateLimited limit => (JsonRpc::rateLimitedCode)
     | ProviderRefusal.missingCapability required => (JsonRpc::missingRequiredClientCapabilityCode)
     | ProviderRefusal.internal reason => (JsonRpc::internalErrorCode)
+    | ProviderRefusal.invalidRequestState => (JsonRpc::invalidParamsCode)
+    | ProviderRefusal.invalidInputResponses => (JsonRpc::invalidParamsCode)
+    | ProviderRefusal.misplacedInputRequired method => (JsonRpc::internalErrorCode)
+    | ProviderRefusal.emptyInputRequired => (JsonRpc::internalErrorCode)
+    | ProviderRefusal.requestStateKeyMissing => (JsonRpc::internalErrorCode)
     | ProviderRefusal.effectRequested request => (JsonRpc::internalErrorCode)),
   executable: true
 }
@@ -220,6 +230,11 @@ definition{
       | ProviderRefusal.rateLimited limit => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("limit", (ctor Json::Json.number (record Json::Decimal {mantissa := (Numeric::natToInt limit (0 : Int)), exponent := (0 : Int)}))) (nil (String * Json::Json)))))
       | ProviderRefusal.missingCapability required => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("requiredCapabilities", (capabilitiesJson required)) (nil (String * Json::Json)))))
       | ProviderRefusal.internal reason => (ctor Option.none [Json::Json])
+      | ProviderRefusal.invalidRequestState => (ctor Option.none [Json::Json])
+      | ProviderRefusal.invalidInputResponses => (ctor Option.none [Json::Json])
+      | ProviderRefusal.misplacedInputRequired method => (ctor Option.none [Json::Json])
+      | ProviderRefusal.emptyInputRequired => (ctor Option.none [Json::Json])
+      | ProviderRefusal.requestStateKeyMissing => (ctor Option.none [Json::Json])
       | ProviderRefusal.effectRequested request => (ctor Option.none [Json::Json]))),
   executable: true
 }
@@ -244,6 +259,11 @@ definition{
       | ProviderRefusal.rateLimited limit => "Rate limit exceeded: too many tool calls"
       | ProviderRefusal.missingCapability required => "Missing required client capability"
       | ProviderRefusal.internal reason => "Internal error"
+      | ProviderRefusal.invalidRequestState => "Invalid params: requestState failed verification"
+      | ProviderRefusal.invalidInputResponses => "Invalid params: inputResponses is not a valid InputResponses object"
+      | ProviderRefusal.misplacedInputRequired method => "Internal error"
+      | ProviderRefusal.emptyInputRequired => "Internal error"
+      | ProviderRefusal.requestStateKeyMissing => "Internal error"
       | ProviderRefusal.effectRequested request => "Internal error")),
   executable: true
 }
@@ -358,6 +378,76 @@ theorem{
   name: an_invalid_prompt_argument_names_its_reason,
   parameters: [reason : String],
   statement: ((dataOf (ctor Refusal.provider (ctor ProviderRefusal.invalidArguments reason))) = (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("reason", (ctor Json::Json.text reason)) (nil (String * Json::Json)))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_request_state_that_fails_verification_has_the_invalid_params_code,
+  parameters: [],
+  statement: ((codeOf (ctor Refusal.provider (ctor ProviderRefusal.invalidRequestState))) = (-32602 : Int)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_invalid_input_responses_object_has_the_invalid_params_code,
+  parameters: [],
+  statement: ((codeOf (ctor Refusal.provider (ctor ProviderRefusal.invalidInputResponses))) = (-32602 : Int)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_input_required_result_on_another_method_has_the_internal_error_code,
+  parameters: [method : String],
+  statement: ((codeOf (ctor Refusal.provider (ctor ProviderRefusal.misplacedInputRequired method))) = (-32603 : Int)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_empty_input_required_result_has_the_internal_error_code,
+  parameters: [],
+  statement: ((codeOf (ctor Refusal.provider (ctor ProviderRefusal.emptyInputRequired))) = (-32603 : Int)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_missing_request_state_key_has_the_internal_error_code,
+  parameters: [],
+  statement: ((codeOf (ctor Refusal.provider (ctor ProviderRefusal.requestStateKeyMissing))) = (-32603 : Int)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_state_that_fails_verification_carries_no_data,
+  parameters: [],
+  statement: ((dataOf (ctor Refusal.provider (ctor ProviderRefusal.invalidRequestState))) = (ctor Option.none [Json::Json])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: invalid_input_responses_carry_no_data,
+  parameters: [],
+  statement: ((dataOf (ctor Refusal.provider (ctor ProviderRefusal.invalidInputResponses))) = (ctor Option.none [Json::Json])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_input_required_result_on_another_method_carries_no_data,
+  parameters: [],
+  statement: ((dataOf (ctor Refusal.provider (ctor ProviderRefusal.misplacedInputRequired "tools/list"))) = (ctor Option.none [Json::Json])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_empty_input_required_result_carries_no_data,
+  parameters: [],
+  statement: ((dataOf (ctor Refusal.provider (ctor ProviderRefusal.emptyInputRequired))) = (ctor Option.none [Json::Json])),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_missing_request_state_key_carries_no_data,
+  parameters: [],
+  statement: ((dataOf (ctor Refusal.provider (ctor ProviderRefusal.requestStateKeyMissing))) = (ctor Option.none [Json::Json])),
   proof: reflexivity{}
 }
 \end{semanticmodule}

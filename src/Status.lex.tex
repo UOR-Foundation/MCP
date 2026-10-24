@@ -49,6 +49,11 @@ definition{
     | Refusal::ProviderRefusal.rateLimited limit => (tooManyRequestsStatus)
     | Refusal::ProviderRefusal.missingCapability required => (badRequestStatus)
     | Refusal::ProviderRefusal.internal reason => (serverErrorStatus)
+    | Refusal::ProviderRefusal.invalidRequestState => (badRequestStatus)
+    | Refusal::ProviderRefusal.invalidInputResponses => (badRequestStatus)
+    | Refusal::ProviderRefusal.misplacedInputRequired method => (serverErrorStatus)
+    | Refusal::ProviderRefusal.emptyInputRequired => (serverErrorStatus)
+    | Refusal::ProviderRefusal.requestStateKeyMissing => (serverErrorStatus)
     | Refusal::ProviderRefusal.effectRequested request => (serverErrorStatus)),
   executable: true
 }
@@ -167,6 +172,11 @@ theorem{
             {proof: reflexivity{}, binders: [limit], constructor: rateLimited},
             {proof: reflexivity{}, binders: [required], constructor: missingCapability},
             {proof: reflexivity{}, binders: [reason], constructor: internal},
+            {proof: reflexivity{}, binders: [], constructor: invalidRequestState},
+            {proof: reflexivity{}, binders: [], constructor: invalidInputResponses},
+            {proof: reflexivity{}, binders: [method], constructor: misplacedInputRequired},
+            {proof: reflexivity{}, binders: [], constructor: emptyInputRequired},
+            {proof: reflexivity{}, binders: [], constructor: requestStateKeyMissing},
             {proof: reflexivity{}, binders: [request], constructor: effectRequested}
           ],
           scrutinee: inner
@@ -289,6 +299,41 @@ theorem{
   name: a_forbidden_host_is_forbidden,
   parameters: [],
   statement: ((transportStatus (ctor Transport::TransportRefusal.forbiddenHost)) = 403),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_request_state_that_fails_verification_is_a_bad_request,
+  parameters: [],
+  statement: ((statusOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.invalidRequestState))) = 400),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: invalid_input_responses_are_a_bad_request,
+  parameters: [],
+  statement: ((statusOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.invalidInputResponses))) = 400),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_input_required_result_on_another_method_is_a_server_error,
+  parameters: [method : String],
+  statement: ((statusOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.misplacedInputRequired method))) = 500),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_empty_input_required_result_is_a_server_error,
+  parameters: [],
+  statement: ((statusOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.emptyInputRequired))) = 500),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_missing_request_state_key_is_a_server_error,
+  parameters: [],
+  statement: ((statusOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.requestStateKeyMissing))) = 500),
   proof: reflexivity{}
 }
 \end{semanticmodule}

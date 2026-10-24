@@ -7,6 +7,7 @@
 \importmodule{Frame}
 \importmodule{HostEffect}
 \importmodule{Http}
+\importmodule{InputGuard}
 \importmodule{Json}
 \importmodule{JsonRead}
 \importmodule{JsonRpc}
@@ -102,6 +103,14 @@ theorem{
 }
 
 theorem{
+  name: an_effect_request_passes_the_input_guard_unchanged,
+  parameters: [key : Bytes, request : Methods::ClientRequest, asked : HostEffect::EffectRequest],
+  statement: ((InputGuard::settleAnswer key request (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.effectRequested asked))) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.effectRequested asked))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
   name: a_forbidden_request_never_reaches_the_provider,
   parameters: [
     info : Extension::ProviderInfo,
@@ -122,9 +131,10 @@ theorem{
     fields : (List Http::Field),
     body : Bytes,
     calls : Nat,
-    hosts : (List (List Nat))
+    hosts : (List (List Nat)),
+    key : Bytes
   ],
-  statement: ((StepServe::serveOpenStep info answer (record Http::HttpRequest {method := (cons 71 (cons 69 (cons 84 (nil Nat)))), target := target, fields := fields, body := body, toolCalls := calls, allowedHosts := hosts})) = (ctor HostEffect::Step.done (Frame::writeResponse (Serve::notAllowedResponse)))),
+  statement: ((StepServe::serveOpenStep info answer (record Http::HttpRequest {method := (cons 71 (cons 69 (cons 84 (nil Nat)))), target := target, fields := fields, body := body, toolCalls := calls, allowedHosts := hosts, stateKey := key})) = (ctor HostEffect::Step.done (Frame::writeResponse (Serve::notAllowedResponse)))),
   proof: reflexivity{}
 }
 

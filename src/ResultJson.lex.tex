@@ -7,6 +7,7 @@
 \importmodule{Content}
 \importmodule{Dispatch}
 \importmodule{Envelope}
+\importmodule{Input}
 \importmodule{Json}
 \importmodule{JsonRead}
 \importmodule{Methods}
@@ -320,6 +321,283 @@ definition{
 }
 
 definition{
+  name: formParamsJson,
+  parameters: [found : Input::ElicitFormParams],
+  result: Json::Json,
+  body: (ctor Json::Json.object (prim append (match (project found mode)
+    | Option.none => (nil (String * Json::Json))
+    | Option.some formMode => (cons ("mode", (ctor Json::Json.text "form")) (nil (String * Json::Json)))) (cons ("message", (ctor Json::Json.text (project found message))) (cons ("requestedSchema", (ctor Json::Json.object (project (project found requestedSchema) members))) (nil (String * Json::Json)))) : (List (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: elicitParamsJson,
+  parameters: [params : Input::ElicitRequestParams],
+  result: Json::Json,
+  body: (match params
+    | Input::ElicitRequestParams.form found => (formParamsJson found)
+    | Input::ElicitRequestParams.url found => (ctor Json::Json.object (cons ("mode", (ctor Json::Json.text "url")) (cons ("message", (ctor Json::Json.text (project found message))) (cons ("url", (ctor Json::Json.text (project found url))) (nil (String * Json::Json))))))),
+  executable: true
+}
+
+definition{
+  name: toolUseJson,
+  parameters: [found : Input::ToolUseContent],
+  result: Json::Json,
+  body: (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "tool_use")) (cons ("id", (ctor Json::Json.text (project found id))) (cons ("name", (ctor Json::Json.text (project found name))) (cons ("input", (ctor Json::Json.object (project (project found input) members))) (metaMember (project found meta))))))),
+  executable: true
+}
+
+definition{
+  name: toolResultJson,
+  parameters: [found : Input::ToolResultContent],
+  result: (Option Json::Json),
+  body: (match (blocksJson (project found content))
+    | Option.none => (ctor Option.none [Json::Json])
+    | Option.some encoded => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "tool_result")) (cons ("toolUseId", (ctor Json::Json.text (project found toolUseId))) (cons ("content", (ctor Json::Json.array encoded)) (prim append (jsonMember "structuredContent" (project found structuredContent)) (prim append (boolMember "isError" (project found isError)) (metaMember (project found meta)) : (List (String * Json::Json))) : (List (String * Json::Json))))))))),
+  executable: true
+}
+
+definition{
+  name: samplingBlockJson,
+  parameters: [block : Input::SamplingContentBlock],
+  result: (Option Json::Json),
+  body: (match block
+    | Input::SamplingContentBlock.text found => (ctor Option.some [Json::Json] (textBlockJson found))
+    | Input::SamplingContentBlock.image found => (ctor Option.some [Json::Json] (dataBlockJson "image" (project found data) (project found mimeType) (project found annotations) (project found meta)))
+    | Input::SamplingContentBlock.audio found => (ctor Option.some [Json::Json] (dataBlockJson "audio" (project found data) (project found mimeType) (project found annotations) (project found meta)))
+    | Input::SamplingContentBlock.tool_use found => (ctor Option.some [Json::Json] (toolUseJson found))
+    | Input::SamplingContentBlock.tool_result found => (toolResultJson found)),
+  executable: true
+}
+
+definition{
+  name: samplingBlocksOnto,
+  parameters: [blocks : (List Input::SamplingContentBlock), built : (List Json::Json)],
+  result: (Option (List Json::Json)),
+  body: (match blocks
+    | List.nil => (ctor Option.some [(List Json::Json)] built)
+    | List.cons head tail => (match (samplingBlockJson head)
+      | Option.none => (ctor Option.none [(List Json::Json)])
+      | Option.some encoded => (samplingBlocksOnto tail (cons encoded built)))),
+  executable: true,
+  recursive_argument: blocks
+}
+
+definition{
+  name: samplingContentJson,
+  parameters: [content : Input::SamplingContent],
+  result: (Option Json::Json),
+  body: (match content
+    | Input::SamplingContent.single found => (samplingBlockJson found)
+    | Input::SamplingContent.many found => (match (samplingBlocksOnto found (nil Json::Json))
+      | Option.none => (ctor Option.none [Json::Json])
+      | Option.some built => (ctor Option.some [Json::Json] (ctor Json::Json.array (JsonRead::reverseOnto [Json::Json] built (nil Json::Json)))))),
+  executable: true
+}
+
+definition{
+  name: samplingMessageJson,
+  parameters: [message : Input::SamplingMessage],
+  result: (Option Json::Json),
+  body: (match (samplingContentJson (project message content))
+    | Option.none => (ctor Option.none [Json::Json])
+    | Option.some encoded => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("role", (ctor Json::Json.text (Common::roleWire (project message role)))) (cons ("content", encoded) (metaMember (project message meta))))))),
+  executable: true
+}
+
+definition{
+  name: samplingMessagesOnto,
+  parameters: [messages : (List Input::SamplingMessage), built : (List Json::Json)],
+  result: (Option (List Json::Json)),
+  body: (match messages
+    | List.nil => (ctor Option.some [(List Json::Json)] built)
+    | List.cons head tail => (match (samplingMessageJson head)
+      | Option.none => (ctor Option.none [(List Json::Json)])
+      | Option.some encoded => (samplingMessagesOnto tail (cons encoded built)))),
+  executable: true,
+  recursive_argument: messages
+}
+
+definition{
+  name: samplingMessagesJson,
+  parameters: [messages : (List Input::SamplingMessage)],
+  result: (Option (List Json::Json)),
+  body: (match (samplingMessagesOnto messages (nil Json::Json))
+    | Option.none => (ctor Option.none [(List Json::Json)])
+    | Option.some built => (ctor Option.some [(List Json::Json)] (JsonRead::reverseOnto [Json::Json] built (nil Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: hintsOnto,
+  parameters: [hints : (List Input::ModelHint), built : (List Json::Json)],
+  result: (List Json::Json),
+  body: (match hints
+    | List.nil => built
+    | List.cons head tail => (hintsOnto tail (cons (ctor Json::Json.object (Envelope::textMember "name" (project head name))) built))),
+  executable: true,
+  recursive_argument: hints
+}
+
+definition{
+  name: decimalMember,
+  parameters: [key : String, value : (Option Json::Decimal)],
+  result: (List (String * Json::Json)),
+  body: (match value
+    | Option.none => (nil (String * Json::Json))
+    | Option.some amount => (cons (key, (ctor Json::Json.number amount)) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: preferencesJson,
+  parameters: [found : Input::ModelPreferences],
+  result: Json::Json,
+  body: (ctor Json::Json.object (prim append (match (project found hints)
+    | Option.none => (nil (String * Json::Json))
+    | Option.some listed => (cons ("hints", (ctor Json::Json.array (JsonRead::reverseOnto [Json::Json] (hintsOnto listed (nil Json::Json)) (nil Json::Json)))) (nil (String * Json::Json)))) (prim append (decimalMember "costPriority" (project found costPriority)) (prim append (decimalMember "speedPriority" (project found speedPriority)) (decimalMember "intelligencePriority" (project found intelligencePriority)) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: includeContextWire,
+  parameters: [scope : Input::IncludeContext],
+  result: String,
+  body: (match scope
+    | Input::IncludeContext.none => "none"
+    | Input::IncludeContext.thisServer => "thisServer"
+    | Input::IncludeContext.allServers => "allServers"),
+  executable: true
+}
+
+definition{
+  name: toolChoiceWire,
+  parameters: [mode : Input::ToolChoiceMode],
+  result: String,
+  body: (match mode
+    | Input::ToolChoiceMode.auto => "auto"
+    | Input::ToolChoiceMode.required => "required"
+    | Input::ToolChoiceMode.none => "none"),
+  executable: true
+}
+
+definition{
+  name: sampleOptions,
+  parameters: [found : Input::CreateMessageParams],
+  result: (List (String * Json::Json)),
+  body: (prim append (match (project found modelPreferences)
+    | Option.none => (nil (String * Json::Json))
+    | Option.some preferred => (cons ("modelPreferences", (preferencesJson preferred)) (nil (String * Json::Json)))) (prim append (Envelope::textMember "systemPrompt" (project found systemPrompt)) (prim append (match (project found includeContext)
+    | Option.none => (nil (String * Json::Json))
+    | Option.some scope => (cons ("includeContext", (ctor Json::Json.text (includeContextWire scope))) (nil (String * Json::Json)))) (decimalMember "temperature" (project found temperature)) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))),
+  executable: true
+}
+
+definition{
+  name: choiceMembers,
+  parameters: [choice : Input::ToolChoice],
+  result: (List (String * Json::Json)),
+  body: (match (project choice mode)
+    | Option.none => (nil (String * Json::Json))
+    | Option.some chosen => (cons ("mode", (ctor Json::Json.text (toolChoiceWire chosen))) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: sampleTail,
+  parameters: [found : Input::CreateMessageParams],
+  result: (List (String * Json::Json)),
+  body: (prim append (match (project found stopSequences)
+    | Option.none => (nil (String * Json::Json))
+    | Option.some listed => (cons ("stopSequences", (textListJson listed)) (nil (String * Json::Json)))) (prim append (Refusal::optionalMember "metadata" (project found metadata)) (prim append (match (project found tools)
+    | Option.none => (nil (String * Json::Json))
+    | Option.some listed => (cons ("tools", (ctor Json::Json.array (toolsJson listed))) (nil (String * Json::Json)))) (match (project found toolChoice)
+    | Option.none => (nil (String * Json::Json))
+    | Option.some choice => (cons ("toolChoice", (ctor Json::Json.object (choiceMembers choice))) (nil (String * Json::Json)))) : (List (String * Json::Json))) : (List (String * Json::Json))) : (List (String * Json::Json))),
+  executable: true
+}
+
+definition{
+  name: createMessageJson,
+  parameters: [found : Input::CreateMessageParams],
+  result: (Option Json::Json),
+  body: (match (samplingMessagesJson (project found messages))
+    | Option.none => (ctor Option.none [Json::Json])
+    | Option.some encoded => (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("messages", (ctor Json::Json.array encoded)) (prim append (sampleOptions found) (cons ("maxTokens", (natJson (project found maxTokens))) (sampleTail found)) : (List (String * Json::Json))))))),
+  executable: true
+}
+
+definition{
+  name: requestJson,
+  parameters: [method : String, params : (Option Json::Json)],
+  result: Json::Json,
+  body: (ctor Json::Json.object (cons ("method", (ctor Json::Json.text method)) (jsonMember "params" params))),
+  executable: true
+}
+
+definition{
+  name: inputRequestJson,
+  parameters: [request : Input::InputRequest],
+  result: (Option Json::Json),
+  body: (match request
+    | Input::InputRequest.elicitation found => (ctor Option.some [Json::Json] (requestJson "elicitation/create" (ctor Option.some [Json::Json] (elicitParamsJson found))))
+    | Input::InputRequest.sampling found => (match (createMessageJson found)
+      | Option.none => (ctor Option.none [Json::Json])
+      | Option.some encoded => (ctor Option.some [Json::Json] (requestJson "sampling/createMessage" (ctor Option.some [Json::Json] encoded))))
+    | Input::InputRequest.roots found => (ctor Option.some [Json::Json] (requestJson "roots/list" (match found
+      | Option.none => (ctor Option.none [Json::Json])
+      | Option.some given => (ctor Option.some [Json::Json] (ctor Json::Json.object (project given members))))))),
+  executable: true
+}
+
+definition{
+  name: requestsOnto,
+  parameters: [
+    entries : (List (String * Input::InputRequest)),
+    built : (List (String * Json::Json))
+  ],
+  result: (Option (List (String * Json::Json))),
+  body: (match entries
+    | List.nil => (ctor Option.some [(List (String * Json::Json))] built)
+    | List.cons entry rest => (match (inputRequestJson (second entry))
+      | Option.none => (ctor Option.none [(List (String * Json::Json))])
+      | Option.some encoded => (requestsOnto rest (cons ((first entry), encoded) built)))),
+  executable: true,
+  recursive_argument: entries
+}
+
+definition{
+  name: requestsMember,
+  parameters: [built : (List (String * Json::Json))],
+  result: (List (String * Json::Json)),
+  body: (match built
+    | List.nil => (nil (String * Json::Json))
+    | List.cons entry rest => (cons ("inputRequests", (ctor Json::Json.object (JsonRead::reverseOnto [(String * Json::Json)] built (nil (String * Json::Json))))) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: stateMember,
+  parameters: [token : (Option String)],
+  result: (List (String * Json::Json)),
+  body: (match token
+    | Option.none => (nil (String * Json::Json))
+    | Option.some held => (cons ("requestState", (ctor Json::Json.text held)) (nil (String * Json::Json)))),
+  executable: true
+}
+
+definition{
+  name: inputRequiredMembers,
+  parameters: [needed : Input::InputRequiredResult],
+  result: (Option (List (String * Json::Json))),
+  body: (match (requestsOnto (Input::requestsOf needed) (nil (String * Json::Json)))
+    | Option.none => (ctor Option.none [(List (String * Json::Json))])
+    | Option.some built => (ctor Option.some [(List (String * Json::Json))] (prim append (requestsMember built) (stateMember (Input::stateOf needed)) : (List (String * Json::Json))))),
+  executable: true
+}
+
+definition{
   name: sanitizedMembers,
   parameters: [members : (Option (List (String * Json::Json)))],
   result: (Option (List (String * Json::Json))),
@@ -573,7 +851,7 @@ definition{
     | Methods::ResultBody.getPrompt found => (sanitizedMembers (getPromptMembers found))
     | Methods::ResultBody.complete found => (ctor Option.some [(List (String * Json::Json))] (completeMembers found))
     | Methods::ResultBody.getTask found => (ctor Option.none [(List (String * Json::Json))])
-    | Methods::ResultBody.inputRequired found => (ctor Option.none [(List (String * Json::Json))])
+    | Methods::ResultBody.inputRequired found => (sanitizedMembers (inputRequiredMembers found))
     | Methods::ResultBody.taskCreated found => (ctor Option.none [(List (String * Json::Json))])),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true

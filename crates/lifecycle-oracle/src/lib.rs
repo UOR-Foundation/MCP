@@ -122,6 +122,12 @@ pub struct Request {
     /// and the client identity; the core only compares the count with the limit its
     /// provider declares (`LIFECYCLE.md`, "The boundary encoding").
     pub tool_calls: u32,
+    /// The key the host holds for `requestState` (SEP-2322): the secret reference
+    /// `request-state-key` of issue 10. The core keeps no secret of its own, so the host
+    /// reads the key from its secret store and passes it with every request, the way it
+    /// passes `tool_calls`; the core computes and checks an HMAC with it
+    /// (`INPUT-REQUIRED.md`). An empty key, or one shorter than 32 bytes, is no key.
+    pub state_key: Vec<u8>,
 }
 
 /// An HTTP response at the core boundary: the status, the header fields, the progress
@@ -163,8 +169,9 @@ fn put_chunk(out: &mut Vec<u8>, bytes: &[u8]) {
 
 /// Encode a request as the frame the root reads: a length-prefixed method, a
 /// length-prefixed target, the field count, each field as a length-prefixed name and
-/// value, a length-prefixed body, and the four-byte count of tool calls the host has
-/// already counted for this client, every length and count four bytes big-endian.
+/// value, a length-prefixed body, the four-byte count of tool calls the host has
+/// already counted for this client and, when the host holds one, the length-prefixed
+/// `requestState` key, every length and count four bytes big-endian.
 pub fn encode_request(request: &Request) -> Vec<u8> {
     let mut out = Vec::new();
     put_chunk(&mut out, &request.method);
@@ -176,6 +183,9 @@ pub fn encode_request(request: &Request) -> Vec<u8> {
     }
     put_chunk(&mut out, &request.body);
     put_u32(&mut out, request.tool_calls as usize);
+    if !request.state_key.is_empty() {
+        put_chunk(&mut out, &request.state_key);
+    }
     out
 }
 
@@ -185,6 +195,9 @@ pub fn encode_request(request: &Request) -> Vec<u8> {
 pub fn encode_request_allowing(request: &Request, allowed_hosts: &[Vec<u8>]) -> Vec<u8> {
     let mut out = encode_request(request);
     if !allowed_hosts.is_empty() {
+        if request.state_key.is_empty() {
+            put_chunk(&mut out, &[]);
+        }
         put_u32(&mut out, allowed_hosts.len());
         for name in allowed_hosts {
             put_chunk(&mut out, name);

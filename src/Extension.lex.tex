@@ -68,7 +68,8 @@ structure{
     {name: capabilities, type: Capabilities::ServerCapabilities},
     {name: discoverCache, type: Common::CacheHint},
     {name: paramRules, type: (List ParamRule)},
-    {name: toolCallLimit, type: Nat}
+    {name: toolCallLimit, type: Nat},
+    {name: requestStateKey, type: Bytes}
   ]
 }
 
@@ -135,7 +136,7 @@ definition{
   name: infoOf,
   parameters: [provider : Provider],
   result: ProviderInfo,
-  body: (record ProviderInfo {serverInfo := (project provider serverInfo), instructions := (project provider instructions), capabilities := (project provider capabilities), discoverCache := (project provider discoverCache), paramRules := (project provider paramRules), toolCallLimit := (project provider toolCallLimit)})
+  body: (record ProviderInfo {serverInfo := (project provider serverInfo), instructions := (project provider instructions), capabilities := (project provider capabilities), discoverCache := (project provider discoverCache), paramRules := (project provider paramRules), toolCallLimit := (project provider toolCallLimit), requestStateKey := 0x})
 }
 
 definition{

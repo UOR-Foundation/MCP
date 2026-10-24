@@ -14,8 +14,8 @@ mod common;
 use std::collections::BTreeSet;
 
 use common::{
-    allowed_hosts_of, all_vectors, call, check_response, json_of, post_owned, request_of, root,
-    rpc, standard, after_calls, META,
+    after_calls, all_vectors, allowed_hosts_of, call, check_response, json_of, post_owned,
+    request_of, root, rpc, standard, META,
 };
 use lifecycle_oracle::{
     decode_response, decode_step, drive, encode_request, encode_request_allowing, encode_turn,
@@ -28,7 +28,10 @@ const BUDGET: usize = 8;
 
 /// A tools/call of `name` with `arguments` (a JSON text).
 fn tool_call(name: &str, arguments: &str) -> Request {
-    post_owned(&standard("tools/call", Some(name)), &call(name, arguments, "1"))
+    post_owned(
+        &standard("tools/call", Some(name)),
+        &call(name, arguments, "1"),
+    )
 }
 
 fn read_effect() -> Request {
@@ -145,9 +148,7 @@ fn the_three_outcomes_declare_the_constructor_and_answer_of_maps_each_to_the_ref
         );
     }
     assert_eq!(
-        extension
-            .matches("ProviderRefusal.effectRequested")
-            .count(),
+        extension.matches("ProviderRefusal.effectRequested").count(),
         3,
         "answerOf maps each of the three outcomes to effectRequested"
     );
@@ -309,8 +310,8 @@ fn a_tool_that_needs_two_effects_requests_the_second_after_the_first_outcome_pe_
 #[test]
 fn the_second_turn_of_a_chain_asks_for_the_second_effect_and_not_the_first_again_pe_03() {
     let frame = encode_request(&tool_call("effect_chain", r#"{"first":"x","second":"y"}"#));
-    let step = decode_step(&exchange_step(&encode_turn(&frame, &[(1, b"ox".to_vec())])))
-        .expect("a step");
+    let step =
+        decode_step(&exchange_step(&encode_turn(&frame, &[(1, b"ox".to_vec())]))).expect("a step");
     assert_eq!(
         step,
         Step::Perform {
@@ -336,7 +337,10 @@ fn a_provider_call_a_read_and_a_prompt_are_replayed_to_their_final_responses_pe_
     let (seen, response, body) = driven(&prompt_effect());
     assert_eq!(seen.performed, vec![(5, b"effect_prompt".to_vec())]);
     check_response(Some("prompts/get"), &response);
-    assert_eq!(body["result"]["messages"][0]["content"]["text"], "prompt:o5");
+    assert_eq!(
+        body["result"]["messages"][0]["content"]["text"],
+        "prompt:o5"
+    );
 }
 
 #[test]
@@ -355,8 +359,8 @@ fn a_replayed_turn_answers_the_same_bytes_pe_03() {
 #[test]
 fn an_outcome_of_another_tag_is_an_internal_error_and_not_another_effect_pe_03() {
     let frame = encode_request(&tool_call("effect_read", r#"{"key":"alpha"}"#));
-    let step = decode_step(&exchange_step(&encode_turn(&frame, &[(9, b"x".to_vec())])))
-        .expect("a step");
+    let step =
+        decode_step(&exchange_step(&encode_turn(&frame, &[(9, b"x".to_vec())]))).expect("a step");
     let response = done_response(step);
     assert_eq!(response.status, 500);
     assert_eq!(code_of(&json_of(&response)), Some(-32603));
@@ -515,8 +519,7 @@ fn a_request_that_fails_a_check_of_the_core_performs_no_effect_pe_04() {
     for case in cases {
         // A host that panics: a single effect request fails the test.
         let frame = encode_request(&case.request);
-        let seen = drive(&frame, BUDGET, never)
-            .unwrap_or_else(|e| panic!("{}: {e:?}", case.what));
+        let seen = drive(&frame, BUDGET, never).unwrap_or_else(|e| panic!("{}: {e:?}", case.what));
         assert_eq!(seen.turns, 1, "{}", case.what);
         assert!(seen.performed.is_empty(), "{}", case.what);
         let response = decode_response(&seen.response).expect("a response frame");
@@ -552,7 +555,12 @@ fn the_refusal_is_the_one_the_byte_serve_gives_for_the_same_frame_pe_04() {
 
 #[test]
 fn arguments_that_fail_the_input_schema_are_a_tool_error_and_perform_no_effect_pe_04() {
-    for arguments in ["{}", r#"{"key":""}"#, r#"{"key":1}"#, r#"{"key":"a","extra":1}"#] {
+    for arguments in [
+        "{}",
+        r#"{"key":""}"#,
+        r#"{"key":1}"#,
+        r#"{"key":"a","extra":1}"#,
+    ] {
         let frame = encode_request(&tool_call("effect_read", arguments));
         let seen = drive(&frame, BUDGET, never).expect("the root writes steps");
         assert!(seen.performed.is_empty(), "{arguments}");
@@ -681,6 +689,7 @@ fn the_named_laws_of_the_step_are_declared_pe_08() {
         "a_call_that_performs_is_the_effect_refusal",
         "a_read_that_performs_is_the_effect_refusal",
         "a_prompt_that_performs_is_the_effect_refusal",
+        "an_effect_request_passes_the_input_guard_unchanged",
         "a_forbidden_request_never_reaches_the_provider",
         "a_request_that_is_not_a_post_never_reaches_the_provider",
         "a_body_that_is_not_json_never_reaches_the_provider",

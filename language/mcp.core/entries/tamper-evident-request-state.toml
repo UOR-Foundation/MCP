@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "tamper-evident-request-state"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "RequestState"
+component = "RequestState"
+
+[[form]]
+id = "tamper-evident-request-state"
+channel = "text"
+surface = "Tamper-evident request state"
+canonical_source = true
+features = ["sentence-case", "singular"]

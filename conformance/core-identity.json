@@ -1,7 +1,7 @@
 {
   "spec": "mcp-conformance/core-identity/1",
   "root": "UorMcp.Fixture.fixtureRun",
-  "program_sha256": "5da88084314a27a48dfe69a936f6df4d64c3e936103b625a93e04888da98dfc8",
+  "program_sha256": "7cbffcf5422d15c36bdaf4d9284c13df5e7651f5c60fd3b31ca2959943cd7b77",
   "package": {
     "name": "mcp_conformance_core",
     "version": "1.0.0",
@@ -18,25 +18,25 @@
       },
       {
         "path": "package.json",
-        "sha256": "0a5fd17b5ff8befbcb4d5fbfcfd59638176fcdb4fe707b13cde883cc5c8a26d2",
-        "byte_length": 1151687
+        "sha256": "33663ab511eaff729da60dd826e74f320c6aa9767ce7e1a3f3fa62e4816869d9",
+        "byte_length": 1435987
       },
       {
         "path": "provenance.json",
-        "sha256": "764b6f513423aac7b418fc1561dcf09abd75910c71706ceac0338a51384346ac",
+        "sha256": "18f3ff9ec9f00b5702c957aa956dbdaf459346ae7fcbeccd8d9a5dd565047569",
         "byte_length": 673
       },
       {
         "path": "src/lib.rs",
-        "sha256": "789c4901c986cb76ccf73b05f1d2d54e4a254d8ba85d44c47dda57e10cfd62b8",
-        "byte_length": 585553
+        "sha256": "859fa35d81254ea86e6f51545113945056abfe76222a78259a08bd41e4dab4ac",
+        "byte_length": 746900
       }
     ]
   },
   "source": {
-    "source_id": "fa33d518424cef47bddfda77cc4fd2e0c9c920527bba725f505e7ee9e0d32a3b",
-    "semantic_id": "c6a5bda3ca659d497aa724dec2694e3e2f978e4b836671ff051eac40fc683e11",
-    "lock_sha256": "c25a235e1aa6a818d3556312c63532be1f99adc9a2b56e91dbdbb120c4cbe711"
+    "source_id": "aa68216a57ab613ea8f63d65f88bbe1cafd4045e465eb37f8b873e77227d2f20",
+    "semantic_id": "e0799f08bea0d9675c3bf58d4429ecb771e37899d6c3bfbef7d57d973681e0c3",
+    "lock_sha256": "ae9ee438c5e3b36c75a010d3dcf641fbd1a14880f7b6fab104a199ec52fc6a78"
   },
   "compiler": {
     "lean_toolchain": "leanprover/lean4:v4.32.1",
@@ -45,6 +45,6 @@
   },
   "same_program_as": {
     "package": "mcp_lifecycle",
-    "program_sha256": "5da88084314a27a48dfe69a936f6df4d64c3e936103b625a93e04888da98dfc8"
+    "program_sha256": "7cbffcf5422d15c36bdaf4d9284c13df5e7651f5c60fd3b31ca2959943cd7b77"
   }
 }
