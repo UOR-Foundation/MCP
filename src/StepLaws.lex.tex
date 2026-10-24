@@ -8,6 +8,7 @@
 \importmodule{HostEffect}
 \importmodule{Http}
 \importmodule{Json}
+\importmodule{JsonRead}
 \importmodule{JsonRpc}
 \importmodule{JsonText}
 \importmodule{Methods}
@@ -35,29 +36,47 @@ theorem{
 
 theorem{
   name: a_turn_with_no_completed_effect_is_read_back,
-  parameters: [],
-  statement: ((StepServe::readTurn 0x00000002414200000000) = (ctor Result.ok [StepServe::Turn, Frame::FrameFault] (record StepServe::Turn {request := 0x4142, completed := (nil HostEffect::Completed)}))),
+  parameters: [source : Bytes, position : Nat, built : (List HostEffect::Completed)],
+  statement: ((StepServe::readCompleted source position 0 built) = (ctor Result.ok [((List HostEffect::Completed) * Nat), Frame::FrameFault] ((JsonRead::reverseOnto [HostEffect::Completed] built (nil HostEffect::Completed)), position))),
   proof: reflexivity{}
 }
 
 theorem{
-  name: a_turn_with_two_completed_effects_is_read_back,
-  parameters: [],
-  statement: ((StepServe::readTurn 0x00000001410000000200000001000000014200000002000000024344) = (ctor Result.ok [StepServe::Turn, Frame::FrameFault] (record StepServe::Turn {request := 0x41, completed := (cons (record HostEffect::Completed {tag := 1, outcome := 0x42}) (cons (record HostEffect::Completed {tag := 2, outcome := 0x4344}) (nil HostEffect::Completed)))}))),
+  name: an_effect_is_read_as_a_tag_and_a_length_prefixed_outcome,
+  parameters: [source : Bytes, position : Nat, below : Nat, built : (List HostEffect::Completed)],
+  statement: ((StepServe::readCompleted source position (below + 1) built) = (match (Frame::u32At source position)
+    | Option.none => (ctor Result.error [((List HostEffect::Completed) * Nat), Frame::FrameFault] (ctor Frame::FrameFault.truncated position))
+    | Option.some tag => (match (Frame::chunkAt source (position + 4))
+      | Option.none => (ctor Result.error [((List HostEffect::Completed) * Nat), Frame::FrameFault] (ctor Frame::FrameFault.truncated (position + 4)))
+      | Option.some outcome => (StepServe::readCompleted source (project outcome next) below (cons (record HostEffect::Completed {tag := tag, outcome := (project outcome bytes)}) built))))),
   proof: reflexivity{}
 }
 
 theorem{
   name: a_turn_cut_inside_the_request_is_a_fault,
-  parameters: [],
-  statement: ((StepServe::readTurn 0x0000000241) = (ctor Result.error [StepServe::Turn, Frame::FrameFault] (ctor Frame::FrameFault.truncated 0))),
+  parameters: [input : Bytes],
+  statement: ((StepServe::turnAfter input (ctor Option.none [Frame::Chunk])) = (ctor Result.error [StepServe::Turn, Frame::FrameFault] (ctor Frame::FrameFault.truncated 0))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_turn_with_no_count_is_a_fault,
+  parameters: [source : Bytes, request : Frame::Chunk],
+  statement: ((StepServe::afterCount source request (ctor Option.none [Nat])) = (ctor Result.error [StepServe::Turn, Frame::FrameFault] (ctor Frame::FrameFault.truncated (project request next)))),
   proof: reflexivity{}
 }
 
 theorem{
   name: a_turn_with_a_byte_after_its_last_outcome_is_a_fault,
-  parameters: [],
-  statement: ((StepServe::readTurn 0x00000001410000000000) = (ctor Result.error [StepServe::Turn, Frame::FrameFault] (ctor Frame::FrameFault.trailing 9))),
+  parameters: [request : Bytes, completed : (List HostEffect::Completed), position : Nat],
+  statement: ((StepServe::closed false request completed position) = (ctor Result.error [StepServe::Turn, Frame::FrameFault] (ctor Frame::FrameFault.trailing position))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_turn_that_ends_with_its_last_outcome_is_read_back,
+  parameters: [request : Bytes, completed : (List HostEffect::Completed), position : Nat],
+  statement: ((StepServe::closed true request completed position) = (ctor Result.ok [StepServe::Turn, Frame::FrameFault] (record StepServe::Turn {request := request, completed := completed}))),
   proof: reflexivity{}
 }
 

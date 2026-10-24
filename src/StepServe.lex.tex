@@ -54,22 +54,46 @@ definition{
 }
 
 definition{
-  name: finishTurn,
-  parameters: [source : Bytes, request : Bytes, read : ((List HostEffect::Completed) * Nat)],
+  name: closed,
+  parameters: [
+    ended : Bool,
+    request : Bytes,
+    completed : (List HostEffect::Completed),
+    position : Nat
+  ],
   result: (Result Turn Frame::FrameFault),
-  body: (if ((second read) =? (prim length source : Nat)) then (ctor Result.ok [Turn, Frame::FrameFault] (record Turn {request := request, completed := (first read)})) else (ctor Result.error [Turn, Frame::FrameFault] (ctor Frame::FrameFault.trailing (second read)))),
+  body: (if ended then (ctor Result.ok [Turn, Frame::FrameFault] (record Turn {request := request, completed := completed})) else (ctor Result.error [Turn, Frame::FrameFault] (ctor Frame::FrameFault.trailing position))),
   executable: true
 }
 
 definition{
-  name: afterRequest,
-  parameters: [source : Bytes, request : Frame::Chunk],
+  name: finishTurn,
+  parameters: [source : Bytes, request : Bytes, read : ((List HostEffect::Completed) * Nat)],
   result: (Result Turn Frame::FrameFault),
-  body: (match (Frame::u32At source (project request next))
+  body: (closed ((second read) =? (prim length source : Nat)) request (first read) (second read)),
+  executable: true
+}
+
+definition{
+  name: afterCount,
+  parameters: [source : Bytes, request : Frame::Chunk, count : (Option Nat)],
+  result: (Result Turn Frame::FrameFault),
+  body: (match count
     | Option.none => (ctor Result.error [Turn, Frame::FrameFault] (ctor Frame::FrameFault.truncated (project request next)))
-    | Option.some count => (match (readCompleted source ((project request next) + 4) count (nil HostEffect::Completed))
+    | Option.some total => (match (readCompleted source ((project request next) + 4) total (nil HostEffect::Completed))
       | Result.error fault => (ctor Result.error [Turn, Frame::FrameFault] fault)
       | Result.ok read => (finishTurn source (project request bytes) read))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: turnAfter,
+  parameters: [input : Bytes, found : (Option Frame::Chunk)],
+  result: (Result Turn Frame::FrameFault),
+  body: (match found
+    | Option.none => (ctor Result.error [Turn, Frame::FrameFault] (ctor Frame::FrameFault.truncated 0))
+    | Option.some request => (afterCount input request (Frame::u32At input (project request next)))),
   axioms: [Quot.sound, propext],
   executable: true
 }
@@ -78,9 +102,7 @@ definition{
   name: readTurn,
   parameters: [input : Bytes],
   result: (Result Turn Frame::FrameFault),
-  body: (match (Frame::chunkAt input 0)
-    | Option.none => (ctor Result.error [Turn, Frame::FrameFault] (ctor Frame::FrameFault.truncated 0))
-    | Option.some request => (afterRequest input request)),
+  body: (turnAfter input (Frame::chunkAt input 0)),
   axioms: [Quot.sound, propext],
   executable: true
 }

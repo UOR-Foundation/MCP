@@ -63,6 +63,7 @@ definition{
   body: (match (prim utf8_decode outcome : (Option String))
     | Option.none => ""
     | Option.some content => content),
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 

@@ -176,6 +176,7 @@ are axiom-free and seven, the ones about `statusForCode`, use `propext` only.
 | `paramRules` | first-order data in `ProviderInfo`; the fixture derives them from the `x-mcp-header` annotations of its catalog (`Admission.rulesOf`, [TOOLS.md](TOOLS.md)) |
 | Result bodies encoded | `server/discover`, `tools/list`, `tools/call` (every content block of the schema: text, image, audio, resource link, embedded resource; `structuredContent`; `isError`); a body the encoder does not cover is a 500, so #9 to #12 each add theirs |
 | Provider | a record of functions cannot be an exported root's parameter in LexLean 1.2, so `Dispatch.handleWith` takes `ProviderInfo` (data) and one answer function; `Dispatch.handle` is `handleWith` over a `Provider` and keeps every earlier theorem |
+| Host effects | a provider asks the host for an effect with `perform` on `CallOutcome`, `ReadOutcome` or `PromptOutcome`; `Serve.serve` answers it as an internal error and `StepServe.serveStep` writes it as a step ([PROVIDER-EFFECTS.md](PROVIDER-EFFECTS.md)) |
 
 ## Evidence
 
