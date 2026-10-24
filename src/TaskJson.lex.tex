@@ -145,18 +145,6 @@ definition{
 }
 
 definition{
-  name: inputRequiredMembers,
-  parameters: [found : Input::InputRequiredResult],
-  result: (Option (List (String * Json::Json))),
-  body: (match (requestsJson (Input::requestsOf found))
-    | Option.none => (ctor Option.none [(List (String * Json::Json))])
-    | Option.some encoded => (ctor Option.some [(List (String * Json::Json))] (prim append (match (Input::requestsOf found)
-      | List.nil => (nil (String * Json::Json))
-      | List.cons head rest => (cons ("inputRequests", encoded) (nil (String * Json::Json)))) (textMember "requestState" (Input::stateOf found)) : (List (String * Json::Json))))),
-  executable: true
-}
-
-definition{
   name: outcomeJson,
   parameters: [outcome : Tasks::PlanOutcome],
   result: Json::Json,

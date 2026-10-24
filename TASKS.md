@@ -100,7 +100,8 @@ then, for a tool that supports tasks:
 
 A tool that asks for input before it becomes a task (`test_tool_with_task`) answers its first
 round with an `input_required` result and its last with the `CreateTaskResult`. This is the
-multi round-trip of issue #10 composed with tasks; see [Not met](#not-met).
+multi round-trip of issue #10 composed with tasks; the first round is written by the encoder of
+[INPUT-REQUIRED.md](INPUT-REQUIRED.md).
 
 ## What a task does
 
@@ -174,7 +175,7 @@ values of `TaskServe`, and the refusals that were already modeled gain the cases
 | `tasks/update` of a task that is not waiting | acknowledged, unchanged |
 | Order of the checks | the request is validated as in [LIFECYCLE.md](LIFECYCLE.md); then the rate limit; for a task method, the extension, then the table, then the task |
 | `statusMessage` | never written; the extension makes it optional |
-| Input requests a task can park on | elicitation (form and URL) and roots; sampling requests have no wire form here yet and a plan that parks on one is a server error, until #10 lands its encoder |
+| Input requests a task can park on | elicitation (form and URL) and roots; the table has no form for a sampling request, so a plan that parks on one is a server error |
 
 ## Kernel theorems
 
@@ -251,21 +252,22 @@ needs a new export (about 25 minutes of CI each), and the 46 tests of `tests/tas
 been shown to stop one. That is the evidence the table does not give.
 
 Restored result: every defect was reverted with `git checkout`, and on the final tree
-`lexlean check` reports 51 modules, `cargo fmt --all -- --check` and `cargo clippy --workspace
+`lexlean check` reports 60 modules, `cargo fmt --all -- --check` and `cargo clippy --workspace
 --all-targets --locked -- -D warnings` pass, and `cargo test --workspace --locked` passes with the
 three packages equal to a fresh export.
 
 ## Not met
 
-* The acceptance of #12 is that the ten scenarios pass against the conformance build (#13). That build
-  does not exist yet and the scenarios have not been run. Not met.
+* The acceptance of #12 is that the ten scenarios pass against the conformance build (#13,
+  [CONFORMANCE-RUN.md](CONFORMANCE-RUN.md)). They do not. The adapter of that build keeps no tasks: it writes
+  no host section, so the core reads a clock of 0, no identifier and no table, and every scenario
+  that creates or reads a task fails. The nine scenarios that send requests are listed in
+  `conformance/waiting.json` with that reason, and they wait on the adapter of PrismPM#216, which gives the
+  core the clock, the identifiers and the table. Not met.
 * `tasks-status-notifications` has no request at the pinned commit; its row has no vector. The
   notifications are modeled and tested here, and their stream is #11's.
-* `tasks-mrtr-composition` and the `input_required` rounds of `test_tool_with_task` depend on the
-  input-required results of #10. This branch carries the part they need and nothing more: the tool
-  asks with an `elicitation/create` request and the result of that round is written by `TaskJson`. When #10 lands,
-  its encoder replaces this one and the scenario is re-run.
-* A task whose plan parks on a sampling request has no wire form; the fixture never parks on one.
+* A task whose plan parks on a sampling request cannot be stored: the table has no form for one. The
+  fixture never parks on one, and the encoder of #10 would write the request.
 * The extension's `subscriptions/listen` subscription by task id, and the `-32021` it returns to a
   client that lists task ids without declaring the extension, are #11's.
 * The host adapter keeps the table, the clock and the identifiers (PrismPM#216). The test host is not
