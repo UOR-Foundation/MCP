@@ -2,6 +2,8 @@
 //! generated root, and the pins the register records.
 #![allow(dead_code)]
 
+pub mod application;
+
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;

@@ -109,3 +109,9 @@ Feature: Tools
     Given a very large arguments object, a very large text argument and a catalog of many tools
     When the root answers each on the default stack
     Then each is answered and none overflows the stack
+
+  @TL-19 @build
+  Scenario: The conformance fixture lists the two diagnostic tools the pinned server-stateless scenario calls, test_streaming_elicitation and test_logging_tool, and a tools/call of each answers one text content block (Streaming complete, Logging evaluated) with no independent JSON-RPC request and no notifications/message written to the response, with or without a logLevel in the request: the core declares no logging capability and streams no server request.
+    Given a tools/call of each diagnostic tool, with and without a logLevel
+    When the root answers
+    Then each result is one text block and the response holds no server request and no log notification

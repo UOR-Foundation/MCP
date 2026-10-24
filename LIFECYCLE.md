@@ -227,9 +227,9 @@ own comment names alpha.10 as its anchor, and between those two commits only lin
 The authority row `A-MCP-CONFORMANCE` records the commit and a manifest checksum over
 the ten vendored files.
 
-Not run, with the owning issue (listed in the vectors files as `not_run`): the probes at
-lines 887 and 947 of `server-stateless`, which call the diagnostic tools
-`test_streaming_elicitation` and `test_logging_tool` that the fixture does not list. The other
+The probes at lines 887 and 947 of `server-stateless` call the diagnostic tools
+`test_streaming_elicitation` and `test_logging_tool`; the fixture lists them (TL-19, #13) and the
+probes are the vectors TS-10 and TS-11 of `vectors/tools.json`. The other
 streaming probes that #7 left to the transport are accounted for in `vectors/transport.json`
 ([TRANSPORT.md](TRANSPORT.md#the-streaming-probes-of-server-stateless)): lines 1037 and 1144 are
 vectors, because `subscriptions/listen` is answered -32601 while `server/discover` advertises no
@@ -377,9 +377,10 @@ and `cargo clippy --workspace --all-targets -- -D warnings` pass.
 * The acceptance of #7 is that the scenarios `server-stateless`, `http-header-validation`
   and `http-custom-header-server-validation` pass against the conformance build (#13).
   That build does not exist yet and the scenarios have not been run. Not met.
-* `server-stateless`: the probes at lines 887 and 947 call diagnostic tools the fixture does
-  not list, and `subscriptions/listen`, list-changed notifications and logging are not
-  registered ([TRANSPORT.md](TRANSPORT.md#not-met)).
+* `server-stateless`: `subscriptions/listen`, list-changed notifications and logging are not
+  registered, so five checks of the scenario are skipped by the suite, which reads a server that
+  advertises no list-changed or subscribe capability as one with nothing to serve there
+  ([TRANSPORT.md](TRANSPORT.md#not-met)).
 * The suite validates each response against its own wire schema before the scenario
   sees it. Here every response is validated against the specification's JSON Schema
   (LC-15) by another validator, which is falsifying evidence; the suite's validator has

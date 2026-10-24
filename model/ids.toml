@@ -399,6 +399,12 @@ suite = "tools"
 statement = "Tool calls with a very large arguments object, a very large text argument and a catalog of many tools are answered on the default 2 MiB thread stack, because no function of the generated package recurses except as a loop."
 
 [[id]]
+id = "TL-19"
+level = "build"
+suite = "tools"
+statement = "The conformance fixture lists the two diagnostic tools the pinned server-stateless scenario calls, test_streaming_elicitation and test_logging_tool, and a tools/call of each answers one text content block (Streaming complete, Logging evaluated) with no independent JSON-RPC request and no notifications/message written to the response, with or without a logLevel in the request: the core declares no logging capability and streams no server request."
+
+[[id]]
 id = "RP-01"
 level = "build"
 suite = "resources"
@@ -548,7 +554,7 @@ statement = "A request whose Host is present and names a host outside the allow-
 id = "SH-06"
 level = "build"
 suite = "transport"
-statement = "The streaming probes of server-stateless that issue 7 left to this issue: server/discover advertises no listChanged and no subscribe capability and subscriptions/listen is answered as methodNotFound (-32601, HTTP status 404), which the scenario reads as a feature that is absent, so the probes at lines 1037 and 1144 are vectors and those at 1209 and 1279 are not reached; the probes at lines 887 and 947 need diagnostic tools the fixture does not list and are listed as not run."
+statement = "The streaming probes of server-stateless that issue 7 left to this issue: server/discover advertises no listChanged and no subscribe capability and subscriptions/listen is answered as methodNotFound (-32601, HTTP status 404), which the scenario reads as a feature that is absent, so the probes at lines 1037 and 1144 are vectors and those at 1209 and 1279 are not reached; the probes at lines 887 and 947 call the diagnostic tools that TL-19 lists and are the vectors TS-10 and TS-11."
 
 [[id]]
 id = "SH-07"
@@ -573,3 +579,53 @@ id = "SH-10"
 level = "build"
 suite = "transport"
 statement = "The transport scenarios and the streaming probes are accounted for: every request the vendored sse-multiple-streams.ts and dns-rebinding.ts send is a vector, every check id they emit is a vector's or is listed, and each probe of server-stateless that issue 7 left to this issue is a vector or is listed with a reason and an owner."
+
+# The conformance build and the oracle run (issue #13): CF-01..CF-08.
+
+[[id]]
+id = "CF-01"
+level = "build"
+suite = "conformance"
+statement = "The conformance build is a PrismPM server application declared in this repository: its core is the unchanged production root UorMcp.Fixture.fixtureRun, its one host effect is the tool-call counter that fills the tool-call section of the request frame, its listener is bound to 127.0.0.1, and its binding crate answers each client's count of tools/call requests in the current window, not counting the request being served."
+
+[[id]]
+id = "CF-02"
+level = "build"
+suite = "conformance"
+statement = "Every acceptance vector and every served vector of the declaration is the committed core package's own answer to the request it holds, byte for byte, as the HTTP adapter frames the request and serializes the answer, so the declaration cannot disagree with the core it names."
+
+[[id]]
+id = "CF-03"
+level = "build"
+suite = "conformance"
+statement = "The pinned conformance suite's server runner, at specification revision 2026-07-28 with the frozen requirements file, is run over loopback against the served conformance build and its verdict is read from the per-scenario checks: each of the 37 required and the 13 not-scored server scenarios is listed with its checks, and a scenario that produced no check, no passing check or any failing check is reported by name with the suite's own diagnostic. The job passes only when the set of failing scenarios equals the set that conformance/waiting.json lists, each entry naming its issue or pull request: a failing scenario that is not listed, a listed scenario that does not fail, and an entry that names neither fail the job, and a listed scenario stays a failure in the report and is never counted among the scenarios passing."
+
+[[id]]
+id = "CF-04"
+level = "build"
+suite = "conformance"
+statement = "Every JSON-RPC message of the transcripts recorded during that run, each request, each result, each error and each event of a stream, validates against the pinned 2026-07-28 schema.json, a response against the definition of the request it answers, and a body that is not a JSON-RPC message is a failure and not a skipped message."
+
+[[id]]
+id = "CF-05"
+level = "build"
+suite = "conformance"
+statement = "A defect planted in the core makes the oracle run fail with the suite's own diagnostic: the verdict logic names the failing scenario and check, and a run whose scenario produced no checks or only skipped ones is not a pass, and a listed scenario that starts to pass or a failure that is not listed fails the run."
+
+[[id]]
+id = "CF-06"
+level = "build"
+suite = "conformance"
+statement = "The core artifact the conformance build produced is recorded by digest: the exported package's name, version and file digests, the source and semantic IDs it was exported from and the compiler that exported it, in a record that a rebuild must reproduce, so a consumer can check that it links the same core."
+
+[[id]]
+id = "CF-07"
+level = "build"
+suite = "conformance"
+statement = "Each pin of the oracle run is written once and agrees with the authority record that names it: the PrismPM revision, the conformance suite commit, the SHA-256 of the frozen requirements file and the scenario sets it lists, and the specification schema's digest."
+
+[[id]]
+id = "CF-08"
+level = "build"
+suite = "conformance"
+statement = "The workspace test gate needs neither node nor the installed conformance suite: every test that runs a node oracle or reads the installed suite is ignored with a reason that names the conformance job, the conformance job runs those tests with --ignored and fails unless every one of them ran and passed, and a test of the workspace that needs node or the suite without being ignored is refused."
