@@ -128,7 +128,11 @@ fn the_generated_package_is_the_recorded_export_of_the_lifecycle_root_lc_13() {
     )
     .expect("request.json is JSON");
     let roots = request["roots"].as_array().expect("roots");
-    assert_eq!(roots.len(), 2, "the stress root and the fixture root");
+    assert_eq!(
+        roots.len(),
+        3,
+        "the crowd root, the fixture root and the step root"
+    );
     assert_eq!(roots[1]["root"], "UorMcp.Fixture.fixtureRun");
     assert_eq!(roots[1]["package"]["name"], "mcp_lifecycle");
 
@@ -401,6 +405,64 @@ fn no_function_of_the_crowd_package_is_on_a_call_cycle_tl_18() {
     );
     if let Some(cycle) = find_cycle(&graph) {
         panic!("the crowd package recurses: {}", cycle.join(" -> "));
+    }
+}
+
+// ---- PE-02: the third root, the step serve over the effect fixture ----
+
+#[test]
+fn the_step_package_is_the_recorded_export_of_the_step_root_pe_02() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("generated")
+        .join("mcp_step");
+    let provenance: Value =
+        serde_json::from_slice(&std::fs::read(dir.join("provenance.json")).expect("provenance"))
+            .expect("provenance.json is JSON");
+    assert_eq!(provenance["name"], "mcp_step");
+    assert_eq!(provenance["profile"], "rust-std");
+    assert_eq!(provenance["exports"].as_array().expect("exports").len(), 1);
+    assert_eq!(provenance["exports"][0]["name"], "run");
+    assert_eq!(
+        provenance["effects"],
+        serde_json::json!(["allocation", "overflow"]),
+        "the export states no recursion effect"
+    );
+    let request: Value = serde_json::from_slice(
+        &std::fs::read(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("generated")
+                .join("request.json"),
+        )
+        .expect("request.json"),
+    )
+    .expect("request.json is JSON");
+    assert_eq!(
+        request["roots"][2]["root"],
+        "UorMcp.StepFixture.stepFixtureRun"
+    );
+    assert_eq!(request["roots"][2]["package"]["name"], "mcp_step");
+    let source = std::fs::read(dir.join("src").join("lib.rs")).expect("the package source");
+    let recorded = provenance["files"]["src/lib.rs"]
+        .as_str()
+        .expect("src/lib.rs is recorded");
+    assert_eq!(recorded, hex(&Sha256::digest(&source)));
+    assert_eq!(
+        recorded,
+        hex(&Sha256::digest(lifecycle_oracle::STEP_SOURCE.as_bytes())),
+        "the oracle compiled a different file from the one recorded"
+    );
+}
+
+#[test]
+fn no_function_of_the_step_package_is_on_a_call_cycle_pe_02() {
+    let graph = call_graph(lifecycle_oracle::STEP_SOURCE);
+    assert!(
+        graph.len() > 300,
+        "the graph reads the package: {}",
+        graph.len()
+    );
+    if let Some(cycle) = find_cycle(&graph) {
+        panic!("the step package recurses: {}", cycle.join(" -> "));
     }
 }
 

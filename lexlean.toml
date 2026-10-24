@@ -3,7 +3,7 @@ name = "mcp-core"
 language = "1.2"
 module_prefix = "UorMcp"
 source_roots = ["src"]
-entrypoints = ["src/Admission.lex.tex", "src/Base64.lex.tex", "src/Crowd.lex.tex", "src/Decode.lex.tex", "src/Dispatch.lex.tex", "src/Envelope.lex.tex", "src/Extension.lex.tex", "src/Fixture.lex.tex", "src/Frame.lex.tex", "src/HeaderLaws.lex.tex", "src/Hmac.lex.tex", "src/Http.lex.tex", "src/InputFixture.lex.tex", "src/InputGuard.lex.tex", "src/InputLaws.lex.tex", "src/Interact.lex.tex", "src/JsonCodec.lex.tex", "src/JsonEq.lex.tex", "src/JsonExamples.lex.tex", "src/JsonGate.lex.tex", "src/JsonRead.lex.tex", "src/JsonRoundTrip.lex.tex", "src/JsonText.lex.tex", "src/JsonWrite.lex.tex", "src/JsonWriteLaws.lex.tex", "src/Methods.lex.tex", "src/Numeric.lex.tex", "src/Param.lex.tex", "src/Refusal.lex.tex", "src/RequestState.lex.tex", "src/ResourceFixture.lex.tex", "src/ResourceLaws.lex.tex", "src/Resources.lex.tex", "src/ResultJson.lex.tex", "src/RpcWire.lex.tex", "src/Sanitize.lex.tex", "src/Schema.lex.tex", "src/ScopeLaws.lex.tex", "src/SealLaws.lex.tex", "src/Serve.lex.tex", "src/Sha256.lex.tex", "src/Status.lex.tex", "src/ToolLaws.lex.tex", "src/Tools.lex.tex", "src/Transport.lex.tex", "src/TransportLaws.lex.tex", "src/Utf8.lex.tex", "src/Validation.lex.tex"]
+entrypoints = ["src/Admission.lex.tex", "src/Base64.lex.tex", "src/Crowd.lex.tex", "src/Decode.lex.tex", "src/Dispatch.lex.tex", "src/Envelope.lex.tex", "src/Extension.lex.tex", "src/Fixture.lex.tex", "src/Frame.lex.tex", "src/HeaderLaws.lex.tex", "src/Hmac.lex.tex", "src/HostEffect.lex.tex", "src/Http.lex.tex", "src/InputFixture.lex.tex", "src/InputGuard.lex.tex", "src/InputLaws.lex.tex", "src/Interact.lex.tex", "src/JsonCodec.lex.tex", "src/JsonEq.lex.tex", "src/JsonExamples.lex.tex", "src/JsonGate.lex.tex", "src/JsonRead.lex.tex", "src/JsonRoundTrip.lex.tex", "src/JsonText.lex.tex", "src/JsonWrite.lex.tex", "src/JsonWriteLaws.lex.tex", "src/Methods.lex.tex", "src/Numeric.lex.tex", "src/Param.lex.tex", "src/Refusal.lex.tex", "src/RequestState.lex.tex", "src/ResourceFixture.lex.tex", "src/ResourceLaws.lex.tex", "src/Resources.lex.tex", "src/ResultJson.lex.tex", "src/RpcWire.lex.tex", "src/Sanitize.lex.tex", "src/Schema.lex.tex", "src/ScopeLaws.lex.tex", "src/SealLaws.lex.tex", "src/Serve.lex.tex", "src/Sha256.lex.tex", "src/Status.lex.tex", "src/StepFixture.lex.tex", "src/StepLaws.lex.tex", "src/StepServe.lex.tex", "src/ToolLaws.lex.tex", "src/Tools.lex.tex", "src/Transport.lex.tex", "src/TransportLaws.lex.tex", "src/Utf8.lex.tex", "src/Validation.lex.tex"]
 build_root = ".lexlean"
 lockfile = "lexlean.lock"
 lean_workspace = "."
@@ -24,7 +24,7 @@ path = "language/mcp.core"
 
 [limits]
 max_file_bytes = 33554432
-max_total_source_bytes = 67108864
+max_total_source_bytes = 134217728
 max_primitive_atoms = 2000000
 max_token_lattice_edges = 4000000
 max_parse_states = 4000000
