@@ -629,3 +629,41 @@ id = "CF-08"
 level = "build"
 suite = "conformance"
 statement = "The workspace test gate needs neither node nor the installed conformance suite: every test that runs a node oracle or reads the installed suite is ignored with a reason that names the conformance job, the conformance job runs those tests with --ignored and fails unless every one of them ran and passed, and a test of the workspace that needs node or the suite without being ignored is refused."
+
+# The protocol core crate (issue #14): PB-01..PB-06.
+
+[[id]]
+id = "PB-01"
+level = "build"
+suite = "publication"
+statement = "The protocol core is published as one crate that is named once: the export request of the lifecycle oracle exports the production root UorMcp.Fixture.fixtureRun as the crate prism_mcp at the version of the workspace, the publication record names the same crate and root, and the committed export, its provenance and its manifest carry that name and version."
+
+[[id]]
+id = "PB-02"
+level = "build"
+suite = "publication"
+statement = "The packaging script makes the crate from the committed export alone, offline and from a checkout at any commit: two packagings are the same bytes, the crate is the export's package.json, provenance.json and src/lib.rs byte for byte, its manifest is the export's with the publish = false line replaced by the publication metadata and nothing else changed, and its version is the workspace version or, for a commit imported during development, the workspace version with the pre-release dev.N."
+
+[[id]]
+id = "PB-03"
+level = "build"
+suite = "publication"
+statement = "The packaged crate is bound to the core digest the conformance build records: the program digest in its provenance equals program_sha256 of conformance/core-identity.json, the SHA-256 of its src/lib.rs equals the one that record lists for the core of the conformance build and the one its own provenance records, and the SHA-256 of the archive is written beside it."
+
+[[id]]
+id = "PB-04"
+level = "build"
+suite = "publication"
+statement = "A package that does not match is refused with a typed diagnostic and no crate is written: a tampered file of the export, a crate name or version that the request, the publication record, the workspace and the manifest do not agree on, and a program or source digest that disagrees with the identity record each fail with their own code."
+
+[[id]]
+id = "PB-05"
+level = "build"
+suite = "publication"
+statement = "An existing archive can be checked against the tree: the script accepts the crate it made, and refuses an archive with a changed file, an extra file, a manifest that differs beyond the publication metadata, or another version than the one asked for."
+
+[[id]]
+id = "PB-06"
+level = "build"
+suite = "publication"
+statement = "The upload is the last step of the release and nothing else uploads: the crate workflow runs the packaging, the identity check and cargo publish --dry-run before any upload, uploads only for a version tag and only when the CARGO_REGISTRY_TOKEN secret is present, and the lexlean workflow packages and dry-runs the crate in every pull request without a credential."

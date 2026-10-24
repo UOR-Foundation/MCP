@@ -91,6 +91,17 @@ model does not sanction.
 | `LC-15` | `build` | The response bodies the root writes in the vector and boundary tests validate against the MCP 2026-07-28 JSON Schema at the pinned specification commit, whose vendored file has the recorded checksum: as a JSON-RPC response, as the typed result response of the request's method, and as the typed error of its code. A validator is falsifying evidence and not the oracle for the protocol, which MCP#6 binds. |
 | `LC-16` | `build` | The exported root needs no stack that grows with its input: its recorded effects do not include recursion, no function of the generated package is on a call cycle, and frames with two hundred thousand header fields, four hundred thousand arguments, a quarter-mebibyte string, the deepest admitted JSON nesting and a long Base64 parameter header complete on a 2 MiB stack. |
 
+## publication
+
+| ID | Level | Statement |
+| --- | --- | --- |
+| `PB-01` | `build` | The protocol core is published as one crate that is named once: the export request of the lifecycle oracle exports the production root UorMcp.Fixture.fixtureRun as the crate prism_mcp at the version of the workspace, the publication record names the same crate and root, and the committed export, its provenance and its manifest carry that name and version. |
+| `PB-02` | `build` | The packaging script makes the crate from the committed export alone, offline and from a checkout at any commit: two packagings are the same bytes, the crate is the export's package.json, provenance.json and src/lib.rs byte for byte, its manifest is the export's with the publish = false line replaced by the publication metadata and nothing else changed, and its version is the workspace version or, for a commit imported during development, the workspace version with the pre-release dev.N. |
+| `PB-03` | `build` | The packaged crate is bound to the core digest the conformance build records: the program digest in its provenance equals program_sha256 of conformance/core-identity.json, the SHA-256 of its src/lib.rs equals the one that record lists for the core of the conformance build and the one its own provenance records, and the SHA-256 of the archive is written beside it. |
+| `PB-04` | `build` | A package that does not match is refused with a typed diagnostic and no crate is written: a tampered file of the export, a crate name or version that the request, the publication record, the workspace and the manifest do not agree on, and a program or source digest that disagrees with the identity record each fail with their own code. |
+| `PB-05` | `build` | An existing archive can be checked against the tree: the script accepts the crate it made, and refuses an archive with a changed file, an extra file, a manifest that differs beyond the publication metadata, or another version than the one asked for. |
+| `PB-06` | `build` | The upload is the last step of the release and nothing else uploads: the crate workflow runs the packaging, the identity check and cargo publish --dry-run before any upload, uploads only for a version tag and only when the CARGO_REGISTRY_TOKEN secret is present, and the lexlean workflow packages and dry-runs the crate in every pull request without a credential. |
+
 ## resources
 
 | ID | Level | Statement |
