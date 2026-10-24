@@ -131,3 +131,102 @@ test('the checks that are neither successes nor failures are counted by status',
   });
   assert.deepEqual(out.rows[0].other, { WARNING: 2, INFO: 1 });
 });
+
+// The gate of the job: the failing scenarios are exactly the waiting ones (CF-03, CF-05).
+const waitingOn = { 'tools-list': { issue: 10, pr: 30, reason: 'r' }, caching: { issue: 12, pr: 32, reason: 'r' } };
+const fail = (id) => ({ id, status: 'FAILURE', errorMessage: 'm' });
+
+function gate(results, waiting = waitingOn) {
+  return verdict({ required, unscored, waiting, results: new Map(Object.entries(results)) });
+}
+
+test('the gate holds when the failing scenarios are exactly the waiting ones, and they stay failures (CF-03)', () => {
+  const out = gate({
+    'server-stateless': [pass('a')],
+    'tools-list': [fail('b')],
+    caching: [fail('c')],
+    'http-header-validation': [pass('d')],
+  });
+  assert.equal(out.matchesWaiting, true);
+  // A waiting scenario is a failure and never a pass: the run is not valid and the
+  // scenarios passing are counted without them.
+  assert.equal(out.valid, false);
+  assert.deepEqual(out.failing, ['tools-list', 'caching']);
+  assert.deepEqual(out.rows.filter((row) => row.status === 'pass').map((row) => row.scenario), ['server-stateless', 'http-header-validation']);
+  assert.deepEqual(out.unexplained, []);
+  assert.deepEqual(out.stale, []);
+});
+
+test('a waiting entry that passes makes the run fail as stale (CF-05)', () => {
+  const out = gate({
+    'server-stateless': [pass('a')],
+    'tools-list': [fail('b')],
+    caching: [pass('c')],
+    'http-header-validation': [pass('d')],
+  });
+  assert.equal(out.matchesWaiting, false);
+  assert.deepEqual(out.stale, ['caching']);
+  assert.deepEqual(out.unexplained, []);
+});
+
+test('a failure that is not listed fails the run, among the listed ones (CF-05)', () => {
+  const out = gate({
+    'server-stateless': [fail('x')],
+    'tools-list': [fail('b')],
+    caching: [fail('c')],
+    'http-header-validation': [pass('d')],
+  });
+  assert.equal(out.matchesWaiting, false);
+  assert.deepEqual(out.unexplained, ['server-stateless']);
+  assert.deepEqual(out.waits.unexplained, ['server-stateless']);
+  assert.deepEqual(out.stale, []);
+});
+
+test('a scenario that produced no checks is an unlisted failure too (CF-05)', () => {
+  const out = gate({ 'server-stateless': [pass('a')], 'tools-list': [fail('b')], caching: [fail('c')] });
+  assert.equal(out.matchesWaiting, false);
+  assert.deepEqual(out.unexplained, ['http-header-validation']);
+});
+
+test('an entry that names neither its issue nor its pull request fails the run (CF-03)', () => {
+  const out = gate(
+    {
+      'server-stateless': [pass('a')],
+      'tools-list': [fail('b')],
+      caching: [fail('c')],
+      'http-header-validation': [pass('d')],
+    },
+    { 'tools-list': { issue: 10, pr: 30 }, caching: { reason: 'r' } },
+  );
+  assert.equal(out.matchesWaiting, false);
+  assert.deepEqual(out.unnamed, ['caching']);
+  const issueOnly = gate(
+    { 'server-stateless': [pass('a')], 'tools-list': [fail('b')], caching: [pass('c')], 'http-header-validation': [pass('d')] },
+    { 'tools-list': { issue: 10, pr: null } },
+  );
+  assert.equal(issueOnly.matchesWaiting, true);
+  assert.deepEqual(issueOnly.waits, { 'no delivering pull request': ['tools-list'] });
+});
+
+test('with nothing waiting and nothing failing the gate holds and the run is valid (CF-03)', () => {
+  const out = gate({
+    'server-stateless': [pass('a')],
+    'tools-list': [pass('b')],
+    caching: [pass('c')],
+    'http-header-validation': [pass('d')],
+  }, {});
+  assert.equal(out.matchesWaiting, true);
+  assert.equal(out.valid, true);
+});
+
+test('a scenario outside the frozen requirements fails the gate (CF-03)', () => {
+  const out = gate({
+    'server-stateless': [pass('a')],
+    'tools-list': [fail('b')],
+    caching: [fail('c')],
+    'http-header-validation': [pass('d')],
+    extra: [pass('e')],
+  });
+  assert.equal(out.matchesWaiting, false);
+  assert.deepEqual(out.unexpected, ['extra']);
+});

@@ -15,14 +15,20 @@
 // usage: server-suite.mjs --suite-root DIR --out DIR [--waiting FILE] SUBJECT [SUBJECT_ARG...]
 //
 // FILE (default: conformance/waiting.json) names the failing scenarios that wait on
-// another pull request and the scenarios the suite itself skips. It classifies the
-// report; it never turns a failure into a pass, and the exit status is 1 while any
-// scenario fails.
+// another issue and pull request, and the scenarios the suite itself skips. It never
+// turns a failure into a pass: a waiting scenario is reported as failing, the
+// required scenarios passing are counted without it, and report.json says
+// `valid: false` while any scenario fails. It decides the exit status.
 //
-// Writes OUT/report.json and OUT/transcript.json. Exit 0: every scenario of the
-// frozen requirements (server leg: required and not scored) ran and passed.
-// Exit 1: a scenario failed or produced no checks, or the subject cannot be started;
-// the diagnostic names each failing check as `scenario: check id: message`.
+// Writes OUT/report.json and OUT/transcript.json.
+// Exit 0: the set of failing scenarios equals the set FILE names as waiting, each entry
+// naming its issue or pull request (every other scenario of the frozen requirements,
+// server leg, ran and passed, or is skipped by the suite). With nothing waiting this is
+// the case that every scenario passed.
+// Exit 1: a scenario failed that FILE does not name (the diagnostic names each failing
+// check as `scenario: check id: message`), or a scenario FILE names did not fail
+// (`named as waiting but not failing`), or an entry names neither an issue nor a pull
+// request, or the subject cannot be started.
 // Exit 2: the oracle cannot run, or the suite's requirements differ from the frozen file.
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -222,7 +228,7 @@ async function main() {
     const record = exchanges(relay.connections);
     writeFileSync(join(outDirectory, 'transcript.json'), `${JSON.stringify(transcript(record))}\n`);
 
-    const { rows, diagnostics, failing, skipped, waits, stale, unexpected, valid } = verdict({ required, unscored, results, suiteSkipped, waiting });
+    const { rows, diagnostics, failing, skipped, waits, stale, unexplained, unnamed, unexpected, valid, matchesWaiting } = verdict({ required, unscored, results, suiteSkipped, waiting });
     const report = {
       oracle: `mcp-conformance/232a9014+${REVISION}`,
       requirements_sha256: FROZEN_REQUIREMENTS_SHA256,
@@ -232,33 +238,42 @@ async function main() {
       waits,
       skipped_by_the_suite: skipped,
       stale_waiting: stale,
+      unexplained,
+      unnamed_waiting: unnamed,
       unexpected,
       suite_exit: suite.code,
       exchanges: record.length,
       scenarios: rows,
       valid,
+      matches_waiting: matchesWaiting,
     };
     writeFileSync(join(outDirectory, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
     process.stdout.write(`${JSON.stringify({ ...report, scenarios: undefined })}\n`);
 
-    if (failing.length > 0) {
-      for (const line of diagnostics.slice(0, MAX_DIAGNOSTICS)) process.stderr.write(`${line}\n`);
-      if (diagnostics.length > MAX_DIAGNOSTICS) process.stderr.write(`... ${diagnostics.length - MAX_DIAGNOSTICS} further failing checks\n`);
+    if (failing.length > 0 || stale.length > 0 || unnamed.length > 0) {
+      // The failures nobody is waiting for come first: they are the ones that fail the job.
+      if (unexplained.length > 0) process.stderr.write(`${wrapped('FAILING and not named in waiting.json', unexplained).join('\n')}\n`);
+      const ordered = [...diagnostics].sort((a, b) => Number(unexplained.includes(b.split(': ')[0])) - Number(unexplained.includes(a.split(': ')[0])));
+      for (const line of ordered.slice(0, MAX_DIAGNOSTICS)) process.stderr.write(`${line}\n`);
+      if (ordered.length > MAX_DIAGNOSTICS) process.stderr.write(`... ${ordered.length - MAX_DIAGNOSTICS} further failing checks\n`);
       process.stderr.write(`${failing.length} failing scenarios, by what they wait on:\n`);
       for (const [label, scenarios] of Object.entries(waits)) {
         for (const line of wrapped(label, scenarios)) process.stderr.write(`${line}\n`);
       }
       if (skipped.length > 0) process.stderr.write(`${wrapped('skipped by the suite', skipped).join('\n')}\n`);
       if (stale.length > 0) process.stderr.write(`${wrapped('named as waiting but not failing', stale).join('\n')}\n`);
-      return 1;
-    }
-    if (stale.length > 0) {
-      process.stderr.write(`named as waiting but not failing: ${stale.join(', ')}\n`);
-      return 1;
+      if (unnamed.length > 0) process.stderr.write(`${wrapped('named as waiting without an issue or a pull request', unnamed).join('\n')}\n`);
+      if (!matchesWaiting) {
+        process.stderr.write(`the failing scenarios are not the ones ${waitingFile} names\n`);
+        return 1;
+      }
+      // The failures are exactly the listed ones: not a pass of those scenarios, but
+      // the state this pull request is in until the pull requests they wait on land.
+      process.stderr.write('the failing scenarios are exactly the ones waiting.json names; they are failures and are counted as such\n');
     }
     if (unexpected.length > 0) throw new Unavailable(`the suite ran scenarios outside the frozen requirements: ${unexpected.join(', ')}`);
-    // Every scenario passed, so a non-zero exit is the runner disagreeing with its own check files.
-    if (suite.code !== 0) throw new Unavailable(`the suite exited ${suite.code} with every scenario passing: ${suite.stderr}`);
+    // Nothing failed, so a non-zero exit is the runner disagreeing with its own check files.
+    if (failing.length === 0 && suite.code !== 0) throw new Unavailable(`the suite exited ${suite.code} with every scenario passing: ${suite.stderr}`);
     return 0;
   } finally {
     if (relay) await relay.close();

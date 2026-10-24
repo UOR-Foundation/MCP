@@ -164,18 +164,10 @@ jobs:
         run: |
           . .github/lexlean-ci/lib.sh
           gate "cargo deny" cargo deny --all-features check
-      - name: 5a. node satisfies the conformance suite
+      - name: 6. cargo test, as the SDK gate runs it (no installed conformance suite)
         run: |
           . .github/lexlean-ci/lib.sh
-          gate "node version" check_node
-      - name: 5b. Install the pinned conformance suite for the oracle tests
-        run: |
-          . .github/lexlean-ci/lib.sh
-          gate "install the conformance suite" install_suite "$RUNNER_TEMP/suite"
-      - name: 6. cargo test
-        run: |
-          . .github/lexlean-ci/lib.sh
-          gate "cargo test" cargo test --workspace --locked --no-fail-fast
+          gate "cargo test" env -u MCP_CONFORMANCE_SUITE_ROOT cargo test --workspace --locked --no-fail-fast
 
   lexlean:
     name: lexlean / ${{ matrix.label }}
@@ -333,6 +325,10 @@ jobs:
         run: |
           . .github/lexlean-ci/lib.sh
           gate "oracle tests" node --test conformance/oracle/test/*.test.mjs
+      - name: 8d. the oracle tests the workspace gate ignores
+        run: |
+          . .github/lexlean-ci/lib.sh
+          gate "oracle tests (cargo test -- --ignored)" run_oracle_tests
       - name: 9a. server suite over the served build
         id: suite
         run: |

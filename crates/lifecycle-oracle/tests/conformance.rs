@@ -5,9 +5,14 @@
 //! served build: the declaration, the vectors, the pins, the verdict logic, the
 //! schema oracle and the record of the core.
 //!
-//! The node tests need `node` and the installed suite (`conformance/oracle/fetch-suite.sh
-//! DIR`, then `MCP_CONFORMANCE_SUITE_ROOT=DIR`). A missing tool is a failure, never a
-//! skip.
+//! The tests that run a node oracle, or read the installed suite, are ignored in the
+//! workspace gate (`cargo test --workspace`, which `just vv` runs inside the locked SDK
+//! image, with neither node nor the suite: R6 forbids fetching it there). The
+//! `conformance` job runs them with `--ignored` after installing the pinned suite
+//! (`conformance/oracle/fetch-suite.sh DIR`, then `MCP_CONFORMANCE_SUITE_ROOT=DIR`), and
+//! fails unless as many passed as are ignored (`run_oracle_tests` in
+//! `.github/lexlean-ci/lib.sh`). A missing tool is a failure there, never a skip. CF-08
+//! keeps the split honest.
 
 mod common;
 
@@ -213,7 +218,8 @@ fn the_vectors_of_the_declaration_are_the_core_packages_answers_cf_02() {
 }
 
 #[test]
-fn the_server_suite_verdict_is_read_from_the_per_scenario_checks_cf_03() {
+#[ignore = "runs in the conformance job with node and the pinned suite, not in the workspace gate"]
+fn the_verdict_and_recorder_node_tests_pass_cf_03() {
     node_tests(
         &[
             "conformance/oracle/test/verdict.test.mjs",
@@ -221,7 +227,10 @@ fn the_server_suite_verdict_is_read_from_the_per_scenario_checks_cf_03() {
         ],
         false,
     );
+}
 
+#[test]
+fn the_server_suite_verdict_is_read_from_the_per_scenario_checks_cf_03() {
     // The scenarios the oracle holds the build to are the frozen requirements': 37
     // required and 13 not scored.
     let (required, unscored) = server_scenarios();
@@ -276,11 +285,35 @@ fn the_server_suite_verdict_is_read_from_the_per_scenario_checks_cf_03() {
             .all(|name| waiting["suite_skipped"].get(name).is_none()),
         "a scenario is waiting or skipped by the suite, not both"
     );
+    // The gate of the job: every waiting entry names its issue and its pull request, and
+    // the job passes only when the failing scenarios are exactly these.
+    for (name, entry) in waiting["waiting"].as_object().expect("waiting") {
+        let issue = entry["issue"].as_u64().expect("an issue number");
+        let expected = if name.starts_with("tasks-") { 12 } else { 10 };
+        assert_eq!(issue, expected, "{name} names the issue that delivers it");
+    }
+    let verdict = read("conformance/oracle/verdict.mjs");
+    for needle in ["matchesWaiting", "unexplained", "stale", "unnamed"] {
+        assert!(
+            verdict.contains(needle),
+            "the verdict logic does not decide {needle}"
+        );
+    }
+    let suite = read("conformance/oracle/server-suite.mjs");
+    assert!(
+        suite.contains("if (!matchesWaiting)"),
+        "the exit status is the gate of the waiting list"
+    );
+}
+
+#[test]
+#[ignore = "runs in the conformance job with node and the pinned suite, not in the workspace gate"]
+fn the_schema_oracle_node_tests_pass_cf_04() {
+    node_tests(&["conformance/oracle/test/schema-oracle.test.mjs"], true);
 }
 
 #[test]
 fn the_recorded_transcripts_validate_against_the_pinned_schema_cf_04() {
-    node_tests(&["conformance/oracle/test/schema-oracle.test.mjs"], true);
     // The oracle reads the schema the authority records.
     let schema = root().join(format!(
         "crates/lifecycle-oracle/suite/mcp-spec-{SPEC_PIN}/schema/2026-07-28/schema.json"
@@ -300,10 +333,16 @@ fn the_recorded_transcripts_validate_against_the_pinned_schema_cf_04() {
 }
 
 #[test]
-fn a_planted_defect_fails_the_run_with_the_suites_diagnostic_cf_05() {
-    // The verdict logic names the scenario and the check for every failure, and a
-    // scenario without a passing check is not a pass; these are the node tests.
+#[ignore = "runs in the conformance job with node and the pinned suite, not in the workspace gate"]
+fn the_verdict_logic_refuses_a_planted_defect_cf_05() {
+    // The verdict logic names the scenario and the check for every failure, a scenario
+    // without a passing check is not a pass, and a listed scenario that passes or an
+    // unlisted one that fails fails the run: these are the node tests.
     node_tests(&["conformance/oracle/test/verdict.test.mjs"], false);
+}
+
+#[test]
+fn a_planted_defect_fails_the_run_with_the_suites_diagnostic_cf_05() {
     // The defect that was planted, and the diagnostic the suite gave, are recorded
     // with the commands that reproduce them.
     let record = read("CONFORMANCE-RUN.md");
@@ -311,6 +350,8 @@ fn a_planted_defect_fails_the_run_with_the_suites_diagnostic_cf_05() {
         "## Planted defects",
         "tools-call-simple-text",
         "content array is empty",
+        "FAILING and not named in waiting.json",
+        "named as waiting but not failing",
     ] {
         assert!(
             record.contains(needle),
@@ -397,7 +438,11 @@ fn the_core_artifact_is_recorded_by_digest_cf_06() {
     assert!(helpers.contains("conformance/oracle/identity.mjs"));
     assert!(helpers.contains("--check conformance/core-identity.json"));
     assert!(ci.contains("check_core_identity"));
+}
 
+#[test]
+#[ignore = "runs in the conformance job with node and the pinned suite, not in the workspace gate"]
+fn the_identity_checker_refuses_another_core_cf_06() {
     // The checker itself is exercised: a package that disagrees with the result is refused.
     let dir = std::env::temp_dir().join(format!("identity-{}", std::process::id()));
     std::fs::create_dir_all(dir.join("src")).expect("a scratch directory");
@@ -523,4 +568,170 @@ fn the_pins_of_the_oracle_run_agree_with_their_authority_records_cf_07() {
     );
     // CI compares the copies with the PrismPM files at the pinned revision.
     assert!(ci.contains("sdk_copies_agree"));
+}
+
+/// One test function of a source file: its name, the text of its attributes and of its
+/// body.
+struct TestFunction {
+    name: String,
+    attributes: String,
+    body: String,
+}
+
+/// The `#[test]` functions of a source file, at the top level.
+fn test_functions(source: &str) -> Vec<TestFunction> {
+    let mut found = Vec::new();
+    let mut attributes = String::new();
+    let mut lines = source.lines();
+    while let Some(line) = lines.next() {
+        if line.starts_with("#[") {
+            attributes.push_str(line);
+            attributes.push('\n');
+        } else if let Some(rest) = line.strip_prefix("fn ") {
+            let name = rest.split('(').next().unwrap_or_default().to_string();
+            let mut body = String::from(line);
+            for next in lines.by_ref() {
+                body.push('\n');
+                body.push_str(next);
+                if next == "}" {
+                    break;
+                }
+            }
+            if attributes.contains("#[test]") {
+                found.push(TestFunction {
+                    name,
+                    attributes: std::mem::take(&mut attributes),
+                    body,
+                });
+            }
+            attributes.clear();
+        } else if !line.starts_with("//") {
+            attributes.clear();
+        }
+    }
+    found
+}
+
+/// Whether a test body runs node or reads the installed suite. The needles are written
+/// in pieces so that this file does not match itself.
+fn needs_node_or_suite(body: &str) -> bool {
+    [
+        concat!("Command::new(", "\"node\")"),
+        concat!("node_", "tests("),
+        concat!("MCP_CONFORMANCE_", "SUITE_ROOT"),
+    ]
+    .iter()
+    .any(|needle| body.contains(needle))
+}
+
+/// What the workspace gate refuses in a test source: a test that needs node or the
+/// installed suite and is not ignored for the conformance job, and an ignored test
+/// whose reason does not name that job.
+fn split_refusals(file: &str, source: &str) -> Vec<String> {
+    let mut refusals = Vec::new();
+    for test in test_functions(source) {
+        let ignored = test.attributes.contains("#[ignore");
+        let needs_node = needs_node_or_suite(&test.body);
+        if needs_node && !ignored {
+            refusals.push(format!(
+                "{file}: {} needs node or the installed suite and is not ignored: the workspace gate runs without them",
+                test.name
+            ));
+        }
+        if needs_node && ignored && !test.attributes.contains("conformance job") {
+            refusals.push(format!(
+                "{file}: {} is ignored without naming the conformance job that runs it",
+                test.name
+            ));
+        }
+    }
+    refusals
+}
+
+#[test]
+fn the_workspace_gate_needs_neither_node_nor_the_suite_and_the_job_runs_the_rest_cf_08() {
+    // The negative cases: the split refuses both ways it can be broken.
+    let call = concat!("node_", "tests(&[\"x\"], true);");
+    let source = |attributes: &str| {
+        format!("#[test]\n{attributes}fn drives_the_oracle_cf_99() {{\n    {call}\n}}\n")
+    };
+    let unignored = source("");
+    let unnamed = source("#[ignore = \"slow\"]\n");
+    let honest = source("#[ignore = \"runs in the conformance job\"]\n");
+    assert_eq!(split_refusals("x.rs", &unignored).len(), 1);
+    assert!(split_refusals("x.rs", &unignored)[0].contains("needs node or the installed suite"));
+    assert_eq!(split_refusals("x.rs", &unnamed).len(), 1);
+    assert!(split_refusals("x.rs", &unnamed)[0].contains("without naming the conformance job"));
+    assert!(split_refusals("x.rs", &honest).is_empty());
+
+    // Every test source of the workspace obeys it, and the ignored tests are these.
+    let mut ignored = BTreeSet::new();
+    for entry in std::fs::read_dir(root().join("crates")).expect("crates") {
+        let tests = entry.expect("a crate").path().join("tests");
+        let Ok(files) = std::fs::read_dir(&tests) else {
+            continue;
+        };
+        for file in files {
+            let path = file.expect("a test source").path();
+            if path.extension().is_none_or(|extension| extension != "rs") {
+                continue;
+            }
+            let source = std::fs::read_to_string(&path).expect("a test source reads");
+            let name = path.strip_prefix(root()).expect("under the root");
+            let refusals = split_refusals(&name.display().to_string(), &source);
+            assert!(refusals.is_empty(), "{}", refusals.join("\n"));
+            for test in test_functions(&source) {
+                let needs_node = needs_node_or_suite(&test.body);
+                if test.attributes.contains("#[ignore") && needs_node {
+                    ignored.insert(format!("{}::{}", name.display(), test.name));
+                }
+            }
+        }
+    }
+    let expected: BTreeSet<String> = [
+        "the_verdict_and_recorder_node_tests_pass_cf_03",
+        "the_schema_oracle_node_tests_pass_cf_04",
+        "the_verdict_logic_refuses_a_planted_defect_cf_05",
+        "the_identity_checker_refuses_another_core_cf_06",
+    ]
+    .iter()
+    .map(|name| format!("crates/lifecycle-oracle/tests/conformance.rs::{name}"))
+    .collect();
+    assert_eq!(
+        ignored, expected,
+        "the tests ignored in the workspace are the oracle tests the conformance job runs"
+    );
+
+    // The conformance job runs exactly these, with --ignored, and requires as many
+    // passes as there are ignored tests; a run that ran none is not green.
+    let helpers = read(".github/lexlean-ci/lib.sh");
+    let ci = read(".github/workflows/lexlean.yml");
+    let start = helpers
+        .find("run_oracle_tests() {")
+        .expect("run_oracle_tests is defined");
+    let function = &helpers[start
+        ..helpers[start..]
+            .find("\n}\n")
+            .map_or(helpers.len(), |n| start + n)];
+    for needle in [
+        "--test conformance",
+        "-- --ignored",
+        concat!("MCP_CONFORMANCE_", "SUITE_ROOT:?"),
+        "grep -c",
+        "ignored tests, expected",
+    ] {
+        assert!(
+            function.contains(needle),
+            "run_oracle_tests does not contain {needle:?}"
+        );
+    }
+    assert!(
+        ci.contains("run_oracle_tests"),
+        "a job runs the oracle tests"
+    );
+    // The cargo job is the workspace gate: it installs no suite and sets no root.
+    let cargo_job = &ci[ci.find("  cargo:").expect("the cargo job")
+        ..ci.find("  lexlean:").expect("the lexlean job")];
+    assert!(!cargo_job.contains("install_suite"));
+    assert!(!cargo_job.contains("run_oracle_tests"));
 }

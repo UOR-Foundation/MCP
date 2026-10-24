@@ -47,9 +47,19 @@ node conformance/oracle/identity.mjs --result production-result.json --lock lexl
     --reference crates/lifecycle-oracle/generated/mcp_lifecycle/provenance.json --check conformance/core-identity.json
 ```
 
-The `conformance` job of `.github/workflows/lexlean.yml` runs these steps. The cargo job
-installs the same suite so that the node tests behind CF-03 to CF-05 run in `cargo test`;
-they fail, and do not skip, when `node` or the suite is missing.
+The `conformance` job of `.github/workflows/lexlean.yml` runs these steps, and
+`MCP_CONFORMANCE_SUITE_ROOT="$SUITE" cargo test -p lifecycle-oracle --test conformance -- --ignored`
+before the server suite.
+
+**The workspace gate does not run the node oracles.** `just vv` runs `cargo test --workspace` in
+the locked SDK image, where the pinned suite is not installed (R6 forbids fetching it there). The
+tests behind CF-03 to CF-06 that run a node program, or read the installed suite, are therefore
+`#[ignore]`d with a reason that names the conformance job, and the pure-Rust checks of the same
+claims (the declaration, the vectors, the waiting list, the digests, the pins and the authorities)
+stay in the gate. The job runs the ignored tests with `--ignored` (`run_oracle_tests`) and is green
+only when as many passed as `conformance.rs` ignores; a run that selected none, or skipped some,
+fails. CF-08 refuses a test that needs node or the suite without the ignore, an ignore without
+that reason, an ignored test the job does not run, and a job that does not require the count.
 
 ## The verdict
 
@@ -62,10 +72,17 @@ the runner refuses any other file) and decides:
 * a scenario passes when it produced a check, no check failed, and at least one succeeded;
 * a scenario with no checks, or whose checks are all skipped or warnings, is a failure;
 * every failing check is reported as `scenario: check id: message`, the suite's own text;
-* the run fails (exit 1) while any scenario fails; the last lines of the diagnostic group the
-  failing scenarios by the pull request that is to deliver what they need, from
-  `conformance/waiting.json`. That file classifies; it never turns a failure into a pass, and
-  a scenario in it that does not fail makes the run fail.
+* the job passes (exit 0) only when the set of failing scenarios equals the set
+  `conformance/waiting.json` lists as waiting, each entry naming its issue and pull request
+  (MCP#10 and #30, MCP#12 and #32). A failing scenario that is not listed fails the job
+  (`FAILING and not named in waiting.json`, printed first); a listed scenario that does not
+  fail fails the job (`named as waiting but not failing`); an entry that names neither an issue
+  nor a pull request fails the job. The last lines of the diagnostic group the failing scenarios
+  by the pull request that is to deliver what they need.
+* a waiting scenario is still a failure: it is `fail` in the table and in `report.json`, which says
+  `valid: false`, the step summary groups it under the pull request it waits on, and the scenarios
+  passing are counted without it (27 of 37 required today). The list classifies; it never turns a
+  failure into a pass, and it is shortened in the pull request that delivers a scenario.
 
 One scenario cannot pass on any server at this pin: `tasks-status-notifications` sends no
 request and reports one `SKIPPED` check (`src/scenarios/server/tasks/notifications.ts`, pending a

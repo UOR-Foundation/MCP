@@ -375,6 +375,34 @@ install_suite() {
   echo "MCP_CONFORMANCE_SUITE_ROOT=$dir" >>"${GITHUB_ENV:-/dev/null}"
 }
 
+# run_oracle_tests: the tests of the workspace that run a node oracle or read the
+# installed suite. The workspace gate (`cargo test --workspace`, and `just vv` in the
+# locked SDK image) has neither node nor the suite and ignores them; this runs exactly
+# those with --ignored, and is green only when as many passed as the source ignores. A
+# run that selected none, or that skipped some, is not green.
+run_oracle_tests() {
+  local file=crates/lifecycle-oracle/tests/conformance.rs log expected passed status
+  : "${MCP_CONFORMANCE_SUITE_ROOT:?the installed conformance suite (install_suite)}"
+  expected=$(grep -c '^#\[ignore' "$file" || true)
+  if ((expected == 0)); then
+    echo "$file ignores no test; the oracle tests are not where the job expects them" >&2
+    return 1
+  fi
+  log=$(mktemp)
+  status=0
+  cargo test --locked -p lifecycle-oracle --test conformance -- --ignored >"$log" 2>&1 || status=$?
+  cat "$log"
+  if ((status != 0)); then
+    return "$status"
+  fi
+  passed=$(sed -n 's/^test result: ok\. \([0-9][0-9]*\) passed; 0 failed.*/\1/p' "$log")
+  if [[ $passed != "$expected" ]]; then
+    echo "${passed:-0} passed of the ignored tests, expected $expected" >&2
+    return 1
+  fi
+  echo "the $expected ignored oracle tests ran and passed"
+}
+
 # build_conformance: `prismpm build` of the conformance server application, then the
 # three generated packages laid beside the binding crate and the compiler's record
 # of the export beside the build. The build id is the step output `build`.
@@ -444,7 +472,9 @@ conformance_summary() {
     const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
     const lines = ["| kind | scenario | status | checks passed | other |", "|---|---|---|---|---|"];
     for (const s of r.scenarios) lines.push(`| ${s.kind} | ${s.scenario} | ${s.status} | ${s.passed}/${s.checks} | ${Object.entries(s.other).map(([k, v]) => k + " " + v).join(", ")} |`);
-    lines.push("", `required ${r.required.passing}/${r.required.scenarios}, not scored ${r.not_scored.passing}/${r.not_scored.scenarios}`);
+    lines.push("", `required ${r.required.passing}/${r.required.scenarios} pass, not scored ${r.not_scored.passing}/${r.not_scored.scenarios} pass`);
+    lines.push("", `${r.failing.length} scenarios FAIL (valid: ${r.valid}); the job gate, failing = waiting.json exactly: ${r.matches_waiting}. Waiting scenarios are failures, never passes.`);
+    for (const [label, names] of [["failing and not named in waiting.json", r.unexplained], ["named as waiting but not failing", r.stale_waiting], ["skipped by the suite, not passing", r.skipped_by_the_suite]]) if (names.length) lines.push("", `${label}: ${names.join(", ")}`);
     for (const [label, names] of Object.entries(r.waits)) lines.push("", `${label}: ${names.join(", ")}`);
     console.log(lines.join("\n"));
   ' "$report" | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"

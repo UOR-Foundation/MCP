@@ -18,7 +18,7 @@ Feature: Conformance build and oracle run
   Scenario: The suite's server runner is run against the served build and the verdict is read from its per-scenario checks.
     Given the frozen requirements for 2026-07-28 with 37 required and 13 not-scored server scenarios and a served conformance build
     When the verdict logic reads the checks of every scenario
-    Then each scenario is passing only with a passing check and no failing check, and each other scenario is named with the suite's diagnostic
+    Then each scenario is passing only with a passing check and no failing check, each other scenario is named with the suite's diagnostic, and the job passes only when the failing scenarios are exactly those conformance/waiting.json lists with their issue or pull request, the listed ones still counted as failures
 
   @CF-04 @build
   Scenario: The recorded transcripts validate against the pinned schema.
@@ -30,7 +30,7 @@ Feature: Conformance build and oracle run
   Scenario: A planted defect fails the run with the suite's diagnostic.
     Given checks of a run in which tools-list reports a failing check and a scenario produced no checks
     When the verdict logic reads them
-    Then the run is not valid, it names tools-list with the check id and message and the empty scenario, and exits 1
+    Then the run is not valid, it names tools-list with the check id and message and the empty scenario, and exits 1, and so does a listed scenario that passes
 
   @CF-06 @build
   Scenario: The core artifact is recorded by digest and a rebuild reproduces the record.
@@ -43,3 +43,9 @@ Feature: Conformance build and oracle run
     Given .github/prismpm.rev, the suite pin of the fetch script, the oracle's frozen requirements digest and the vendored requirements file
     When each pin is compared with the authority records
     Then they agree and the scenario sets are 37 required and 13 not-scored server scenarios
+
+  @CF-08 @build
+  Scenario: The workspace test gate needs neither node nor the installed suite, and the conformance job runs the tests that do.
+    Given the tests of the workspace, the ignore reasons of those that run a node oracle or read the installed suite, and the conformance job
+    When the sources of the tests and of the job are read
+    Then every such test is ignored with a reason that names the conformance job, no other test is ignored, the job runs them with --ignored and requires as many passes as there are ignored tests, and an unignored test that runs node or reads the suite is refused
