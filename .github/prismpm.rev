@@ -1,0 +1,17 @@
+# The PrismPM revision `prismpm build` is made by in .github/workflows/lexlean.yml,
+# the only place it is written (AGENTS.md R1), like .github/lexlean.rev. The
+# workflow builds `prismpm` at this commit (`cargo install --git ... --rev ... --locked`
+# from the PrismPM workspace's binary crate) and builds the conformance server
+# application with it (conformance/, prismpm.toml).
+#
+# The pin moves to the PrismPM SDK release before MCP v0.1.0.
+#
+# Currently: the branch claude/lexlean-mcp-conformance-compiler of
+# UOR-Foundation/PrismPM at 898af195, which is PrismPM#339 at its head f5927bf46b92
+# (the `ServerApplication` model, the server build and the host packages) with one
+# change: vendor/lexlean is release/v0.4 at 9796067 instead of cee0fbade. The
+# vendored cee0fbade cannot read this repository's sources (LLP2001 on `term_cases`,
+# src/Json.lex.tex:230); 9796067 reads them, and lexlean.conformance.lock is made by
+# it. Move this line to #339's head, or to the SDK release, once its vendored LexLean
+# reads these sources.
+rev = 898af195bc611aff8e1c5ea37503ec39bc2d1f37

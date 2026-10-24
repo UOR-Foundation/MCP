@@ -273,13 +273,17 @@ prismpm_installed_at() {
 
 # install_prismpm: build `prismpm` at the pinned revision from the PrismPM
 # workspace's binary crate, unless $PRISMPM_ROOT already holds exactly that revision.
+# The build is the debug profile: PrismPM's release profile (thin LTO, one codegen
+# unit) is killed for memory on the 7 GB runners and on the machines this was
+# developed on, and `prismpm build` spends its time in the LexLean checker, which
+# the debug profile of the binary does not change.
 install_prismpm() {
   local rev
   rev=$(prismpm_rev)
   if ! prismpm_installed_at "$rev"; then
     rm -rf "$PRISMPM_ROOT"
     cargo install --git https://github.com/UOR-Foundation/PrismPM \
-      --rev "$rev" --locked --root "$PRISMPM_ROOT" prismpm
+      --rev "$rev" --locked --debug --root "$PRISMPM_ROOT" prismpm
   fi
   prismpm_installed_at "$rev"
   echo "$PRISMPM_ROOT/bin" >>"${GITHUB_PATH:-/dev/null}"
