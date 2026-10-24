@@ -236,3 +236,82 @@ export_matches() {
   done <<<"$exported"
   return "$status"
 }
+
+# prismpm_rev: the revision .github/prismpm.rev names, or an error.
+prismpm_rev() {
+  local file=.github/prismpm.rev matches rev
+  matches=$(grep -c '^rev = ' "$file") || true
+  if [[ $matches != 1 ]]; then
+    echo "$file must hold exactly one 'rev = ' line, found $matches" >&2
+    return 1
+  fi
+  rev=$(sed -n 's/^rev = \([0-9a-f]\{40\}\)$/\1/p' "$file")
+  if [[ -z $rev ]]; then
+    echo "$file: rev must be a 40-digit lowercase commit hash" >&2
+    return 1
+  fi
+  printf '%s\n' "$rev"
+}
+
+# The root the workflow caches the SDK binary in.
+PRISMPM_ROOT=${PRISMPM_ROOT:-$HOME/.prismpm-bin}
+
+# output_prismpm_pin: the pinned PrismPM revision as the step output `rev`, the
+# key of the cache that holds the binary built from it.
+output_prismpm_pin() {
+  local rev
+  rev=$(prismpm_rev)
+  echo "rev=$rev" >>"${GITHUB_OUTPUT:?}"
+}
+
+# prismpm_installed_at REV: cargo's own record says $PRISMPM_ROOT was built from
+# exactly REV, so a cache restored for another key cannot pass.
+prismpm_installed_at() {
+  grep -qF "UOR-Foundation/PrismPM?rev=$1#$1)" "$PRISMPM_ROOT/.crates.toml" 2>/dev/null &&
+    test -x "$PRISMPM_ROOT/bin/prismpm"
+}
+
+# install_prismpm: build `prismpm` at the pinned revision from the PrismPM
+# workspace's binary crate, unless $PRISMPM_ROOT already holds exactly that revision.
+install_prismpm() {
+  local rev
+  rev=$(prismpm_rev)
+  if ! prismpm_installed_at "$rev"; then
+    rm -rf "$PRISMPM_ROOT"
+    cargo install --git https://github.com/UOR-Foundation/PrismPM \
+      --rev "$rev" --locked --root "$PRISMPM_ROOT" prismpm
+  fi
+  prismpm_installed_at "$rev"
+  echo "$PRISMPM_ROOT/bin" >>"${GITHUB_PATH:-/dev/null}"
+  "$PRISMPM_ROOT/bin/prismpm" --version
+}
+
+# sdk_copies_agree: the files this repository copies from the PrismPM standard
+# library and lexicon, `Foundation.Bytes`, `Foundation.Server.V1.Model` and the
+# `prism.arch` lexicon package, are byte for byte the ones at the pinned revision.
+sdk_copies_agree() {
+  local rev scratch status=0 file
+  rev=$(prismpm_rev)
+  scratch=$(mktemp -d)
+  git -C "$scratch" init -q
+  git -C "$scratch" remote add origin https://github.com/UOR-Foundation/PrismPM
+  git -C "$scratch" sparse-checkout set stdlib/src/Foundation language/prism.arch
+  git -C "$scratch" fetch -q --depth 1 --filter=blob:none origin "$rev"
+  git -C "$scratch" checkout -q FETCH_HEAD
+  for file in conformance/src/Foundation/Bytes.lex.tex conformance/src/Foundation/Server/V1/Model.lex.tex; do
+    if cmp -s "$file" "$scratch/stdlib/src/${file#conformance/src/}"; then
+      echo "$file equals the standard library's"
+    else
+      echo "$file differs from stdlib/src/${file#conformance/src/} at $rev" >&2
+      status=1
+    fi
+  done
+  if diff -rq language/prism.arch "$scratch/language/prism.arch"; then
+    echo "language/prism.arch equals the SDK's"
+  else
+    echo "language/prism.arch differs from the SDK's at $rev" >&2
+    status=1
+  fi
+  rm -rf "$scratch"
+  return "$status"
+}
