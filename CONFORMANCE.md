@@ -18,6 +18,18 @@ The three honesty levels (R2):
 `cargo xtask audit-limits` fails if any code path returns an error the
 model does not sanction.
 
+## conformance
+
+| ID | Level | Statement |
+| --- | --- | --- |
+| `CF-01` | `build` | The conformance build is a PrismPM server application declared in this repository: its core is the unchanged production root UorMcp.Fixture.fixtureRun, its one host effect is the tool-call counter that fills the tool-call section of the request frame, its listener is bound to 127.0.0.1, and its binding crate answers each client's count of tools/call requests in the current window, not counting the request being served. |
+| `CF-02` | `build` | Every acceptance vector and every served vector of the declaration is the committed core package's own answer to the request it holds, byte for byte, as the HTTP adapter frames the request and serializes the answer, so the declaration cannot disagree with the core it names. |
+| `CF-03` | `build` | The pinned conformance suite's server runner, at specification revision 2026-07-28 with the frozen requirements file, is run over loopback against the served conformance build and its verdict is read from the per-scenario checks: each of the 37 required and the 13 not-scored server scenarios is listed with its checks, and a scenario that produced no check, no passing check or any failing check is reported by name with the suite's own diagnostic. |
+| `CF-04` | `build` | Every JSON-RPC message of the transcripts recorded during that run, each request, each result, each error and each event of a stream, validates against the pinned 2026-07-28 schema.json, a response against the definition of the request it answers, and a body that is not a JSON-RPC message is a failure and not a skipped message. |
+| `CF-05` | `build` | A defect planted in the core makes the oracle run fail with the suite's own diagnostic: the verdict logic names the failing scenario and check, and a run whose scenario produced no checks or only skipped ones is not a pass. |
+| `CF-06` | `build` | The core artifact the conformance build produced is recorded by digest: the exported package's name, version and file digests, the source and semantic IDs it was exported from and the compiler that exported it, in a record that a rebuild must reproduce, so a consumer can check that it links the same core. |
+| `CF-07` | `build` | Each pin of the oracle run is written once and agrees with the authority record that names it: the PrismPM revision, the conformance suite commit, the SHA-256 of the frozen requirements file and the scenario sets it lists, and the specification schema's digest. |
+
 ## http-headers
 
 | ID | Level | Statement |
