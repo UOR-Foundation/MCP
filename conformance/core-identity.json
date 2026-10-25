@@ -36,7 +36,7 @@
   "source": {
     "source_id": "aa68216a57ab613ea8f63d65f88bbe1cafd4045e465eb37f8b873e77227d2f20",
     "semantic_id": "e0799f08bea0d9675c3bf58d4429ecb771e37899d6c3bfbef7d57d973681e0c3",
-    "lock_sha256": "ae9ee438c5e3b36c75a010d3dcf641fbd1a14880f7b6fab104a199ec52fc6a78"
+    "lock_sha256": "3f13daf79a84ac44a911acc4b2d2adffa6f067cb6e0c6d90aa77167abc3ec502"
   },
   "compiler": {
     "lean_toolchain": "leanprover/lean4:v4.32.1",
