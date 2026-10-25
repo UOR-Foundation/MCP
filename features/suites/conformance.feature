@@ -3,16 +3,16 @@ Feature: Conformance build and oracle run
   The conformance build serves the unchanged LexLean core, with the suite's fixture provider, over loopback HTTP through the generated PrismPM host adapter, and the pinned MCP conformance suite and the pinned 2026-07-28 schema decide whether it conforms. The verdict is the oracles', never this repository's.
 
   @CF-01 @build
-  Scenario: The conformance build is a PrismPM server application whose core is the unchanged fixture root, whose only host effect is the tool-call counter, and whose listener is loopback.
-    Given the declaration conformance/src/Application.lex.tex, the fixture root in src/Fixture.lex.tex, the consumer workspace conformance/Cargo.toml and the binding crate
+  Scenario: The conformance build is a PrismPM server application whose core is the step serve over the fixture provider, whose host effects fill the request frame with the tool-call count, the clock, a task identifier and the task table and receive the table the core stores, and whose listener is loopback.
+    Given the declaration conformance/src/Application.lex.tex, the conformance root in src/ConformanceFixture.lex.tex, the consumer workspace conformance/Cargo.toml and the binding crate
     When the declaration is read
-    Then the core root is UorMcp.Fixture.fixtureRun with its production clause, the frame section tool_calls reads the result field calls of the effect tool.calls, the address is 127.0.0.1, the workspace lists exactly the generated packages and the binding, and the binding answers the count before the request it serves
+    Then the core root is UorMcp.ConformanceFixture.conformanceRun with its production clause, the frame sections read the result fields of the effects tool.calls, clock.now, task.id and task.table, the address is 127.0.0.1, the workspace lists exactly the generated packages and the binding, and the binding answers the count before the request it serves
 
   @CF-02 @build
   Scenario: The vectors of the declaration are the committed core package's own answers.
     Given the requests the declaration names, taken from the pinned scenarios' vectors
     When the committed package answers each as the adapter frames it
-    Then the acceptance and served vectors of the declaration equal the regenerated ones byte for byte
+    Then the acceptance and served vectors of the declaration equal the regenerated ones byte for byte and the transcripts hold the store of the task table
 
   @CF-03 @build
   Scenario: The suite's server runner is run against the served build and the verdict is read from its per-scenario checks.

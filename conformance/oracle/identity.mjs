@@ -2,16 +2,16 @@
 // The identity of the conformance core, the artifact the oracle runs measure.
 //
 // The core is the package `mcp_conformance_core` that `prismpm build` generates from
-// `UorMcp.Fixture.fixtureRun`. Its identity is the digest of its compiled program,
+// `UorMcp.ConformanceFixture.conformanceRun`. Its identity is the digest of its compiled program,
 // which does not depend on the compiler that built it, together with the files of the
 // package, the sources and lock it was built from and the compiler that built it. This
 // reads the compiler's record of the export (`production-result.json`), checks it
 // against the package on disk, the lock and the committed export of the same core
-// (`mcp_lifecycle`), and writes or checks conformance/core-identity.json, which
+// (`mcp_conformance`), and writes or checks conformance/core-identity.json, which
 // lexlean-mcp checks.
 //
 // usage: identity.mjs --result production-result.json --lock lexlean.conformance.lock
-//          --package DIR --reference mcp_lifecycle/provenance.json (--write FILE | --check FILE)
+//          --package DIR --reference mcp_conformance/provenance.json (--write FILE | --check FILE)
 //
 // Exit 0: the record was written, or equals the one computed. Exit 1: the record
 // differs, or the inputs disagree with each other (the diagnostic names each
@@ -21,7 +21,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const SPEC = 'mcp-conformance/core-identity/1';
-const ROOT = 'UorMcp.Fixture.fixtureRun';
+const ROOT = 'UorMcp.ConformanceFixture.conformanceRun';
 const PACKAGE = 'mcp_conformance_core';
 
 export class Disagree extends Error {}

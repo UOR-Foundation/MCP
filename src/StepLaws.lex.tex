@@ -326,7 +326,12 @@ theorem{
 
 theorem{
   name: the_byte_serve_answers_an_effect_request_with_the_internal_error,
-  parameters: [host : Tasks::TaskHost, accepts : Bool, ident : JsonRpc::RequestId, request : HostEffect::EffectRequest],
+  parameters: [
+    host : Tasks::TaskHost,
+    accepts : Bool,
+    ident : JsonRpc::RequestId,
+    request : HostEffect::EffectRequest
+  ],
   statement: ((Serve::respond host accepts (record Dispatch::Handled {id := ident, outcome := (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.effectRequested request)))})) = (Serve::jsonResponse 500 (RpcWire::errorResponse (ctor Option.some [JsonRpc::RequestId] ident) (record JsonRpc::ErrorObject {code := (-32603 : Int), message := "Internal error", data := (ctor Option.none [Json::Json])})))),
   proof: reflexivity{},
   axioms: [Classical.choice, Quot.sound, propext]

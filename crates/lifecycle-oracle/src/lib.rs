@@ -85,6 +85,29 @@ mod crowd;
 #[path = "../generated/mcp_step/src/lib.rs"]
 mod step;
 
+// The fourth root, the conformance build's core: the step serve over the conformance
+// fixture, which asks the host to store the task table (`CONFORMANCE-RUN.md`).
+#[allow(
+    dead_code,
+    unused,
+    missing_docs,
+    clippy::type_complexity,
+    clippy::too_many_arguments,
+    clippy::large_enum_variant,
+    clippy::result_large_err,
+    clippy::result_unit_err,
+    clippy::single_match,
+    clippy::manual_unwrap_or,
+    clippy::manual_unwrap_or_default,
+    clippy::manual_map,
+    clippy::manual_ok_err,
+    clippy::collapsible_match,
+    clippy::infallible_destructuring_match
+)]
+#[rustfmt::skip]
+#[path = "../generated/mcp_conformance/src/lib.rs"]
+mod conformance;
+
 /// The text of the generated package this crate compiled, so a test can hash the
 /// file the oracle ran against the digest the export recorded.
 pub const GENERATED_SOURCE: &str = include_str!("../generated/mcp_lifecycle/src/lib.rs");
@@ -94,6 +117,10 @@ pub const CROWD_SOURCE: &str = include_str!("../generated/mcp_crowd/src/lib.rs")
 
 /// The text of the third generated package, the root `UorMcp.StepFixture.stepFixtureRun`.
 pub const STEP_SOURCE: &str = include_str!("../generated/mcp_step/src/lib.rs");
+
+/// The text of the fourth generated package, the root
+/// `UorMcp.ConformanceFixture.conformanceRun`.
+pub const CONFORMANCE_SOURCE: &str = include_str!("../generated/mcp_conformance/src/lib.rs");
 
 /// The stack the root runs on: 2 MiB, which is the size Rust gives a spawned thread
 /// when nothing says otherwise. The export states no `recursion` effect and no
@@ -461,6 +488,36 @@ pub fn exchange_step(turn: &[u8]) -> Vec<u8> {
     exchange_step_on(turn, STACK_BYTES)
 }
 
+/// [`exchange_step_on`] for the fourth root, `UorMcp.ConformanceFixture.conformanceRun`:
+/// the root the conformance build serves.
+///
+/// # Panics
+///
+/// Panics when the realization reports an overflow, and aborts the process when the
+/// stack is too small for the turn.
+pub fn exchange_conformance_step_on(turn: &[u8], stack_bytes: usize) -> Vec<u8> {
+    let input = turn.to_vec();
+    let worker = std::thread::Builder::new()
+        .stack_size(stack_bytes)
+        .spawn(move || {
+            let mut list = conformance::run(conformance::Bytes::lit(&input))
+                .expect("the conformance root does not overflow on this input");
+            let mut out = Vec::new();
+            while let Some((head, tail)) = list.uncons() {
+                out.push(head);
+                list = tail;
+            }
+            out
+        })
+        .expect("a worker thread starts");
+    words_to_bytes(worker.join().expect("the conformance root did not panic"))
+}
+
+/// [`exchange_conformance_step_on`] on the default [`STACK_BYTES`] stack.
+pub fn exchange_conformance_step(turn: &[u8]) -> Vec<u8> {
+    exchange_conformance_step_on(turn, STACK_BYTES)
+}
+
 /// What a driver saw while it answered one request.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Driven {
@@ -493,6 +550,29 @@ pub enum DriveError {
 pub fn drive(
     request_frame: &[u8],
     budget: usize,
+    host: impl FnMut(u32, &[u8]) -> Vec<u8>,
+) -> Result<Driven, DriveError> {
+    drive_root(exchange_step, request_frame, budget, host)
+}
+
+/// [`drive`] over the conformance root, `UorMcp.ConformanceFixture.conformanceRun`.
+///
+/// # Errors
+///
+/// Returns [`DriveError`] when the root writes something that is not a step or asks for
+/// more than `budget` effects.
+pub fn drive_conformance(
+    request_frame: &[u8],
+    budget: usize,
+    host: impl FnMut(u32, &[u8]) -> Vec<u8>,
+) -> Result<Driven, DriveError> {
+    drive_root(exchange_conformance_step, request_frame, budget, host)
+}
+
+fn drive_root(
+    exchange: fn(&[u8]) -> Vec<u8>,
+    request_frame: &[u8],
+    budget: usize,
     mut host: impl FnMut(u32, &[u8]) -> Vec<u8>,
 ) -> Result<Driven, DriveError> {
     let mut completed: Vec<(u32, Vec<u8>)> = Vec::new();
@@ -500,7 +580,7 @@ pub fn drive(
     let mut turns = 0;
     loop {
         turns += 1;
-        let written = exchange_step(&encode_turn(request_frame, &completed));
+        let written = exchange(&encode_turn(request_frame, &completed));
         match decode_step(&written).map_err(DriveError::Step)? {
             Step::Done(response) => {
                 return Ok(Driven {

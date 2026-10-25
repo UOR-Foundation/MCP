@@ -177,7 +177,12 @@ definition{
 
 definition{
   name: performed,
-  parameters: [host : Tasks::TaskHost, accepts : Bool, handled : Dispatch::Handled, request : HostEffect::EffectRequest],
+  parameters: [
+    host : Tasks::TaskHost,
+    accepts : Bool,
+    handled : Dispatch::Handled,
+    request : HostEffect::EffectRequest
+  ],
   result: HostEffect::Step,
   body: (if (HostEffect::tagFits (project request tag)) then (ctor HostEffect::Step.perform request) else (ctor HostEffect::Step.done (Frame::writeResponse (Serve::respond host accepts (record Dispatch::Handled {id := (project handled id), outcome := (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (tagRefusal))}))))),
   axioms: [Classical.choice, Quot.sound, propext],
@@ -194,7 +199,12 @@ definition{
 
 definition{
   name: storing,
-  parameters: [info : Extension::ProviderInfo, stored : Bool, table : (List Nat), response : Http::HttpResponse],
+  parameters: [
+    info : Extension::ProviderInfo,
+    stored : Bool,
+    table : (List Nat),
+    response : Http::HttpResponse
+  ],
   result: HostEffect::Step,
   body: (if stored then (ctor HostEffect::Step.done (Frame::writeResponse (Serve::withoutTable response))) else (if (HostEffect::tagFits (project info taskStoreTag)) then (ctor HostEffect::Step.perform (storeRequest info table)) else (tagFault))),
   axioms: [Classical.choice, Quot.sound, propext],

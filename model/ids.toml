@@ -668,7 +668,7 @@ statement = "The task lifecycle is stated in kernel-checked theorems: a task in 
 id = "TK-15"
 level = "build"
 suite = "tasks"
-statement = "The core keeps no task state: the host supplies a clock, the identifier of a task the request may create and the task table with each request, and stores the table the response returns; a table that cannot be read, a host that supplies no identifier and a frame whose host section is cut or is not text are server errors (-32603 or the fixed internal body, HTTP 500) that leave the table as it was; the table is returned only when a task was created or touched."
+statement = "The core keeps no task state: the host supplies a clock, the identifier of a task the request may create and the task table with each request, and stores the table the response returns; a table that cannot be read, a host that supplies no identifier, a host that supplies the identifier of a task the table holds and a frame whose host section is cut or is not text are server errors (-32603 or the fixed internal body, HTTP 500) that leave the table as it was; the table is returned only when a task was created or touched."
 
 [[id]]
 id = "TK-16"
@@ -676,19 +676,25 @@ level = "build"
 suite = "tasks"
 statement = "The ten tasks scenarios at the pinned suite commit and the pinned ext-tasks commit are accounted for: every request they send is a step of vectors/tasks.json with its file and line, every check id they emit is covered or listed with its reason, the vendored files match the checksums the authorities record, and the requirements file runs the scenarios as extension scenarios that are not scored."
 
+[[id]]
+id = "TK-17"
+level = "build"
+suite = "tasks"
+statement = "The step serve writes the task table through one host effect and never in the response frame: a response that wrote a table is a perform of the store effect, under the tag the provider declares, whose payload is the table preceded by its length in four bytes; once the host's outcome of that effect is in the log, the response is written without the table; a response that wrote no table, a request that was refused and a request that fails a check ask for no effect; a tag that does not fit four bytes is not a perform. The byte serve still returns the table in its response frame."
+
 # The conformance build and the oracle run (issue #13): CF-01..CF-08.
 
 [[id]]
 id = "CF-01"
 level = "build"
 suite = "conformance"
-statement = "The conformance build is a PrismPM server application declared in this repository: its core is the unchanged production root UorMcp.Fixture.fixtureRun, its one host effect is the tool-call counter that fills the tool-call section of the request frame, its listener is bound to 127.0.0.1, and its binding crate answers each client's count of tools/call requests in the current window, not counting the request being served."
+statement = "The conformance build is a PrismPM server application declared in this repository: its core is the production root UorMcp.ConformanceFixture.conformanceRun, the step serve over the unchanged fixture provider; its host effects are the tool-call counter, the clock, the identifier of a task and the table of tasks, which fill the sections of the request frame, and the store of the task table, the one effect the core requests; its listener is bound to 127.0.0.1; and its binding crate answers each client's count of tools/call requests in the current window, not counting the request being served, the clock, a fresh identifier, and holds the table the core stores."
 
 [[id]]
 id = "CF-02"
 level = "build"
 suite = "conformance"
-statement = "Every acceptance vector and every served vector of the declaration is the committed core package's own answer to the request it holds, byte for byte, as the HTTP adapter frames the request and serializes the answer, so the declaration cannot disagree with the core it names."
+statement = "Every acceptance vector and every served vector of the declaration is the committed core package's own answer to the request it holds, byte for byte, as the HTTP adapter frames the request and serializes the answer, so the declaration cannot disagree with the core it names; the acceptance transcripts hold the effect requests the core makes while it answers the vectors that write a task table, so the one effect the core requests is exercised."
 
 [[id]]
 id = "CF-03"
@@ -780,7 +786,7 @@ statement = "The kernel checks the laws of the step: the step of a done response
 id = "PE-09"
 level = "build"
 suite = "provider-effects"
-statement = "The conformance fixture requests no effect: the fixture provider and the root fixtureRun import neither the effect module nor the step serve, every request of the committed vectors is answered done by the step serve of the fixture provider, and the conformance build still names fixtureRun, so its core identity moves only with the source and semantic IDs and the program of the modules it imports."
+statement = "The conformance fixture provider requests no effect: the fixture provider and the root fixtureRun import neither the effect module nor the step serve, every request of the committed vectors is answered done by the step serve of the fixture provider, and the conformance build names conformanceRun, the step serve over the fixture provider, whose only effect request is the store of a task table (TK-17)."
 
 [[id]]
 id = "IR-01"

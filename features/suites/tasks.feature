@@ -87,10 +87,16 @@ Feature: Tasks
     Then each theorem is accepted and the laws source states every transition and every refusal the tasks layer uses
 
   @TK-15 @build
-  Scenario: The core keeps no task state: the host supplies a clock, the identifier of a task the request may create and the task table with each request, and stores the table the response returns; a table that cannot be read, a host that supplies no identifier and a frame whose host section is cut or is not text are server errors (-32603 or the fixed internal body, HTTP 500) that leave the table as it was; the table is returned only when a task was created or touched.
+  Scenario: The core keeps no task state: the host supplies a clock, the identifier of a task the request may create and the task table with each request, and stores the table the response returns; a table that cannot be read, a host that supplies no identifier, a host that supplies the identifier of a task the table holds and a frame whose host section is cut or is not text are server errors (-32603 or the fixed internal body, HTTP 500) that leave the table as it was; the table is returned only when a task was created or touched.
     Given a host and tables that are valid, unreadable and large
     When requests are sent
     Then the table is returned exactly when a task was created or touched and an unreadable table is never rewritten
+
+  @TK-17 @build
+  Scenario: The step serve writes the task table through one host effect and never in the response frame: a response that wrote a table is a perform of the store effect, under the tag the provider declares, whose payload is the table preceded by its length in four bytes; once the host's outcome of that effect is in the log, the response is written without the table; a response that wrote no table, a request that was refused and a request that fails a check ask for no effect; a tag that does not fit four bytes is not a perform. The byte serve still returns the table in its response frame.
+    Given the step root over the fixture provider and a host that performs the store
+    When a task is created, read and cancelled through the driver
+    Then each creation and cancellation performs the store once, a read performs none, the response frames carry no table and the stored table is the one the byte serve returns
 
   @TK-16 @build
   Scenario: The ten tasks scenarios at the pinned suite commit and the pinned ext-tasks commit are accounted for: every request they send is a step of vectors/tasks.json with its file and line, every check id they emit is covered or listed with its reason, the vendored files match the checksums the authorities record, and the requirements file runs the scenarios as extension scenarios that are not scored.

@@ -61,6 +61,14 @@ definition{
 }
 
 definition{
+  name: idInUse,
+  parameters: [],
+  result: Refusal::ProviderRefusal,
+  body: (ctor Refusal::ProviderRefusal.internal "the host supplied a task id that a task already has"),
+  executable: true
+}
+
+definition{
   name: seed,
   parameters: [host : Tasks::TaskHost, plan : Tasks::TaskPlan],
   result: Tasks::TaskEntry,
@@ -74,7 +82,9 @@ definition{
   result: (Result Methods::ResultBody Refusal::ProviderRefusal),
   body: (if (prim equal (project host freshId) "" : Bool) then (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (noFreshId)) else (match (TaskJson::readTable (project host table))
     | Option.none => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (unreadableTable))
-    | Option.some table => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.taskCreated (record Tasks::CreateTaskResult {status := (ctor Tasks::TaskStatus.working), fields := (Tasks::fieldsOf (project (seed host plan) task)), entry := (seed host plan)}))))),
+    | Option.some table => (match (Tasks::findEntry (project host freshId) table (project host nowMs))
+      | Option.some taken => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (idInUse))
+      | Option.none => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.taskCreated (record Tasks::CreateTaskResult {status := (ctor Tasks::TaskStatus.working), fields := (Tasks::fieldsOf (project (seed host plan) task)), entry := (seed host plan)})))))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }

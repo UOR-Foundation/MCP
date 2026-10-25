@@ -3,13 +3,17 @@
 \useglossary{lexlean.std.nat@1.2.0}
 \useglossary{mcp.core@1.0.0}
 \importmodule{Capabilities}
+\importmodule{Content}
 \importmodule{Input}
 \importmodule{Json}
 \importmodule{JsonRpc}
+\importmodule{Methods}
 \importmodule{Refusal}
 \importmodule{Status}
 \importmodule{TaskJson}
+\importmodule{TaskServe}
 \importmodule{Tasks}
+\importmodule{Tools}
 \title{MCP task laws}
 \begin{semanticmodule}
 definition{
@@ -446,6 +450,22 @@ theorem{
   parameters: [],
   statement: (((Refusal::codeOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.internal "the task table is not readable"))) = (-32603 : Int)) /\ ((Refusal::dataOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.internal "the task table is not readable"))) = (ctor Option.none [Json::Json]))),
   proof: constructor{branches: [reflexivity{}, reflexivity{}]}
+}
+
+theorem{
+  name: a_tool_that_needs_a_task_is_not_answered_without_one,
+  parameters: [tool : Content::Tool, sync : Methods::Progressed],
+  statement: ((TaskServe::fallThrough (ctor TaskServe::TaskSupport.required) tool sync) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (TaskServe::missingTasks))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_tool_that_may_use_a_task_is_answered_at_once_without_one,
+  parameters: [tool : Content::Tool, sync : Methods::Progressed],
+  statement: ((TaskServe::fallThrough (ctor TaskServe::TaskSupport.optional) tool sync) = (Tools::checkExecuted tool sync)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
 }
 \end{semanticmodule}
 \end{lexlean}
