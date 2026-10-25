@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-step-fixture"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "StepFixture"
+component = "StepFixture"
+
+[[form]]
+id = "mcp-step-fixture"
+channel = "text"
+surface = "MCP step fixture"
+canonical_source = true
+features = ["sentence-case", "singular"]

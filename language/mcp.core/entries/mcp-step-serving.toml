@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-step-serving"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "StepServe"
+component = "StepServe"
+
+[[form]]
+id = "mcp-step-serving"
+channel = "text"
+surface = "MCP step serving"
+canonical_source = true
+features = ["sentence-case", "singular"]

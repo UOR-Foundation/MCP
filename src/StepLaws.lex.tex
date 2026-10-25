@@ -1,0 +1,271 @@
+\begin{lexlean}{StepLaws}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Dispatch}
+\importmodule{Extension}
+\importmodule{Frame}
+\importmodule{HostEffect}
+\importmodule{Http}
+\importmodule{InputGuard}
+\importmodule{Json}
+\importmodule{JsonRead}
+\importmodule{JsonRpc}
+\importmodule{JsonText}
+\importmodule{Methods}
+\importmodule{Refusal}
+\importmodule{RpcWire}
+\importmodule{Serve}
+\importmodule{Status}
+\importmodule{StepServe}
+\importmodule{Transport}
+\title{MCP step laws}
+\begin{semanticmodule}
+theorem{
+  name: a_done_step_is_the_word_zero_and_the_response,
+  parameters: [response : (List Nat)],
+  statement: ((StepServe::stepList (ctor HostEffect::Step.done response)) = (prim append (Frame::u32List 0) response : (List Nat))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_perform_step_is_the_word_one_the_tag_and_the_payload,
+  parameters: [request : HostEffect::EffectRequest],
+  statement: ((StepServe::stepList (ctor HostEffect::Step.perform request)) = (prim append (Frame::u32List 1) (prim append (Frame::u32List (project request tag)) (JsonText::bytesToList (project request payload)) : (List Nat)) : (List Nat))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_turn_with_no_completed_effect_is_read_back,
+  parameters: [source : Bytes, position : Nat, built : (List HostEffect::Completed)],
+  statement: ((StepServe::readCompleted source position 0 built) = (ctor Result.ok [((List HostEffect::Completed) * Nat), Frame::FrameFault] ((JsonRead::reverseOnto [HostEffect::Completed] built (nil HostEffect::Completed)), position))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: an_effect_is_read_as_a_tag_and_a_length_prefixed_outcome,
+  parameters: [source : Bytes, position : Nat, below : Nat, built : (List HostEffect::Completed)],
+  statement: ((StepServe::readCompleted source position (below + 1) built) = (match (Frame::u32At source position)
+    | Option.none => (ctor Result.error [((List HostEffect::Completed) * Nat), Frame::FrameFault] (ctor Frame::FrameFault.truncated position))
+    | Option.some tag => (match (Frame::chunkAt source (position + 4))
+      | Option.none => (ctor Result.error [((List HostEffect::Completed) * Nat), Frame::FrameFault] (ctor Frame::FrameFault.truncated (position + 4)))
+      | Option.some outcome => (StepServe::readCompleted source (project outcome next) below (cons (record HostEffect::Completed {tag := tag, outcome := (project outcome bytes)}) built))))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_turn_cut_inside_the_request_is_a_fault,
+  parameters: [input : Bytes],
+  statement: ((StepServe::turnAfter input (ctor Option.none [Frame::Chunk])) = (ctor Result.error [StepServe::Turn, Frame::FrameFault] (ctor Frame::FrameFault.truncated 0))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_turn_with_no_count_is_a_fault,
+  parameters: [source : Bytes, request : Frame::Chunk],
+  statement: ((StepServe::afterCount source request (ctor Option.none [Nat])) = (ctor Result.error [StepServe::Turn, Frame::FrameFault] (ctor Frame::FrameFault.truncated (project request next)))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_turn_with_a_byte_after_its_last_outcome_is_a_fault,
+  parameters: [request : Bytes, completed : (List HostEffect::Completed), position : Nat],
+  statement: ((StepServe::closed false request completed position) = (ctor Result.error [StepServe::Turn, Frame::FrameFault] (ctor Frame::FrameFault.trailing position))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_turn_that_ends_with_its_last_outcome_is_read_back,
+  parameters: [request : Bytes, completed : (List HostEffect::Completed), position : Nat],
+  statement: ((StepServe::closed true request completed position) = (ctor Result.ok [StepServe::Turn, Frame::FrameFault] (record StepServe::Turn {request := request, completed := completed}))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_call_that_performs_is_the_effect_refusal,
+  parameters: [request : HostEffect::EffectRequest],
+  statement: ((Extension::callAnswer (ctor Result.ok [Extension::CallOutcome, Refusal::ProviderRefusal] (ctor Extension::CallOutcome.perform request))) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.effectRequested request))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_read_that_performs_is_the_effect_refusal,
+  parameters: [request : HostEffect::EffectRequest],
+  statement: ((Extension::readAnswer (ctor Result.ok [Extension::ReadOutcome, Refusal::ProviderRefusal] (ctor Extension::ReadOutcome.perform request))) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.effectRequested request))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_prompt_that_performs_is_the_effect_refusal,
+  parameters: [request : HostEffect::EffectRequest],
+  statement: ((Extension::promptAnswer (ctor Result.ok [Extension::PromptOutcome, Refusal::ProviderRefusal] (ctor Extension::PromptOutcome.perform request))) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.effectRequested request))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_effect_request_passes_the_input_guard_unchanged,
+  parameters: [key : Bytes, request : Methods::ClientRequest, asked : HostEffect::EffectRequest],
+  statement: ((InputGuard::settleAnswer key request (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.effectRequested asked))) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.effectRequested asked))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_forbidden_request_never_reaches_the_provider,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    request : Http::HttpRequest,
+    refusal : Transport::TransportRefusal
+  ],
+  statement: ((StepServe::serveGatedStep info answer request (ctor Option.some [Transport::TransportRefusal] refusal)) = (ctor HostEffect::Step.done (Frame::writeResponse (Serve::forbiddenResponse refusal)))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_request_that_is_not_a_post_never_reaches_the_provider,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    target : (List Nat),
+    fields : (List Http::Field),
+    body : Bytes,
+    calls : Nat,
+    hosts : (List (List Nat)),
+    key : Bytes
+  ],
+  statement: ((StepServe::serveOpenStep info answer (record Http::HttpRequest {method := (cons 71 (cons 69 (cons 84 (nil Nat)))), target := target, fields := fields, body := body, toolCalls := calls, allowedHosts := hosts, stateKey := key})) = (ctor HostEffect::Step.done (Frame::writeResponse (Serve::notAllowedResponse)))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_body_that_is_not_json_never_reaches_the_provider,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    used : Nat,
+    fields : (List Http::Field),
+    refusal : JsonText::JsonRefusal
+  ],
+  statement: ((StepServe::afterParseStep info answer used fields (ctor Result.error [Json::Json, JsonText::JsonRefusal] refusal)) = (ctor HostEffect::Step.done (Frame::writeResponse (Serve::jsonResponse (Status::badRequestStatus) (RpcWire::errorResponse (ctor Option.none [JsonRpc::RequestId]) (RpcWire::faultObject (ctor RpcWire::Fault.parseError))))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_message_that_is_not_a_request_never_reaches_the_provider,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    used : Nat,
+    fields : (List Http::Field),
+    fault : RpcWire::Fault
+  ],
+  statement: ((StepServe::afterDecodeStep info answer used fields (ctor Result.error [JsonRpc::Request, RpcWire::Fault] fault)) = (ctor HostEffect::Step.done (Frame::writeResponse (Serve::jsonResponse (Status::faultStatus fault) (RpcWire::errorResponse (RpcWire::faultId fault) (RpcWire::faultObject fault)))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_gated_request_is_judged_before_the_provider_is_asked,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    request : Http::HttpRequest
+  ],
+  statement: ((StepServe::serveRequestStep info answer request) = (StepServe::serveGatedStep info answer request (Transport::gateOf (project request fields) (project request allowedHosts)))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_refused_check_is_never_an_effect,
+  parameters: [
+    problem : Refusal::ParamsProblem,
+    requested : String,
+    supported : (List String),
+    mismatch : Refusal::HeaderProblem,
+    method : String
+  ],
+  statement: ((((StepServe::effectOf (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (ctor Refusal::Refusal.invalidParams problem))) = (ctor Option.none [HostEffect::EffectRequest])) /\ ((StepServe::effectOf (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (ctor Refusal::Refusal.unsupportedProtocolVersion requested supported))) = (ctor Option.none [HostEffect::EffectRequest]))) /\ (((StepServe::effectOf (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (ctor Refusal::Refusal.headerMismatch mismatch))) = (ctor Option.none [HostEffect::EffectRequest])) /\ ((StepServe::effectOf (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound method))) = (ctor Option.none [HostEffect::EffectRequest])))),
+  proof: constructor{
+    branches: [
+      constructor{branches: [reflexivity{}, reflexivity{}]},
+      constructor{branches: [reflexivity{}, reflexivity{}]}
+    ]
+  }
+}
+
+theorem{
+  name: a_handled_request_that_ended_in_an_effect_is_a_perform,
+  parameters: [accepts : Bool, ident : JsonRpc::RequestId, payload : Bytes],
+  statement: ((StepServe::stepOfHandled accepts (record Dispatch::Handled {id := ident, outcome := (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.effectRequested (record HostEffect::EffectRequest {tag := 4294967295, payload := payload}))))})) = (ctor HostEffect::Step.perform (record HostEffect::EffectRequest {tag := 4294967295, payload := payload}))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_handled_request_that_did_not_end_in_an_effect_is_done,
+  parameters: [
+    accepts : Bool,
+    ident : JsonRpc::RequestId,
+    reply : Dispatch::Reply,
+    method : String
+  ],
+  statement: (((StepServe::stepOfHandled accepts (record Dispatch::Handled {id := ident, outcome := (ctor Result.ok [Dispatch::Reply, Refusal::Refusal] reply)})) = (ctor HostEffect::Step.done (Frame::writeResponse (Serve::respond accepts (record Dispatch::Handled {id := ident, outcome := (ctor Result.ok [Dispatch::Reply, Refusal::Refusal] reply)}))))) /\ ((StepServe::stepOfHandled accepts (record Dispatch::Handled {id := ident, outcome := (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound method))})) = (ctor HostEffect::Step.done (Frame::writeResponse (Serve::respond accepts (record Dispatch::Handled {id := ident, outcome := (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound method))})))))),
+  proof: constructor{branches: [reflexivity{}, reflexivity{}]},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_tag_that_does_not_fit_thirty_two_bits_is_not_a_perform,
+  parameters: [accepts : Bool, ident : JsonRpc::RequestId, payload : Bytes],
+  statement: ((StepServe::stepOfHandled accepts (record Dispatch::Handled {id := ident, outcome := (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.effectRequested (record HostEffect::EffectRequest {tag := 4294967296, payload := payload}))))})) = (ctor HostEffect::Step.done (Frame::writeResponse (Serve::respond accepts (record Dispatch::Handled {id := ident, outcome := (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (StepServe::tagRefusal))}))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_frame_that_cannot_be_read_is_the_internal_error,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answerWith : (Fn (StepServe::Asked) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    turn : StepServe::Turn,
+    fault : Frame::FrameFault
+  ],
+  statement: ((StepServe::stepOfTurn info answerWith turn (ctor Result.error [Http::HttpRequest, Frame::FrameFault] fault)) = (ctor HostEffect::Step.done (Frame::writeResponse (Serve::internalResponse)))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: an_effect_request_is_an_internal_error_with_no_data,
+  parameters: [request : HostEffect::EffectRequest],
+  statement: ((Refusal::errorObjectOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.effectRequested request))) = (record JsonRpc::ErrorObject {code := (-32603 : Int), message := "Internal error", data := (ctor Option.none [Json::Json])})),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_effect_request_is_a_server_error_status,
+  parameters: [request : HostEffect::EffectRequest],
+  statement: ((Status::statusOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.effectRequested request))) = 500),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_byte_serve_answers_an_effect_request_with_the_internal_error,
+  parameters: [accepts : Bool, ident : JsonRpc::RequestId, request : HostEffect::EffectRequest],
+  statement: ((Serve::respond accepts (record Dispatch::Handled {id := ident, outcome := (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.effectRequested request)))})) = (Serve::jsonResponse 500 (RpcWire::errorResponse (ctor Option.some [JsonRpc::RequestId] ident) (record JsonRpc::ErrorObject {code := (-32603 : Int), message := "Internal error", data := (ctor Option.none [Json::Json])})))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+\end{semanticmodule}
+\end{lexlean}
