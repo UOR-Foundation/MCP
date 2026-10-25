@@ -414,13 +414,14 @@ fn refused_requests() -> Vec<Refused> {
         post_owned(&standard("tools/frob", None), &body)
     };
     let not_offered = {
-        // The fixture declares no tasks extension, so tasks/get is not a method it offers.
+        // The fixture declares the tasks extension, which removed tasks/result: it is a method
+        // no provider offers.
         let body = rpc(
-            "tasks/get",
+            "tasks/result",
             &format!(r#"{{"taskId":"t","_meta":{META}}}"#),
             "1",
         );
-        post_owned(&standard("tasks/get", Some("t")), &body)
+        post_owned(&standard("tasks/result", Some("t")), &body)
     };
     let undecodable = {
         let body = rpc(

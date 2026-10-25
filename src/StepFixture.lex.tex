@@ -2,7 +2,6 @@
 \useglossary{lexlean.std.bool@1.2.0}
 \useglossary{lexlean.std.nat@1.2.0}
 \useglossary{mcp.core@1.0.0}
-\importmodule{Capabilities}
 \importmodule{Common}
 \importmodule{Content}
 \importmodule{Extension}
@@ -11,6 +10,7 @@
 \importmodule{HostEffect}
 \importmodule{Http}
 \importmodule{Json}
+\importmodule{JsonText}
 \importmodule{Methods}
 \importmodule{Refusal}
 \importmodule{ResultJson}
@@ -253,9 +253,9 @@ definition{
     | Methods::ClientRequest.resourcesTemplatesList params => (Fixture::fixtureAnswer (project asked request))
     | Methods::ClientRequest.promptsList params => (Fixture::fixtureAnswer (project asked request))
     | Methods::ClientRequest.completionComplete params => (Fixture::fixtureAnswer (project asked request))
-    | Methods::ClientRequest.tasksGet params => (Fixture::fixtureAnswer (project asked request))
-    | Methods::ClientRequest.tasksUpdate params => (Fixture::fixtureAnswer (project asked request))
-    | Methods::ClientRequest.tasksCancel params => (Fixture::fixtureAnswer (project asked request))),
+    | Methods::ClientRequest.tasksGet params => (Fixture::fixtureAnswerWith (record Tasks::TaskHost {nowMs := (0 : Int), now := "", freshId := "", table := (JsonText::emptyBytes)}) (project asked request))
+    | Methods::ClientRequest.tasksUpdate params => (Fixture::fixtureAnswerWith (record Tasks::TaskHost {nowMs := (0 : Int), now := "", freshId := "", table := (JsonText::emptyBytes)}) (project asked request))
+    | Methods::ClientRequest.tasksCancel params => (Fixture::fixtureAnswerWith (record Tasks::TaskHost {nowMs := (0 : Int), now := "", freshId := "", table := (JsonText::emptyBytes)}) (project asked request))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -266,23 +266,6 @@ definition{
   result: (Result Methods::ResultBody Refusal::ProviderRefusal),
   body: (effectAnswer (record StepServe::Asked {completed := (nil HostEffect::Completed), request := request})),
   axioms: [Classical.choice, Quot.sound, propext],
-  executable: true
-}
-
-definition{
-  name: stepCapabilities,
-  parameters: [],
-  result: Capabilities::ServerCapabilities,
-  body: (record Capabilities::ServerCapabilities {experimental := (project (Fixture::fixtureCapabilities) experimental), logging := (project (Fixture::fixtureCapabilities) logging), completions := (project (Fixture::fixtureCapabilities) completions), prompts := (project (Fixture::fixtureCapabilities) prompts), resources := (project (Fixture::fixtureCapabilities) resources), tools := (project (Fixture::fixtureCapabilities) tools), extensions := (ctor Option.none [Json::JsonObject])}),
-  executable: true
-}
-
-definition{
-  name: stepInfo,
-  parameters: [],
-  result: Extension::ProviderInfo,
-  body: (record Extension::ProviderInfo {serverInfo := (project (Fixture::fixtureInfo) serverInfo), instructions := (project (Fixture::fixtureInfo) instructions), capabilities := (stepCapabilities), discoverCache := (project (Fixture::fixtureInfo) discoverCache), paramRules := (project (Fixture::fixtureInfo) paramRules), toolCallLimit := (project (Fixture::fixtureInfo) toolCallLimit), requestStateKey := (project (Fixture::fixtureInfo) requestStateKey)}),
-  axioms: [Quot.sound, propext],
   executable: true
 }
 
@@ -310,7 +293,7 @@ definition{
   name: routed,
   parameters: [input : Bytes, turn : StepServe::Turn],
   result: (List Nat),
-  body: (if (bytesTarget (Frame::readRequest (project turn request))) then (Serve::serveTasks (stepInfo) (ref byteAnswerWith) (project turn request)) else (StepServe::serveStep (stepInfo) (ref effectAnswer) input)),
+  body: (if (bytesTarget (Frame::readRequest (project turn request))) then (Serve::serveTasks (Fixture::fixtureInfo) (ref byteAnswerWith) (project turn request)) else (StepServe::serveStep (Fixture::fixtureInfo) (ref effectAnswer) input)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -320,7 +303,7 @@ definition{
   parameters: [input : Bytes],
   result: (List Nat),
   body: (match (StepServe::readTurn input)
-    | Result.error fault => (StepServe::serveStep (stepInfo) (ref effectAnswer) input)
+    | Result.error fault => (StepServe::serveStep (Fixture::fixtureInfo) (ref effectAnswer) input)
     | Result.ok turn => (routed input turn)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true,
