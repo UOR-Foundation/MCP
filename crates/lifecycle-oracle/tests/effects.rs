@@ -814,14 +814,22 @@ fn byte_serve_table(frame: &[u8]) -> Vec<u8> {
 }
 
 fn drive_with(
-    root_driver: fn(&[u8], usize, &mut dyn FnMut(u32, &[u8]) -> Vec<u8>) -> Result<Driven, DriveError>,
+    root_driver: fn(
+        &[u8],
+        usize,
+        &mut dyn FnMut(u32, &[u8]) -> Vec<u8>,
+    ) -> Result<Driven, DriveError>,
     frame: &[u8],
     store: u32,
 ) -> Driven {
     root_driver(frame, BUDGET, &mut |tag, payload| {
-        assert_eq!(tag, store, "the core asked for an effect other than the store");
+        assert_eq!(
+            tag, store,
+            "the core asked for an effect other than the store"
+        );
         assert!(
-            u32::try_from(payload.len() - 4).is_ok_and(|length| payload[..4] == length.to_be_bytes()),
+            u32::try_from(payload.len() - 4)
+                .is_ok_and(|length| payload[..4] == length.to_be_bytes()),
             "the payload is the table preceded by its length"
         );
         0u32.to_be_bytes().to_vec()
@@ -853,9 +861,15 @@ fn check_store_of_a_task_lifecycle(
     let (_, frame) = task_frame("tools/call", &create_params(), "slow_compute", &[], 0);
     let created = drive_with(driver, &frame, store);
     assert_eq!(created.performed.len(), 1, "one store");
-    assert_eq!(created.turns, 2, "the root is called again with the outcome");
+    assert_eq!(
+        created.turns, 2,
+        "the root is called again with the outcome"
+    );
     let response = step_response_checked(&created.response);
-    assert!(response.tasks.is_none(), "the response frame carries no table");
+    assert!(
+        response.tasks.is_none(),
+        "the response frame carries no table"
+    );
     assert_eq!(response.status, 200);
     let body = json_of(&response);
     assert_eq!(body["result"]["resultType"], "task", "{body}");
@@ -927,7 +941,8 @@ fn a_refused_request_and_a_failed_check_ask_for_no_effect_tk_17() {
     }
     // a request that fails a check before the provider asks for nothing
     let mut bad = tasks_request("tools/call", &create_params(), "slow_compute");
-    bad.fields.retain(|(name, _)| !name.eq_ignore_ascii_case(b"Mcp-Method"));
+    bad.fields
+        .retain(|(name, _)| !name.eq_ignore_ascii_case(b"Mcp-Method"));
     bad.host = request.host.clone();
     let frame = encode_request(&bad);
     for driver in [step_driver, conformance_driver] {

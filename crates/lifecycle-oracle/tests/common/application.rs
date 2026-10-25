@@ -170,7 +170,10 @@ fn acceptance_host(issued: u32, table: &[u8]) -> TaskHost {
 /// The effect of the host that stores the table: it completes, and the transcript
 /// records the table the core wrote.
 fn store_outcome(tag: u32, _payload: &[u8]) -> Vec<u8> {
-    assert_eq!(tag, STORE_TAG, "the core asked for an effect other than the store");
+    assert_eq!(
+        tag, STORE_TAG,
+        "the core asked for an effect other than the store"
+    );
     0u32.to_be_bytes().to_vec()
 }
 
@@ -313,7 +316,10 @@ fn effect(
             .map(|(field, kind)| {
                 record(
                     "HostField",
-                    &[("name", text(field)), ("kind", constructor("HostKind", kind))],
+                    &[
+                        ("name", text(field)),
+                        ("kind", constructor("HostKind", kind)),
+                    ],
                 )
             })
             .collect();
@@ -469,8 +475,20 @@ pub fn render() -> String {
         ),
         effect("clock.now", &[], &[("ms", "U64"), ("iso", "Text")], 8, 64),
         effect("task.id", &[], &[("id", "Text")], 8, 128),
-        effect("task.table", &[], &[("table", "Bytes")], 8, TABLE_MAXIMUM + 8),
-        effect("task.store", &[("table", "Bytes")], &[], TABLE_MAXIMUM + 8, 8),
+        effect(
+            "task.table",
+            &[],
+            &[("table", "Bytes")],
+            8,
+            TABLE_MAXIMUM + 8,
+        ),
+        effect(
+            "task.store",
+            &[("table", "Bytes")],
+            &[],
+            TABLE_MAXIMUM + 8,
+            8,
+        ),
     ];
     let host = record(
         "HostProtocol",

@@ -130,8 +130,8 @@ fn the_generated_package_is_the_recorded_export_of_the_lifecycle_root_lc_13() {
     let roots = request["roots"].as_array().expect("roots");
     assert_eq!(
         roots.len(),
-        3,
-        "the crowd root, the fixture root and the step root"
+        4,
+        "the crowd root, the fixture root, the step root and the conformance root"
     );
     assert_eq!(roots[1]["root"], "UorMcp.Fixture.fixtureRun");
     assert_eq!(roots[1]["package"]["name"], "mcp_lifecycle");
@@ -463,6 +463,66 @@ fn no_function_of_the_step_package_is_on_a_call_cycle_pe_02() {
     );
     if let Some(cycle) = find_cycle(&graph) {
         panic!("the step package recurses: {}", cycle.join(" -> "));
+    }
+}
+
+// ---- CF-01: the fourth root, the conformance build's core ----
+
+#[test]
+fn the_conformance_package_is_the_recorded_export_of_the_conformance_root_cf_01() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("generated")
+        .join("mcp_conformance");
+    let provenance: Value =
+        serde_json::from_slice(&std::fs::read(dir.join("provenance.json")).expect("provenance"))
+            .expect("provenance.json is JSON");
+    assert_eq!(provenance["name"], "mcp_conformance");
+    assert_eq!(provenance["profile"], "rust-std");
+    assert_eq!(provenance["exports"].as_array().expect("exports").len(), 1);
+    assert_eq!(provenance["exports"][0]["name"], "run");
+    assert_eq!(
+        provenance["effects"],
+        serde_json::json!(["allocation", "overflow"]),
+        "the export states no recursion effect"
+    );
+    let request: Value = serde_json::from_slice(
+        &std::fs::read(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("generated")
+                .join("request.json"),
+        )
+        .expect("request.json"),
+    )
+    .expect("request.json is JSON");
+    assert_eq!(
+        request["roots"][3]["root"],
+        "UorMcp.ConformanceFixture.conformanceRun"
+    );
+    assert_eq!(request["roots"][3]["package"]["name"], "mcp_conformance");
+    let source = std::fs::read(dir.join("src").join("lib.rs")).expect("the package source");
+    let recorded = provenance["files"]["src/lib.rs"]
+        .as_str()
+        .expect("src/lib.rs is recorded");
+    assert_eq!(recorded, hex(&Sha256::digest(&source)));
+    assert_eq!(
+        recorded,
+        hex(&Sha256::digest(
+            lifecycle_oracle::CONFORMANCE_SOURCE.as_bytes()
+        )),
+        "the oracle compiled a different file from the one recorded"
+    );
+}
+
+#[test]
+fn no_function_of_the_conformance_package_is_on_a_call_cycle_cf_01() {
+    let graph = call_graph(lifecycle_oracle::CONFORMANCE_SOURCE);
+    assert!(
+        graph.len() > 300,
+        "the graph reads the package: {}",
+        graph.len()
+    );
+    if let Some(cycle) = find_cycle(&graph) {
+        panic!("the conformance package recurses: {}", cycle.join(" -> "));
     }
 }
 

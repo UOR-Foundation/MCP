@@ -207,7 +207,6 @@ definition{
   ],
   result: HostEffect::Step,
   body: (if stored then (ctor HostEffect::Step.done (Frame::writeResponse (Serve::withoutTable response))) else (if (HostEffect::tagFits (project info taskStoreTag)) then (ctor HostEffect::Step.perform (storeRequest info table)) else (tagFault))),
-  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
@@ -218,7 +217,6 @@ definition{
   body: (match (project response tasks)
     | Option.none => (ctor HostEffect::Step.done (Frame::writeResponse response))
     | Option.some table => (storing info stored table response)),
-  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 

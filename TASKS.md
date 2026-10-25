@@ -31,6 +31,8 @@ The pin of `ext-tasks` is the last commit at or before the pinned specification 
 | `src/TaskFixture.lex.tex` | the seven tools the scenarios name, and what each does |
 | `src/TaskLaws.lex.tex` | kernel-checked theorems about the above |
 | `src/Methods`, `Dispatch`, `Tools`, `ResultJson`, `Http`, `Frame`, `Serve`, `Fixture` | extended: one more result body (`stored`), the host's clock and table in the frame, `Fixture.fixtureRun` over `Serve.serveTasks` |
+| `src/StepServe.lex.tex`, `StepFixture`, `StepLaws`, `Extension` | extended: the store effect (`storeRequest`, `storing`), `Asked.host`, `ProviderInfo.taskStoreTag`, and the theorems of the store |
+| `src/ConformanceFixture.lex.tex` | the root of the conformance build: the step serve over the fixture provider, with the store tag 4 (the fifth effect the conformance declaration lists) |
 | `crates/lifecycle-oracle/generated/mcp_lifecycle` | LexLean's export of `fixtureRun`, unedited |
 | `crates/lifecycle-oracle/vectors/tasks.json` | the requests of the nine scenarios that send any, in the order they send them, with file and line at the pinned suite commit |
 | `crates/lifecycle-oracle/tests/tasks.rs` | TK-01 to TK-16: the host of the test, the vectors, and the probes beyond them |
@@ -53,12 +55,23 @@ arrives with each request and leaves with its answer, as the rate-limit count do
 | `fresh_task_id` | an identifier that no task has had and that a client cannot guess; the core cannot make one and uses it only when this request creates a task |
 | `task_table` | the table as the previous response returned it, or empty |
 
-The response frame carries a flag and a table. When the flag is 1 the host stores the table
-from now on; when it is 0 the host keeps its own. The core returns a table when a request created
-or touched a task, and never when it refused the request. The table is a JSON array with one
-object per task: the task as `tasks/get` would write it, the instant it was created, and the plan
-the work follows. It is the host's to keep and the core's to read: the host must hand back exactly
-what it was given.
+What the core returns depends on the root the host serves:
+
+| Root | How the host gets the table |
+| --- | --- |
+| the byte serve (`Serve.serveTasks`, exported as `UorMcp.Fixture.fixtureRun`) | the response frame ends with the flag 1 and the table, when the request created or touched a task; the host stores it from then on |
+| the step serve (`StepServe.serveStep`, exported as `UorMcp.ConformanceFixture.conformanceRun`) | the core asks for one effect, the store of the table, under the tag its `ProviderInfo.taskStoreTag` names (TK-17). The payload is the table preceded by its length in four bytes; once the host's outcome is in the log the response is written without the table |
+
+PrismPM's adapter reads a response frame that ends at the body and refuses one with a byte after
+it, so a root served by PrismPM's adapter cannot return the table in the frame. The conformance
+build declares the three sections that fill the frame (`clock.now`, `task.id` and `task.table`
+beside `tool.calls`) and the effect `task.store` that the core requests; its binding holds the
+table in memory (`conformance/bindings/mcp-binding`).
+
+The core returns a table when a request created or touched a task, and never when it refused the
+request. The table is a JSON array with one object per task: the task as `tasks/get` would write it,
+the instant it was created, and the plan the work follows. It is the host's to keep and the core's to
+read: the host must hand back exactly what it was given.
 
 The host is also the work. A task in this model is a plan: what the task asks the client for,
 when it asks, when it finishes and how. The fixture's plans are functions of the call, so the
@@ -149,10 +162,10 @@ notifications on the listen stream. TK-12 therefore has no vector, and says so.
 | `unknownTask` (existing) | -32602 | 400 | `tasks/get`, `tasks/update` or `tasks/cancel` for a task the table does not hold, or whose ttl has elapsed |
 | `methodNotFound` (existing) | -32601 | 404 | `tasks/result`, `tasks/list`, and any other `tasks/` method |
 | `headerMismatch` (existing) | -32020 | 400 | `Mcp-Name` missing or different from `params.taskId` on a task method; `Mcp-Method` different from the method |
-| `internal` | -32603, no `data`, message `Internal error` | 500 | a task table the core cannot read (`the task table is not readable`); a host that supplied no identifier for a task the request creates (`the host supplied no task id`); a task that cannot be written (a parked request that has no wire form) |
+| `internal` | -32603, no `data`, message `Internal error` | 500 | a task table the core cannot read (`the task table is not readable`); a host that supplied no identifier for a task the request creates (`the host supplied no task id`) or the identifier of a task the table still holds (`the host supplied a task id that a task already has`); a task that cannot be written (a parked request that has no wire form) |
 | the fixed internal body | -32603, no `id` | 500 | a frame whose host section is cut, whose text is not UTF-8, or that has bytes after the table |
 
-Each is stated in a theorem or a test: the new `internal` texts are the two `ProviderRefusal.internal`
+Each is stated in a theorem or a test: the new `internal` texts are the `ProviderRefusal.internal`
 values of `TaskServe`, and the refusals that were already modeled gain the cases above.
 
 ## Decisions
@@ -161,7 +174,7 @@ values of `TaskServe`, and the refusals that were already modeled gain the cases
 | --- | --- |
 | Where task state lives | the host's table, in the frame; the core is a function of the request and the table |
 | How a task finishes | by the plan and the host's clock, found out lazily; nothing runs between requests |
-| What a task id is | the host's `fresh_task_id`; an empty one is refused |
+| What a task id is | the host's `fresh_task_id`; an empty one is refused, and so is one that a live task of the table has, because a creation would replace that task |
 | `ttlMs` and `pollIntervalMs` | 60 000 and 1 000 for every fixture task; `ttlMs` is an `Int` in `TaskFields`, as is `pollIntervalMs`, because a millisecond clock is an `Int` and a conversion from `Nat` counts one successor at a time |
 | A task of a tool that needs one | `missingCapability` for a client without the extension, on the call; the issue's "typed refusal for a tool that does not support tasks" has no case, because the extension is server-directed and a client cannot ask for a task |
 | `tasks/cancel` of a terminal task | acknowledged, unchanged: the scenario `tasks-lifecycle` requires the idempotent acknowledgement and reserves `-32602` for unknown ids |
@@ -201,7 +214,8 @@ a table are covered by the tests of `tests/tasks.rs`, which run LexLean's export
 | TK-01 to TK-11, TK-13 | `tests/tasks.rs` over the steps of `vectors/tasks.json` (the requests of nine scenarios), and the probes beyond them; every response and notification is validated against the specification's schema and the extension's |
 | TK-12 | `tests/tasks.rs` probes only; the scenario has no request at the pin |
 | TK-14 | `TaskLaws.lex.tex`, checked by `lexlean verify`, and the test that it states every transition and every refusal |
-| TK-15 | `tests/tasks.rs`: unreadable tables, a missing identifier, a cut or non-UTF-8 host section, the table returned only when touched, 301 tasks on the standard stack |
+| TK-15 | `tests/tasks.rs`: unreadable tables, a missing identifier, an identifier a live task has, a cut or non-UTF-8 host section, the table returned only when touched, 301 tasks on the standard stack |
+| TK-17 | `tests/effects.rs`: the store of the table through the step root of the tests and through the conformance root, no effect for a read, a refusal or a failed check, the table stored equal to the one the byte serve returns; `StepLaws`, checked by `lexlean verify`, for the store request and the tag |
 | TK-16 | `tests/tasks.rs`: the vendored files against the checksums of the authorities, every request site and every check id of the vendored scenarios against the vectors |
 
 ## The vectors

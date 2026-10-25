@@ -255,24 +255,21 @@ theorem{
     body : (List Nat)
   ],
   statement: ((StepServe::finished info stored (record Http::HttpResponse {status := status, fields := fields, notifications := notes, body := body, tasks := (ctor Option.none [(List Nat)])})) = (ctor HostEffect::Step.done (Frame::writeResponse (record Http::HttpResponse {status := status, fields := fields, notifications := notes, body := body, tasks := (ctor Option.none [(List Nat)])})))),
-  proof: reflexivity{},
-  axioms: [Classical.choice, Quot.sound, propext]
+  proof: reflexivity{}
 }
 
 theorem{
   name: a_table_that_is_not_yet_stored_is_stored_before_the_response_is_done,
   parameters: [info : Extension::ProviderInfo, table : (List Nat), response : Http::HttpResponse],
   statement: ((StepServe::storing info false table response) = (if (HostEffect::tagFits (project info taskStoreTag)) then (ctor HostEffect::Step.perform (StepServe::storeRequest info table)) else (StepServe::tagFault))),
-  proof: reflexivity{},
-  axioms: [Classical.choice, Quot.sound, propext]
+  proof: reflexivity{}
 }
 
 theorem{
   name: a_table_that_is_stored_leaves_the_response_without_it,
   parameters: [info : Extension::ProviderInfo, table : (List Nat), response : Http::HttpResponse],
   statement: ((StepServe::storing info true table response) = (ctor HostEffect::Step.done (Frame::writeResponse (Serve::withoutTable response)))),
-  proof: reflexivity{},
-  axioms: [Classical.choice, Quot.sound, propext]
+  proof: reflexivity{}
 }
 
 theorem{

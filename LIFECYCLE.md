@@ -26,6 +26,7 @@ then params.
 | `src/HeaderLaws.lex.tex` | kernel-checked laws for header names, values, sentinels and Base64 |
 | `src/Validation.lex.tex`, `src/Dispatch.lex.tex`, `src/Extension.lex.tex`, `src/Refusal.lex.tex` | extended: `Headers` carries a header fault and the parameter headers, `Dispatch.handleWith` takes the provider's data and answer function, `ProviderInfo` and `ParamRule` |
 | `crates/lifecycle-oracle/generated/mcp_lifecycle` | LexLean's export of `fixtureRun`, unedited |
+| `crates/lifecycle-oracle/generated/mcp_conformance` | LexLean's export of `UorMcp.ConformanceFixture.conformanceRun` (the conformance build's core), unedited |
 | `crates/lifecycle-oracle/vectors/suite.json` | the vectors taken from the pinned scenarios |
 | `crates/lifecycle-oracle/tests/schema.rs`, `tests/common/mod.rs` | LC-15: every response a test produces is validated against the specification's JSON Schema |
 | `crates/lifecycle-oracle/tests/stress.rs` | LC-16: the largest frames the tests build, on a 2 MiB stack |
@@ -45,8 +46,9 @@ the SHA-256 of `lexlean.lock` that its packages were exported from (SPEC section
 names each target by its descriptor digest. `cargo xtask export` reads those values from
 `lexlean check`, `lexlean.lock` and `lexlean production targets`, writes them into every
 request, runs `lexlean production build --request` on each (this one names the roots
-`UorMcp.Crowd.crowdRun`, package `mcp_crowd`, and `UorMcp.Fixture.fixtureRun`, package
-`mcp_lifecycle`, both 1.0.0, target `rust-std`) and replaces the packages committed beside
+`UorMcp.Crowd.crowdRun`, package `mcp_crowd`, `UorMcp.Fixture.fixtureRun`, package
+`mcp_lifecycle`, `UorMcp.StepFixture.stepFixtureRun`, package `mcp_step`, and
+`UorMcp.ConformanceFixture.conformanceRun`, package `mcp_conformance`, all 1.0.0, target `rust-std`) and replaces the packages committed beside
 it with the export. A source edit committed without it is
 refused by `lexlean production build` as `LLC0204`; a hand-edited package is refused by the
 byte comparison (see [CI.md](CI.md)). A re-export of the committed sources
@@ -96,9 +98,14 @@ u32 field_count
 u32 notification_count                  always 0 since issue #11 (reserved)
   u32 length          notification      one compact JSON-RPC notification, repeated notification_count times
 u32 body_length       body
-u32 stored                              1 when the core returned a task table, else 0
-u32 table_length  task_table            the table the host stores from now on; empty when stored is 0
+[u32 1, u32 table_length  task_table]   only when the core returns a task table: the table the host stores from now on
 ```
+
+and nothing after the body when the core returns no table. The byte serve (`Serve.serve`,
+`Serve.serveTasks`) writes the table in the response frame. The step serve never does: PrismPM's
+adapter refuses a response frame with a byte after the body, so `StepServe.serveStep` asks the host to
+store the table through one effect and writes the response without it ([TASKS.md](TASKS.md#the-hosts-side),
+[PROVIDER-EFFECTS.md](PROVIDER-EFFECTS.md)).
 
 `tool_calls` is the one input the core cannot compute, because it is state: how many
 `tools/call` requests the host has already admitted for this client in the current

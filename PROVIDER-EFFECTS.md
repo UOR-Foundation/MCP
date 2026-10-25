@@ -13,17 +13,20 @@ needs. Issue #39; register rows PE-01 to PE-09.
 | `src/HostEffect.lex.tex` | `EffectRequest` (a tag and a payload), `Completed` (a tag and an outcome), `Step` (`done` or `perform`), and `tagFits`, the check that a tag is four bytes |
 | `src/Extension.lex.tex` | extended: the constructor `perform` on `CallOutcome`, `ReadOutcome` and `PromptOutcome`, and `callAnswer`, `readAnswer` and `promptAnswer`, which `answerOf` uses and which turn a `perform` into the refusal `effectRequested` |
 | `src/Refusal.lex.tex`, `src/Status.lex.tex` | extended: the provider refusal `effectRequested`, whose code is -32603, whose status is 500 and whose data is empty |
-| `src/StepServe.lex.tex` | `serveStep`: the turn read, the same pre-provider checks as `Serve.serve` in the same order, the provider asked with the completed effects of the turn, and the step written |
+| `src/StepServe.lex.tex` | `serveStep`: the turn read, the same pre-provider checks as `Serve.serve` in the same order, the provider asked with the completed effects of the turn and the task host, and the step written; the store of the task table when the response wrote one (TK-17) |
 | `src/StepFixture.lex.tex` | the root `stepFixtureRun`: the step serve over a provider that requests effects on a few tools, one resource and one prompt, and over the unchanged fixture provider for every other request |
 | `src/StepLaws.lex.tex` | kernel-checked theorems about the above (PE-08) |
 | `crates/lifecycle-oracle/generated/mcp_step` | LexLean's export of `stepFixtureRun`, unedited |
 | `crates/lifecycle-oracle/tests/effects.rs` | PE-01 to PE-09, run through a driver that performs the effects as PrismPM's generated driver does |
 
-`src/Fixture.lex.tex` and `src/Serve.lex.tex` are not changed. The conformance fixture
-requests no effect, `Serve.serve` is the byte root it was, and the core identity of
-`UorMcp.Fixture.fixtureRun` moves only because the types it is compiled with gained constructors:
-`Refusal` and `Status` gained `effectRequested`, and `CallOutcome`, `ReadOutcome` and
-`PromptOutcome` gained `perform`. The functions over those types gained only the arm for the new constructor.
+The fixture provider requests no effect of its own, and `Serve.serve` is the byte root it was: a
+wrapper over `Serve.serveTasks`, which also takes the task host and returns the task table in its
+response frame ([TASKS.md](TASKS.md#the-hosts-side)). The step serve has one effect request of its
+own, the store of that table (TK-17): `StepServe.storeRequest` is an `EffectRequest` under the tag
+`ProviderInfo.taskStoreTag`, made when a response wrote a table and not yet stored, and
+`StepServe.Asked` carries the task host with the completed effects. The conformance build's core is
+`UorMcp.ConformanceFixture.conformanceRun`, the step serve over the fixture provider with the tag of
+the store effect of its declaration.
 
 ## The typed outcome
 
@@ -98,7 +101,8 @@ vector.
 | PE-06 the byte serve never performs | `effects.rs`; `StepLaws` |
 | PE-07 the tag is four bytes | `effects.rs`; `StepLaws` |
 | PE-08 the laws are stated | `StepLaws` and the check of its theorem names in `effects.rs` |
-| PE-09 the fixture requests no effect | `effects.rs`: the fixture imports none of the new modules and its core identity names `fixtureRun` |
+| PE-09 the fixture provider requests no effect | `effects.rs`: the fixture imports none of the new modules; the conformance declaration names `conformanceRun`, whose only effect request is the store of a task table |
+| TK-17 the task table is stored through one effect | `effects.rs` and `StepLaws` ([TASKS.md](TASKS.md#the-hosts-side)) |
 
 The tests are falsifying evidence. The theorems in `StepLaws` are the kernel-checked part:
 they are about the step and the wire as data, the pre-provider checks that end in `done`

@@ -11,10 +11,10 @@ is evidence for what it checks, not a proof about the core.
 
 | Part | Where |
 | --- | --- |
-| The declaration, a PrismPM `ServerApplication` whose core is `UorMcp.Fixture.fixtureRun` | `conformance/src/Application.lex.tex`, generated from the vectors of the pinned scenarios: `cargo run -p lifecycle-oracle --example conformance_application -- --write` |
+| The declaration, a PrismPM `ServerApplication` whose core is `UorMcp.ConformanceFixture.conformanceRun`, the step serve over the fixture provider | `conformance/src/Application.lex.tex`, generated from the vectors of the pinned scenarios: `cargo run -p lifecycle-oracle --example conformance_application -- --write` |
 | The LexLean and PrismPM projects the declaration is built in | `lexlean.conformance.toml`, `lexlean.conformance.lock`, `prismpm.toml`; the main project (`lexlean.toml`) does not see them |
 | The copies of PrismPM's `Foundation.Bytes`, `Foundation.Server.V1.Model` and the `prism.arch` lexicon | `conformance/src/Foundation`, `language/prism.arch`; byte for byte the files at the revision of `.github/prismpm.rev` (authority `A-PRISMPM-SERVER-APPLICATION`) |
-| The binding: the host effect `tool.calls`, the count of `tools/call` requests in the last 60 s | `conformance/bindings/mcp-binding` |
+| The binding: the host effects `tool.calls` (the count of `tools/call` requests in the last 60 s), `clock.now`, `task.id` and `task.table`, which fill the request frame, and `task.store`, which the core requests to store the task table | `conformance/bindings/mcp-binding` |
 | The consumer workspace: the generated core and host packages beside the binding | `conformance/Cargo.toml`; the three generated packages are not committed |
 | The oracles | `conformance/oracle/`: `server-suite.mjs`, `recorder.mjs`, `verdict.mjs`, `schema-oracle.mjs`, `identity.mjs`, `fetch-suite.sh` |
 | What is not a pass, and which pull request it waits on | `conformance/waiting.json` |

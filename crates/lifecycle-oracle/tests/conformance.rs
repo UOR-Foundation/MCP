@@ -216,7 +216,9 @@ fn the_vectors_of_the_declaration_are_the_core_packages_answers_cf_02() {
     // The core asks the host for one effect, the store of the task table, and the
     // declaration exercises it: a transcript step for each vector that wrote a table.
     assert_eq!(
-        rendered.matches("HostStep {effect := \"task.store\"").count(),
+        rendered
+            .matches("HostStep {effect := \"task.store\"")
+            .count(),
         tasks.iter().map(|vector| vector.steps.len()).sum::<usize>()
     );
     assert!(
@@ -229,17 +231,24 @@ fn the_vectors_of_the_declaration_are_the_core_packages_answers_cf_02() {
     );
     // The tag of an effect is its position in the declaration: the store is the fifth, and
     // the conformance root names that tag.
-    let declared: Vec<usize> = ["tool.calls", "clock.now", "task.id", "task.table", "task.store"]
-        .iter()
-        .map(|name| {
-            rendered
-                .find(&format!("HostEffect {{name := \"{name}\""))
-                .unwrap_or_else(|| panic!("the declaration holds the effect {name}"))
-        })
-        .collect();
+    let declared: Vec<usize> = [
+        "tool.calls",
+        "clock.now",
+        "task.id",
+        "task.table",
+        "task.store",
+    ]
+    .iter()
+    .map(|name| {
+        rendered
+            .find(&format!("HostEffect {{name := \"{name}\""))
+            .unwrap_or_else(|| panic!("the declaration holds the effect {name}"))
+    })
+    .collect();
     assert!(declared.windows(2).all(|pair| pair[0] < pair[1]));
     assert_eq!(common::application::STORE_TAG, 4);
-    assert!(read("src/ConformanceFixture.lex.tex").contains("name: storeEffectTag,\n  parameters: [],\n  result: Nat,\n  body: 4,"));
+    assert!(read("src/ConformanceFixture.lex.tex")
+        .contains("name: storeEffectTag,\n  parameters: [],\n  result: Nat,\n  body: 4,"));
     // No served vector depends on the host's count, which starts at zero in each run.
     for id in common::application::SERVED {
         let vector = common::application::vector(id);

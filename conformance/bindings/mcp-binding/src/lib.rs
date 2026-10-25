@@ -101,7 +101,9 @@ impl Default for Native {
             started: Instant::now(),
             started_epoch_ms: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .map_or(0, |elapsed| u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX)),
+                .map_or(0, |elapsed| {
+                    u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX)
+                }),
             table: Vec::new(),
         }
     }
