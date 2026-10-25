@@ -1,6 +1,9 @@
 [workspace]
 resolver = "2"
 members = ["crates/*", "xtask"]
+# The conformance build has its own workspace: it needs the packages `prismpm build`
+# generates, which a fresh checkout does not have.
+exclude = ["conformance"]
 
 [workspace.package]
 version = "0.1.0"

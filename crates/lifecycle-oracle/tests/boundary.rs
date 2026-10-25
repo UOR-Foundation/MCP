@@ -155,6 +155,7 @@ fn only_post_is_served_and_anything_else_is_405_with_allow_post_lc_09() {
             body: discover("1").into_bytes(),
             tool_calls: 0,
             host: lifecycle_oracle::TaskHost::default(),
+            state_key: Vec::new(),
         };
         let response = common::exchange_checked(&request).expect("a response frame");
         assert_eq!(response.status, 405, "method {method:?}");

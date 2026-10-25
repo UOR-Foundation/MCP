@@ -8,6 +8,7 @@
 \importmodule{Decode}
 \importmodule{Extension}
 \importmodule{Input}
+\importmodule{InputGuard}
 \importmodule{Json}
 \importmodule{JsonRead}
 \importmodule{JsonRpc}
@@ -309,7 +310,8 @@ definition{
     request : Methods::ClientRequest
   ],
   result: (Result Reply Refusal::Refusal),
-  body: (if (isDiscoverMethod (Methods::methodOfRequest request)) then (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info (ctor Methods::ResultBody.discover (discoverOf info)))) else (settle info request (Tools::gate (project info toolCallLimit) used answer request))),
+  body: (if (isDiscoverMethod (Methods::methodOfRequest request)) then (ctor Result.ok [Reply, Refusal::Refusal] (replyOf info (ctor Methods::ResultBody.discover (discoverOf info)))) else (settle info request (InputGuard::guardedGate (project info requestStateKey) (project info toolCallLimit) used answer request))),
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
@@ -325,6 +327,7 @@ definition{
   body: (match decoded
     | Result.error problem => (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.invalidParams problem))
     | Result.ok typed => (run info answer used typed)),
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
@@ -339,6 +342,7 @@ definition{
   ],
   result: (Result Reply Refusal::Refusal),
   body: (if offered then (afterDecode info answer used (Decode::decodeParams (project routed method) (project routed meta) (project routed params))) else (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound (Methods::methodWire (project routed method))))),
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
@@ -352,6 +356,7 @@ definition{
   ],
   result: (Result Reply Refusal::Refusal),
   body: (gateOffer info answer used routed (offers (project info capabilities) (project routed method))),
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
@@ -367,6 +372,7 @@ definition{
   body: (match validated
     | Result.error refusal => (ctor Result.error [Reply, Refusal::Refusal] refusal)
     | Result.ok routed => (dispatch info answer used routed)),
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
@@ -382,7 +388,7 @@ definition{
   ],
   result: Handled,
   body: (record Handled {id := (project request id), outcome := (afterValidation info answer used (Validation::validate headers versions request))}),
-  axioms: [Quot.sound, propext],
+  axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
@@ -403,7 +409,7 @@ definition{
   ],
   result: Handled,
   body: (handleWith (Extension::infoOf provider) (answerFn provider) 0 headers versions request),
-  axioms: [Quot.sound, propext]
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 definition{
@@ -513,35 +519,40 @@ theorem{
   name: unoffered_method_never_reaches_the_provider,
   parameters: [used : Nat, provider : Extension::Provider, routed : Validation::Routed],
   statement: ((gateOffer (Extension::infoOf provider) (answerFn provider) used routed false) = (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.methodNotFound (Methods::methodWire (project routed method))))),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
   name: dispatch_gates_on_the_declared_capability,
   parameters: [used : Nat, provider : Extension::Provider, routed : Validation::Routed],
   statement: ((dispatch (Extension::infoOf provider) (answerFn provider) used routed) = (gateOffer (Extension::infoOf provider) (answerFn provider) used routed (offers (project provider capabilities) (project routed method)))),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
   name: offered_method_decodes_its_params_before_running,
   parameters: [used : Nat, provider : Extension::Provider, routed : Validation::Routed],
   statement: ((gateOffer (Extension::infoOf provider) (answerFn provider) used routed true) = (afterDecode (Extension::infoOf provider) (answerFn provider) used (Decode::decodeParams (project routed method) (project routed meta) (project routed params)))),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
   name: undecodable_params_are_invalid_params,
   parameters: [used : Nat, provider : Extension::Provider, problem : Refusal::ParamsProblem],
   statement: ((afterDecode (Extension::infoOf provider) (answerFn provider) used (ctor Result.error [Methods::ClientRequest, Refusal::ParamsProblem] problem)) = (ctor Result.error [Reply, Refusal::Refusal] (ctor Refusal::Refusal.invalidParams problem))),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
   name: decoded_params_are_run,
   parameters: [used : Nat, provider : Extension::Provider, typed : Methods::ClientRequest],
   statement: ((afterDecode (Extension::infoOf provider) (answerFn provider) used (ctor Result.ok [Methods::ClientRequest, Refusal::ParamsProblem] typed)) = (run (Extension::infoOf provider) (answerFn provider) used typed)),
-  proof: reflexivity{}
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -571,7 +582,8 @@ theorem{
       {proof: reflexivity{}, binders: [], constructor: tasksCancel}
     ],
     scrutinee: method
-  }
+  },
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -599,7 +611,8 @@ theorem{
       }
     ],
     scrutinee: route
-  }
+  },
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -620,7 +633,7 @@ theorem{
     ],
     theorem: an_unknown_method_never_gets_a_result_whatever_the_admission
   },
-  axioms: [Quot.sound, propext]
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -640,7 +653,7 @@ theorem{
   ],
   statement: ((project (handle provider headers versions request) id) = (project request id)),
   proof: reflexivity{},
-  axioms: [Quot.sound, propext]
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -648,7 +661,7 @@ theorem{
   parameters: [],
   statement: ((typeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCallMetaOnly "tools/list"))) = (ctor Option.some [Meta::ResultType] (ctor Meta::ResultType.complete))),
   proof: reflexivity{},
-  axioms: [Quot.sound, propext]
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -656,7 +669,7 @@ theorem{
   parameters: [],
   statement: ((serverNameOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCallMetaOnly "tools/list"))) = (ctor Option.some [String] "sample")),
   proof: reflexivity{},
-  axioms: [Quot.sound, propext]
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -664,7 +677,7 @@ theorem{
   parameters: [],
   statement: ((codeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCallMetaOnly "prompts/list"))) = (ctor Option.some [Int] (-32601 : Int))),
   proof: reflexivity{},
-  axioms: [Quot.sound, propext]
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -672,7 +685,7 @@ theorem{
   parameters: [],
   statement: ((codeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCall "tools/call" "2026-07-28"))) = (ctor Option.some [Int] (-32603 : Int))),
   proof: reflexivity{},
-  axioms: [Quot.sound, propext]
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -680,7 +693,7 @@ theorem{
   parameters: [],
   statement: ((codeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCallWithoutMeta "tools/list"))) = (ctor Option.some [Int] (-32602 : Int))),
   proof: reflexivity{},
-  axioms: [Quot.sound, propext]
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -688,7 +701,7 @@ theorem{
   parameters: [],
   statement: ((codeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCallMetaOnly "tools/call"))) = (ctor Option.some [Int] (-32602 : Int))),
   proof: reflexivity{},
-  axioms: [Quot.sound, propext]
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -696,7 +709,7 @@ theorem{
   parameters: [],
   statement: ((codeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCallMetaOnly "prompts/get"))) = (ctor Option.some [Int] (-32601 : Int))),
   proof: reflexivity{},
-  axioms: [Quot.sound, propext]
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -704,7 +717,7 @@ theorem{
   parameters: [],
   statement: ((codeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCall "initialize" "2025-11-25"))) = (ctor Option.some [Int] (-32022 : Int))),
   proof: reflexivity{},
-  axioms: [Quot.sound, propext]
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -712,7 +725,7 @@ theorem{
   parameters: [],
   statement: ((codeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCall "prompts/list" "2025-11-25"))) = (ctor Option.some [Int] (-32022 : Int))),
   proof: reflexivity{},
-  axioms: [Quot.sound, propext]
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -720,7 +733,7 @@ theorem{
   parameters: [],
   statement: ((codeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCallWithoutMeta "initialize"))) = (ctor Option.some [Int] (-32602 : Int))),
   proof: reflexivity{},
-  axioms: [Quot.sound, propext]
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 
 theorem{
@@ -728,7 +741,7 @@ theorem{
   parameters: [],
   statement: ((codeOfHandled (handle (toolsProvider) (ctor Option.none [Validation::Headers]) (Validation::supportedVersions) (Validation::sampleCall "initialize" "2026-07-28"))) = (ctor Option.some [Int] (-32601 : Int))),
   proof: reflexivity{},
-  axioms: [Quot.sound, propext]
+  axioms: [Classical.choice, Quot.sound, propext]
 }
 \end{semanticmodule}
 \end{lexlean}

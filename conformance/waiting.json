@@ -1,0 +1,80 @@
+{
+  "spec": "2026-07-28",
+  "waiting": {
+    "input-required-result-request-state": {
+      "issue": 10,
+      "pr": 30,
+      "reason": "the scenario's tool needs a requestState and the core refuses to write one without the host's key (IR-16), and the conformance application's request frame has no section that carries it; the key section of the application is the open work (MCP#10, INPUT-REQUIRED.md, Not met)"
+    },
+    "input-required-result-multiple-input-requests": {
+      "issue": 10,
+      "pr": 30,
+      "reason": "the scenario's tool needs a requestState and the core refuses to write one without the host's key (IR-16), and the conformance application's request frame has no section that carries it; the key section of the application is the open work (MCP#10, INPUT-REQUIRED.md, Not met)"
+    },
+    "input-required-result-multi-round": {
+      "issue": 10,
+      "pr": 30,
+      "reason": "the scenario's tool needs a requestState and the core refuses to write one without the host's key (IR-16), and the conformance application's request frame has no section that carries it; the key section of the application is the open work (MCP#10, INPUT-REQUIRED.md, Not met)"
+    },
+    "input-required-result-tampered-state": {
+      "issue": 10,
+      "pr": 30,
+      "reason": "the scenario's tool needs a requestState and the core refuses to write one without the host's key (IR-16), and the conformance application's request frame has no section that carries it; the key section of the application is the open work (MCP#10, INPUT-REQUIRED.md, Not met)"
+    },
+    "input-required-result-capability-check": {
+      "issue": 10,
+      "pr": 30,
+      "reason": "the scenario's tool needs a requestState and the core refuses to write one without the host's key (IR-16), and the conformance application's request frame has no section that carries it; the key section of the application is the open work (MCP#10, INPUT-REQUIRED.md, Not met)"
+    },
+    "tasks-lifecycle": {
+      "issue": 12,
+      "pr": 32,
+      "reason": "the tools and methods the scenario calls are registered by the tasks extension of MCP#12"
+    },
+    "tasks-capability-negotiation": {
+      "issue": 12,
+      "pr": 32,
+      "reason": "the tools and methods the scenario calls are registered by the tasks extension of MCP#12"
+    },
+    "tasks-wire-fields": {
+      "issue": 12,
+      "pr": 32,
+      "reason": "the tools and methods the scenario calls are registered by the tasks extension of MCP#12"
+    },
+    "tasks-request-state-removal": {
+      "issue": 12,
+      "pr": 32,
+      "reason": "the tools and methods the scenario calls are registered by the tasks extension of MCP#12"
+    },
+    "tasks-mrtr-input": {
+      "issue": 12,
+      "pr": 32,
+      "reason": "the tools and methods the scenario calls are registered by the tasks extension of MCP#12"
+    },
+    "tasks-request-headers": {
+      "issue": 12,
+      "pr": 32,
+      "reason": "the tools and methods the scenario calls are registered by the tasks extension of MCP#12"
+    },
+    "tasks-dispatch-and-envelope": {
+      "issue": 12,
+      "pr": 32,
+      "reason": "the tools and methods the scenario calls are registered by the tasks extension of MCP#12"
+    },
+    "tasks-required-task-error": {
+      "issue": 12,
+      "pr": 32,
+      "reason": "the tools and methods the scenario calls are registered by the tasks extension of MCP#12"
+    },
+    "tasks-mrtr-composition": {
+      "issue": 12,
+      "pr": 32,
+      "reason": "the tools and methods the scenario calls are registered by the tasks extension of MCP#12"
+    }
+  },
+  "suite_skipped": {
+    "tasks-status-notifications": {
+      "reason": "the suite skips it at this pin: it sends no request and reports one SKIPPED check, pending a subscriptions/listen rewrite (src/scenarios/server/tasks/notifications.ts)"
+    }
+  }
+}

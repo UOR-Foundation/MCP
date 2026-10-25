@@ -1,0 +1,49 @@
+\begin{lexlean}{HostEffect}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\title{MCP host effects}
+\begin{semanticmodule}
+structure{
+  name: EffectRequest,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: tag, type: Nat}, {name: payload, type: Bytes}]
+}
+
+structure{
+  name: Completed,
+  type_parameters: [],
+  parameters: [],
+  fields: [{name: tag, type: Nat}, {name: outcome, type: Bytes}]
+}
+
+inductive{
+  name: Step,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: done, fields: [(List Nat)]}, {name: perform, fields: [EffectRequest]}]
+}
+
+definition{name: tagLimit, parameters: [], result: Nat, body: 4294967296, executable: true}
+
+definition{
+  name: tagFits,
+  parameters: [tag : Nat],
+  result: Bool,
+  body: (tag <? (tagLimit)),
+  executable: true
+}
+
+definition{
+  name: hasTag,
+  parameters: [completed : (List Completed), tag : Nat],
+  result: Bool,
+  body: (match completed
+    | List.nil => false
+    | List.cons head rest => (if ((project head tag) =? tag) then true else (hasTag rest tag))),
+  executable: true,
+  recursive_argument: completed
+}
+\end{semanticmodule}
+\end{lexlean}

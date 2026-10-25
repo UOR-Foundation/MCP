@@ -146,7 +146,7 @@ definition{
   result: (Result Methods::ResultBody Refusal::ProviderRefusal),
   body: (match called
     | Option.none => ordinary
-    | Option.some call => (afterArguments host tool params call (Tools::checkArguments tool params))),
+    | Option.some call => (afterArguments host tool params call (Tools::argumentVerdict tool params))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -157,13 +157,13 @@ definition{
     host : Tasks::TaskHost,
     tools : (List Content::Tool),
     taskCall : (Fn (Methods::CallToolParams) (Option TaskCall)),
-    behave : (Fn (Methods::CallToolParams) (Result Methods::Progressed Refusal::ProviderRefusal)),
+    ordinary : (Result Methods::ResultBody Refusal::ProviderRefusal),
     params : Methods::CallToolParams
   ],
   result: (Result Methods::ResultBody Refusal::ProviderRefusal),
   body: (match (Tools::findTool (project params name) tools)
     | Option.none => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.unknownTool (project params name)))
-    | Option.some tool => (callWith host tool params (apply taskCall params) (Tools::answerCall tools behave params))),
+    | Option.some tool => (callWith host tool params (apply taskCall params) ordinary)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }

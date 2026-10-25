@@ -1,0 +1,252 @@
+\begin{lexlean}{Hmac}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{JsonText}
+\importmodule{Sha256}
+\title{Keyed message authentication}
+\begin{semanticmodule}
+definition{name: blockBytes, parameters: [], result: Nat, body: 64, executable: true}
+
+definition{
+  name: byteU,
+  parameters: [source : Bytes, position : Nat],
+  result: UInt8,
+  body: (match (prim index source position : (Option UInt8))
+    | Option.some octet => octet
+    | Option.none => (0 : UInt8)),
+  executable: true
+}
+
+definition{
+  name: rawByte,
+  parameters: [source : Bytes, position : Nat],
+  result: UInt32,
+  body: (match (prim index source position : (Option UInt8))
+    | Option.some octet => (match (prim checked_convert octet : (Option UInt32))
+      | Option.some wide => wide
+      | Option.none => (0 : UInt32))
+    | Option.none => (0 : UInt32)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: rawWord,
+  parameters: [source : Bytes, position : Nat],
+  result: UInt32,
+  body: (Sha256::wordAt (rawByte source position) (rawByte source (position + 1)) (rawByte source (position + 2)) (rawByte source (position + 3))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{name: zeroWord, parameters: [], result: UInt32, body: (0 : UInt32), executable: true}
+
+definition{
+  name: bytesSchedule,
+  parameters: [source : Bytes],
+  result: Sha256::Schedule,
+  body: (record Sha256::Schedule {w0 := (rawWord source 0), w1 := (rawWord source 4), w2 := (rawWord source 8), w3 := (rawWord source 12), w4 := (rawWord source 16), w5 := (rawWord source 20), w6 := (rawWord source 24), w7 := (rawWord source 28), w8 := (rawWord source 32), w9 := (rawWord source 36), w10 := (rawWord source 40), w11 := (rawWord source 44), w12 := (rawWord source 48), w13 := (rawWord source 52), w14 := (rawWord source 56), w15 := (rawWord source 60)}),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: digestSchedule,
+  parameters: [digest : Sha256::Digest],
+  result: Sha256::Schedule,
+  body: (record Sha256::Schedule {w0 := (project digest h0), w1 := (project digest h1), w2 := (project digest h2), w3 := (project digest h3), w4 := (project digest h4), w5 := (project digest h5), w6 := (project digest h6), w7 := (project digest h7), w8 := (zeroWord), w9 := (zeroWord), w10 := (zeroWord), w11 := (zeroWord), w12 := (zeroWord), w13 := (zeroWord), w14 := (zeroWord), w15 := (zeroWord)}),
+  executable: true
+}
+
+definition{
+  name: keySchedule,
+  parameters: [key : Bytes],
+  result: Sha256::Schedule,
+  body: (if ((blockBytes) <? (prim length key : Nat)) then (digestSchedule (Sha256::sha256 key)) else (bytesSchedule key)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: maskSchedule,
+  parameters: [block : Sha256::Schedule, mask : UInt32],
+  result: Sha256::Schedule,
+  body: (record Sha256::Schedule {w0 := (prim bit_xor (project block w0) mask : UInt32), w1 := (prim bit_xor (project block w1) mask : UInt32), w2 := (prim bit_xor (project block w2) mask : UInt32), w3 := (prim bit_xor (project block w3) mask : UInt32), w4 := (prim bit_xor (project block w4) mask : UInt32), w5 := (prim bit_xor (project block w5) mask : UInt32), w6 := (prim bit_xor (project block w6) mask : UInt32), w7 := (prim bit_xor (project block w7) mask : UInt32), w8 := (prim bit_xor (project block w8) mask : UInt32), w9 := (prim bit_xor (project block w9) mask : UInt32), w10 := (prim bit_xor (project block w10) mask : UInt32), w11 := (prim bit_xor (project block w11) mask : UInt32), w12 := (prim bit_xor (project block w12) mask : UInt32), w13 := (prim bit_xor (project block w13) mask : UInt32), w14 := (prim bit_xor (project block w14) mask : UInt32), w15 := (prim bit_xor (project block w15) mask : UInt32)}),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: lengthWord,
+  parameters: [bits : Nat, high : Bool],
+  result: UInt32,
+  body: (if high then (Sha256::wordOfNat (prim quotient bits 4294967296 0 : Nat)) else (Sha256::wordOfNat (prim remainder bits 4294967296 0 : Nat))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: wordFrom,
+  parameters: [message : Bytes, size : Nat, total : Nat, bits : Nat, position : Nat],
+  result: UInt32,
+  body: (if ((position + 8) =? total) then (lengthWord bits true) else (if ((position + 4) =? total) then (lengthWord bits false) else (Sha256::wordAt (Sha256::byteAt message size position) (Sha256::byteAt message size (position + 1)) (Sha256::byteAt message size (position + 2)) (Sha256::byteAt message size (position + 3))))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: blockFrom,
+  parameters: [message : Bytes, size : Nat, total : Nat, bits : Nat, offset : Nat],
+  result: Sha256::Schedule,
+  body: (record Sha256::Schedule {w0 := (wordFrom message size total bits offset), w1 := (wordFrom message size total bits (offset + 4)), w2 := (wordFrom message size total bits (offset + 8)), w3 := (wordFrom message size total bits (offset + 12)), w4 := (wordFrom message size total bits (offset + 16)), w5 := (wordFrom message size total bits (offset + 20)), w6 := (wordFrom message size total bits (offset + 24)), w7 := (wordFrom message size total bits (offset + 28)), w8 := (wordFrom message size total bits (offset + 32)), w9 := (wordFrom message size total bits (offset + 36)), w10 := (wordFrom message size total bits (offset + 40)), w11 := (wordFrom message size total bits (offset + 44)), w12 := (wordFrom message size total bits (offset + 48)), w13 := (wordFrom message size total bits (offset + 52)), w14 := (wordFrom message size total bits (offset + 56)), w15 := (wordFrom message size total bits (offset + 60))}),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: hashFrom,
+  parameters: [start : Sha256::Digest, prefix : Nat, message : Bytes],
+  result: Sha256::Digest,
+  body: (let size : Nat := (prim length message : Nat); (let total : Nat := (prim multiply (prim quotient (size + 72) 64 0 : Nat) 64 : Nat); (second (prim iterate (fun [message, prefix, size, total] (state : (Nat * Sha256::Digest)) => (((first state) + 64), (Sha256::compress (second state) (blockFrom message size total (prim multiply (prefix + size) 8 : Nat) (first state))))) (prim quotient total 64 0 : Nat) (0, start) : (Nat * Sha256::Digest))))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: closingBlock,
+  parameters: [inner : Sha256::Digest],
+  result: Sha256::Schedule,
+  body: (record Sha256::Schedule {w0 := (project inner h0), w1 := (project inner h1), w2 := (project inner h2), w3 := (project inner h3), w4 := (project inner h4), w5 := (project inner h5), w6 := (project inner h6), w7 := (project inner h7), w8 := (2147483648 : UInt32), w9 := (zeroWord), w10 := (zeroWord), w11 := (zeroWord), w12 := (zeroWord), w13 := (zeroWord), w14 := (zeroWord), w15 := (768 : UInt32)}),
+  executable: true
+}
+
+definition{
+  name: hmacDigest,
+  parameters: [key : Bytes, message : Bytes],
+  result: Sha256::Digest,
+  body: (let block : Sha256::Schedule := (keySchedule key); (let inner : Sha256::Digest := (hashFrom (Sha256::compress (Sha256::initial) (maskSchedule block (909522486 : UInt32))) 64 message); (Sha256::compress (Sha256::compress (Sha256::initial) (maskSchedule block (1549556828 : UInt32))) (closingBlock inner)))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: wordByte,
+  parameters: [word : UInt32, shift : UInt32],
+  result: Bytes,
+  body: (JsonText::byteOf (prim to_nat (prim bit_and (Sha256::shiftRight word shift) (255 : UInt32) : UInt32) : Nat)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: wordBytes,
+  parameters: [word : UInt32],
+  result: Bytes,
+  body: (prim append (wordByte word (24 : UInt32)) (prim append (wordByte word (16 : UInt32)) (prim append (wordByte word (8 : UInt32)) (wordByte word (0 : UInt32)) : Bytes) : Bytes) : Bytes),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: digestBytes,
+  parameters: [digest : Sha256::Digest],
+  result: Bytes,
+  body: (prim append (wordBytes (project digest h0)) (prim append (wordBytes (project digest h1)) (prim append (wordBytes (project digest h2)) (prim append (wordBytes (project digest h3)) (prim append (wordBytes (project digest h4)) (prim append (wordBytes (project digest h5)) (prim append (wordBytes (project digest h6)) (wordBytes (project digest h7)) : Bytes) : Bytes) : Bytes) : Bytes) : Bytes) : Bytes) : Bytes),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: hmac,
+  parameters: [key : Bytes, message : Bytes],
+  result: Bytes,
+  body: (digestBytes (hmacDigest key message)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: hmacHex,
+  parameters: [key : Bytes, message : Bytes],
+  result: Bytes,
+  body: (Sha256::hexDigest (hmacDigest key message)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: differences,
+  parameters: [left : Bytes, right : Bytes],
+  result: Nat,
+  body: (second (prim iterate (fun [left, right] (state : (Nat * Nat)) => (((first state) + 1), ((second state) + (prim to_nat (prim bit_xor (byteU left (first state)) (byteU right (first state)) : UInt8) : Nat)))) (prim length left : Nat) (0, 0) : (Nat * Nat))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: sameTag,
+  parameters: [left : Bytes, right : Bytes],
+  result: Bool,
+  body: (((prim length left : Nat) =? (prim length right : Nat)) && ((differences left right) =? 0)),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+theorem{
+  name: hashing_from_the_initial_state_is_hashing,
+  parameters: [],
+  statement: ((hashFrom (Sha256::initial) 0 0x616263) = (Sha256::sha256 0x616263)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: rfc4231_case_1,
+  parameters: [],
+  statement: ((hmacDigest 0x0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b 0x4869205468657265) = (record Sha256::Digest {h0 := (2956217441 : UInt32), h1 := (3638245459 : UInt32), h2 := (1554558926 : UInt32), h3 := (2936795435 : UInt32), h4 := (2283651584 : UInt32), h5 := (3380821415 : UInt32), h6 := (652818284 : UInt32), h7 := (775081975 : UInt32)})),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: rfc4231_case_2,
+  parameters: [],
+  statement: ((hmacDigest 0x4a656665 0x7768617420646f2079612077616e7420666f72206e6f7468696e673f) = (record Sha256::Digest {h0 := (1541194054 : UInt32), h1 := (3210769742 : UInt32), h2 := (1778656294 : UInt32), h3 := (144012743 : UInt32), h4 := (1509965576 : UInt32), h5 := (2636593539 : UInt32), h6 := (2649512121 : UInt32), h7 := (1693202499 : UInt32)})),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: rfc4231_case_3,
+  parameters: [],
+  statement: ((hmacDigest 0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd) = (record Sha256::Digest {h0 := (2000595230 : UInt32), h1 := (914361926 : UInt32), h2 := (2236463339 : UInt32), h3 := (3499196839 : UInt32), h4 := (693701003 : UInt32), h5 := (1056489762 : UInt32), h6 := (3647165716 : UInt32), h7 := (3470091774 : UInt32)})),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: rfc4231_case_4,
+  parameters: [],
+  statement: ((hmacDigest 0x0102030405060708090a0b0c0d0e0f10111213141516171819 0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd) = (record Sha256::Digest {h0 := (2186644024 : UInt32), h1 := (2588163086 : UInt32), h2 := (2764865944 : UInt32), h3 := (2582775866 : UInt32), h4 := (2247162531 : UInt32), h5 := (3849910279 : UInt32), h6 := (2049851380 : UInt32), h7 := (1730766427 : UInt32)})),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: rfc4231_case_6,
+  parameters: [],
+  statement: ((hmacDigest 0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 0x54657374205573696e67204c6172676572205468616e20426c6f636b2d53697a65204b6579202d2048617368204b6579204669727374) = (record Sha256::Digest {h0 := (1625567577 : UInt32), h1 := (518043263 : UInt32), h2 := (227157674 : UInt32), h3 := (3421878143 : UInt32), h4 := (2383136289 : UInt32), h5 := (925418772 : UInt32), h6 := (88474639 : UInt32), h7 := (249790292 : UInt32)})),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: rfc4231_case_7,
+  parameters: [],
+  statement: ((hmacDigest 0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 0x5468697320697320612074657374207573696e672061206c6172676572207468616e20626c6f636b2d73697a65206b657920616e642061206c6172676572207468616e20626c6f636b2d73697a6520646174612e20546865206b6579206e6565647320746f20626520686173686564206265666f7265206265696e6720757365642062792074686520484d414320616c676f726974686d2e) = (record Sha256::Digest {h0 := (2601123751 : UInt32), h1 := (462696395 : UInt32), h2 := (660823996 : UInt32), h3 := (3585141060 : UInt32), h4 := (3218891620 : UInt32), h5 := (1325863827 : UInt32), h6 := (2323599699 : UInt32), h7 := (1547318754 : UInt32)})),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+\end{semanticmodule}
+\end{lexlean}

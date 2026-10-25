@@ -2,6 +2,8 @@
 //! generated root, and the pins the register records.
 #![allow(dead_code)]
 
+pub mod application;
+
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -174,7 +176,14 @@ pub fn post(headers: &[(&str, &str)], body: &str) -> Request {
         body: body.as_bytes().to_vec(),
         tool_calls: 0,
         host: lifecycle_oracle::TaskHost::default(),
+        state_key: Vec::new(),
     }
+}
+
+/// `request`, sent when the host holds `key` as the `requestState` key.
+pub fn keyed(mut request: Request, key: &[u8]) -> Request {
+    request.state_key = key.to_vec();
+    request
 }
 
 /// `request`, sent when the host has already counted `tool_calls` tool calls for the
@@ -214,6 +223,7 @@ pub fn request_of(vector: &Value) -> Request {
             u32::try_from(n.as_u64().expect("tool_calls")).expect("u32")
         }),
         host: lifecycle_oracle::TaskHost::default(),
+        state_key: Vec::new(),
     }
 }
 
@@ -571,6 +581,23 @@ pub fn frame_checked_on(frame: &[u8], stack_bytes: usize) -> Result<Response, Fr
     let response = decode_response(&exchange_frame_on(frame, stack_bytes))?;
     check_response(None, &response);
     Ok(response)
+}
+
+/// Decode a response frame that the step root wrote and check it against the schema.
+///
+/// # Panics
+///
+/// Panics when the bytes are not a response frame or the schema refuses it.
+pub fn step_response_checked(frame: &[u8]) -> Response {
+    let response = decode_response(frame).expect("a response frame");
+    check_response(None, &response);
+    response
+}
+
+/// The frame the byte root writes for a frame: the answer the step root must give when
+/// no effect is requested.
+pub fn byte_root_frame(frame: &[u8]) -> Vec<u8> {
+    lifecycle_oracle::exchange_frame(frame)
 }
 
 /// Run one request through the second generated root, the one over a catalog of many

@@ -4,7 +4,7 @@ Feature: Tools
 
   @TL-01 @build
   Scenario: tools/list answers with the tool catalog in its fixed declaration order, every tool with a name of 1 to 64 characters from A-Z, a-z, 0-9, underscore, dot and hyphen (the intersection of the specification and of the suite check), a description and an inputSchema, and an outputSchema when it declares one; the catalog is one page, so a request that carries a cursor is refused as invalidParams (-32602); a kernel-checked theorem states the order.
-    Given the fixture catalog of twenty-five tools
+    Given the fixture catalog of thirty-five tools
     When tools/list is requested, with and without a cursor
     Then the names are the catalog's in its declared order, every tool has the members and the name format, and a cursor is refused as -32602
 
@@ -109,3 +109,9 @@ Feature: Tools
     Given a very large arguments object, a very large text argument and a catalog of many tools
     When the root answers each on the default stack
     Then each is answered and none overflows the stack
+
+  @TL-19 @build
+  Scenario: The conformance fixture lists the two diagnostic tools the pinned server-stateless scenario calls, test_streaming_elicitation and test_logging_tool, and a tools/call of each answers one text content block (Streaming complete, Logging evaluated) with no independent JSON-RPC request and no notifications/message written to the response, with or without a logLevel in the request: the core declares no logging capability and streams no server request.
+    Given a tools/call of each diagnostic tool, with and without a logLevel
+    When the root answers
+    Then each result is one text block and the response holds no server request and no log notification

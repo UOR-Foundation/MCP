@@ -41,12 +41,14 @@ MCP's own oracles, so this repository makes no conformance claim.
 | `Param`, `Base64`, `Http`, `HeaderLaws` | the HTTP exchange as data: header fields read without regard to case, repeated and malformed fields refused, the Base64 sentinel decoded, `Mcp-Param` headers compared by kind, and theorems about them ([LIFECYCLE.md](LIFECYCLE.md)) |
 | `RpcWire`, `ResultJson`, `Status`, `Frame` | JSON-RPC faults before a request exists, the result bodies of `server/discover`, `tools/list`, `tools/call`, `resources/list`, `resources/read`, `resources/templates/list`, `prompts/list`, `prompts/get` and `completion/complete` as JSON, the HTTP status of every outcome with kernel-checked theorems, and the first-order frame that is the boundary encoding |
 | `Serve`, `Fixture`, `Crowd` | the pipeline from an encoded request to an encoded response, and its production roots `fixtureRun` over the tool catalog of the conformance fixture and `crowdRun` over a catalog of 60 tools ([LIFECYCLE.md](LIFECYCLE.md), [TOOLS.md](TOOLS.md)) |
+| `Sha256`, `Hmac`, `RequestState`, `InputGuard`, `Interact`, `InputFixture`, `InputLaws` | input-required results (SEP-2322): SHA-256 and HMAC-SHA-256 with the RFC 4231 test cases as theorems, the tamper-evident `requestState` sealed and opened under the host's key, the guard that opens a presented state and validates `inputResponses` before a tool runs and seals the state a tool hands out, the interactive tool engine, the eight input-required tools of the conformance fixture, and their theorems ([INPUT-REQUIRED.md](INPUT-REQUIRED.md)) |
 | `Numeric`, `JsonEq`, `Schema`, `Admission`, `Sanitize`, `Tools`, `ToolLaws` | the tools layer: number comparison, JSON equality, a JSON Schema 2020-12 validator, catalog admission and the parameter rules derived from `x-mcp-header`, output sanitization, `tools/list` and `tools/call`, the rate-limit decision, and their theorems ([TOOLS.md](TOOLS.md)) |
 | `Resources`, `ResourceFixture`, `ResourceLaws` | the resources layer: `resources/list`, `resources/read`, `resources/templates/list`, `prompts/list`, `prompts/get` and `completion/complete`, their refusals and cache hints, the catalogs of the conformance fixture, and their theorems ([RESOURCES.md](RESOURCES.md)) |
 | `Transport`, `TransportLaws` | the Streamable HTTP transport: the response event stream and its framing, the `Accept` negotiation, the `Origin` and `Host` allow-list against DNS rebinding, and their theorems ([TRANSPORT.md](TRANSPORT.md)) |
+| `HostEffect`, `StepServe`, `StepFixture`, `StepLaws` | a provider's request for a host effect as a typed outcome (`CallOutcome.perform`, `ReadOutcome.perform`, `PromptOutcome.perform`), the step serve that reads PrismPM's turn and writes its step, the fixture root `stepFixtureRun`, and their theorems ([PROVIDER-EFFECTS.md](PROVIDER-EFFECTS.md)) |
 
-What is not modeled: the `subscriptions/listen` stream (its params and result types are
-declared, but the method is not dispatched), server notifications other than progress and task
+What is not modeled: the `subscriptions/listen` stream (its params and result types are declared,
+but the method is not dispatched), server notifications other than progress and task
 status, and host effects (sockets, the loopback binding, closing a stream). The core keeps no
 state: the host holds the task table ([TASKS.md](TASKS.md)).
 
@@ -54,10 +56,13 @@ state: the host holds the task table ([TASKS.md](TASKS.md)).
   stateless lifecycle and HTTP header capabilities of #7 (LC-01 to LC-16, HH-01 to HH-13),
   the tools of #8 (TL-01 to TL-18), the resources, resource templates, prompts,
   completion and caching capabilities of #9 (RP-01 to RP-19), the Streamable HTTP
-  transport of #11 (SH-01 to SH-10) and the tasks extension of #12 (TK-01 to TK-16).
-  No other protocol capability is registered and none is claimed, and the conformance
-  scenarios have not been run against a conformance build (#13). The ten tasks scenarios
-  are extension scenarios that the pinned requirements run and do not score.
+  transport of #11 (SH-01 to SH-10), the input-required results of #10
+  (IR-01 to IR-19) and the tasks extension of #12 (TK-01 to TK-16).
+  The conformance build and the oracle run of #13 (CF-01 to CF-07) are in
+  [CONFORMANCE-RUN.md](CONFORMANCE-RUN.md): the pinned suite's server scenarios and the
+  2026-07-28 schema are run over the served core, and that file lists, scenario by scenario,
+  what passes and what does not. No other protocol capability is registered and none is
+  claimed.
 - The repository is not bound to a PrismPM SDK release (#4): `prismpm.lock` and
   `template.lock` are absent, so `just vv` and the devcontainer cannot run.
 - v0.1.0 is tracked in #16.

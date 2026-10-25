@@ -1,0 +1,526 @@
+\begin{lexlean}{InputLaws}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Capabilities}
+\importmodule{Common}
+\importmodule{Content}
+\importmodule{Dispatch}
+\importmodule{Fixture}
+\importmodule{InputFixture}
+\importmodule{Input}
+\importmodule{Interact}
+\importmodule{Json}
+\importmodule{Meta}
+\importmodule{Methods}
+\importmodule{Refusal}
+\importmodule{ResultJson}
+\importmodule{Status}
+\title{Input-required laws}
+\begin{semanticmodule}
+definition{
+  name: callWith,
+  parameters: [
+    name : String,
+    declared : Capabilities::ClientCapabilities,
+    responses : (Option Json::JsonObject),
+    held : (Option String)
+  ],
+  result: Methods::CallToolParams,
+  body: (record Methods::CallToolParams {meta := (record Meta::RequestMeta {protocolVersion := "2026-07-28", clientCapabilities := declared, clientInfo := (ctor Option.none [Json::JsonObject]), logLevel := (ctor Option.none [Common::LoggingLevel]), progressToken := (ctor Option.none [Common::ProgressToken]), raw := (record Json::JsonObject {members := (nil (String * Json::Json))})}), name := name, arguments := (ctor Option.none [Json::JsonObject]), inputResponses := responses, requestState := held}),
+  executable: true
+}
+
+definition{
+  name: allDeclared,
+  parameters: [],
+  result: Capabilities::ClientCapabilities,
+  body: (record Capabilities::ClientCapabilities {experimental := (ctor Option.none [Json::JsonObject]), roots := (ctor Option.some [Json::JsonObject] (Capabilities::noObject)), sampling := (ctor Option.some [Json::JsonObject] (Capabilities::noObject)), elicitation := (ctor Option.some [Json::JsonObject] (Capabilities::noObject)), extensions := (ctor Option.none [Json::JsonObject])}),
+  executable: true
+}
+
+definition{
+  name: noResponses,
+  parameters: [],
+  result: (Option Json::JsonObject),
+  body: (ctor Option.none [Json::JsonObject]),
+  executable: true
+}
+
+definition{
+  name: noState,
+  parameters: [],
+  result: (Option String),
+  body: (ctor Option.none [String]),
+  executable: true
+}
+
+definition{
+  name: responsesOf,
+  parameters: [entries : (List (String * Json::Json))],
+  result: (Option Json::JsonObject),
+  body: (ctor Option.some [Json::JsonObject] (record Json::JsonObject {members := entries})),
+  executable: true
+}
+
+definition{
+  name: accepted,
+  parameters: [content : (List (String * Json::Json))],
+  result: Json::Json,
+  body: (ctor Json::Json.object (cons ("action", (ctor Json::Json.text "accept")) (cons ("content", (ctor Json::Json.object content)) (nil (String * Json::Json))))),
+  executable: true
+}
+
+definition{
+  name: namesAsked,
+  parameters: [entries : (List (String * Input::InputRequest))],
+  result: (List String),
+  body: (match entries
+    | List.nil => (nil String)
+    | List.cons entry rest => (cons (first entry) (namesAsked rest))),
+  executable: true,
+  recursive_argument: entries
+}
+
+definition{
+  name: wireOf,
+  parameters: [request : Input::InputRequest],
+  result: String,
+  body: (match request
+    | Input::InputRequest.elicitation found => "elicitation/create"
+    | Input::InputRequest.sampling found => "sampling/createMessage"
+    | Input::InputRequest.roots found => "roots/list"),
+  executable: true
+}
+
+definition{
+  name: wiresAsked,
+  parameters: [entries : (List (String * Input::InputRequest))],
+  result: (List String),
+  body: (match entries
+    | List.nil => (nil String)
+    | List.cons entry rest => (cons (wireOf (second entry)) (wiresAsked rest))),
+  executable: true,
+  recursive_argument: entries
+}
+
+definition{
+  name: keysAsked,
+  parameters: [stepped : (Result Interact::Step Refusal::ProviderRefusal)],
+  result: (Option (List String)),
+  body: (match stepped
+    | Result.error refusal => (ctor Option.none [(List String)])
+    | Result.ok taken => (match taken
+      | Interact::Step.finished done => (ctor Option.none [(List String)])
+      | Interact::Step.asks needed => (ctor Option.some [(List String)] (namesAsked (Input::requestsOf needed))))),
+  executable: true
+}
+
+definition{
+  name: wiresOfStep,
+  parameters: [stepped : (Result Interact::Step Refusal::ProviderRefusal)],
+  result: (Option (List String)),
+  body: (match stepped
+    | Result.error refusal => (ctor Option.none [(List String)])
+    | Result.ok taken => (match taken
+      | Interact::Step.finished done => (ctor Option.none [(List String)])
+      | Interact::Step.asks needed => (ctor Option.some [(List String)] (wiresAsked (Input::requestsOf needed))))),
+  executable: true
+}
+
+definition{
+  name: stateAsked,
+  parameters: [stepped : (Result Interact::Step Refusal::ProviderRefusal)],
+  result: (Option String),
+  body: (match stepped
+    | Result.error refusal => (ctor Option.none [String])
+    | Result.ok taken => (match taken
+      | Interact::Step.finished done => (ctor Option.none [String])
+      | Interact::Step.asks needed => (Input::stateOf needed))),
+  executable: true
+}
+
+definition{
+  name: wasFinished,
+  parameters: [stepped : (Result Interact::Step Refusal::ProviderRefusal)],
+  result: Bool,
+  body: (match stepped
+    | Result.error refusal => false
+    | Result.ok taken => (match taken
+      | Interact::Step.finished done => true
+      | Interact::Step.asks needed => false)),
+  executable: true
+}
+
+definition{
+  name: refusalOf,
+  parameters: [stepped : (Result Interact::Step Refusal::ProviderRefusal)],
+  result: (Option Refusal::ProviderRefusal),
+  body: (match stepped
+    | Result.error refusal => (ctor Option.some [Refusal::ProviderRefusal] refusal)
+    | Result.ok taken => (ctor Option.none [Refusal::ProviderRefusal])),
+  executable: true
+}
+
+definition{
+  name: stepOf,
+  parameters: [
+    name : String,
+    declared : Capabilities::ClientCapabilities,
+    responses : (Option Json::JsonObject),
+    held : (Option String)
+  ],
+  result: (Result Interact::Step Refusal::ProviderRefusal),
+  body: (InputFixture::interact (callWith name declared responses held)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: promptCall,
+  parameters: [responses : (Option Json::JsonObject)],
+  result: Methods::GetPromptParams,
+  body: (record Methods::GetPromptParams {meta := (record Meta::RequestMeta {protocolVersion := "2026-07-28", clientCapabilities := (allDeclared), clientInfo := (ctor Option.none [Json::JsonObject]), logLevel := (ctor Option.none [Common::LoggingLevel]), progressToken := (ctor Option.none [Common::ProgressToken]), raw := (record Json::JsonObject {members := (nil (String * Json::Json))})}), name := "test_input_required_result_prompt", arguments := (ctor Option.none [(List (String * String))]), inputResponses := responses, requestState := (ctor Option.none [String])}),
+  executable: true
+}
+
+definition{
+  name: promptAsked,
+  parameters: [answered : (Result Methods::ResultBody Refusal::ProviderRefusal)],
+  result: (Option (List String)),
+  body: (match answered
+    | Result.error refusal => (ctor Option.none [(List String)])
+    | Result.ok body => (match body
+      | Methods::ResultBody.inputRequired needed => (ctor Option.some [(List String)] (namesAsked (Input::requestsOf needed)))
+      | Methods::ResultBody.discover found => (ctor Option.none [(List String)])
+      | Methods::ResultBody.listTools found => (ctor Option.none [(List String)])
+      | Methods::ResultBody.callTool found => (ctor Option.none [(List String)])
+      | Methods::ResultBody.progressed found => (ctor Option.none [(List String)])
+      | Methods::ResultBody.listResources found => (ctor Option.none [(List String)])
+      | Methods::ResultBody.readResource found => (ctor Option.none [(List String)])
+      | Methods::ResultBody.listResourceTemplates found => (ctor Option.none [(List String)])
+      | Methods::ResultBody.listPrompts found => (ctor Option.none [(List String)])
+      | Methods::ResultBody.getPrompt found => (ctor Option.none [(List String)])
+      | Methods::ResultBody.complete found => (ctor Option.none [(List String)])
+      | Methods::ResultBody.getTask found => (ctor Option.none [(List String)])
+      | Methods::ResultBody.acknowledged => (ctor Option.none [(List String)])
+      | Methods::ResultBody.taskCreated found => (ctor Option.none [(List String)])
+      | Methods::ResultBody.stored found => (ctor Option.none [(List String)]))),
+  executable: true
+}
+
+definition{
+  name: promptFinished,
+  parameters: [answered : (Result Methods::ResultBody Refusal::ProviderRefusal)],
+  result: Bool,
+  body: (match answered
+    | Result.error refusal => false
+    | Result.ok body => (match body
+      | Methods::ResultBody.getPrompt found => true
+      | Methods::ResultBody.inputRequired needed => false
+      | Methods::ResultBody.discover found => false
+      | Methods::ResultBody.listTools found => false
+      | Methods::ResultBody.callTool found => false
+      | Methods::ResultBody.progressed found => false
+      | Methods::ResultBody.listResources found => false
+      | Methods::ResultBody.readResource found => false
+      | Methods::ResultBody.listResourceTemplates found => false
+      | Methods::ResultBody.listPrompts found => false
+      | Methods::ResultBody.complete found => false
+      | Methods::ResultBody.getTask found => false
+      | Methods::ResultBody.acknowledged => false
+      | Methods::ResultBody.taskCreated found => false
+      | Methods::ResultBody.stored found => false)),
+  executable: true
+}
+
+definition{
+  name: samplingNeeded,
+  parameters: [],
+  result: Input::InputRequiredResult,
+  body: (ctor Input::InputRequiredResult.requests (InputFixture::single "capital_question" (InputFixture::samplingRequest "What is the capital of France?" 100))),
+  executable: true
+}
+
+theorem{
+  name: the_elicitation_tool_asks_for_the_name,
+  parameters: [],
+  statement: ((keysAsked (stepOf "test_input_required_result_elicitation" (allDeclared) (noResponses) (noState))) = (ctor Option.some [(List String)] (cons "user_name" (nil String)))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: the_elicitation_tool_asks_by_elicitation_create,
+  parameters: [],
+  statement: ((wiresOfStep (stepOf "test_input_required_result_elicitation" (allDeclared) (noResponses) (noState))) = (ctor Option.some [(List String)] (cons "elicitation/create" (nil String)))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: the_elicitation_tool_keeps_no_state,
+  parameters: [],
+  statement: ((stateAsked (stepOf "test_input_required_result_elicitation" (allDeclared) (noResponses) (noState))) = (ctor Option.none [String])),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: the_elicitation_tool_finishes_when_the_name_is_given,
+  parameters: [],
+  statement: ((wasFinished (stepOf "test_input_required_result_elicitation" (allDeclared) (responsesOf (cons ("user_name", (accepted (cons ("name", (ctor Json::Json.text "Alice")) (nil (String * Json::Json))))) (nil (String * Json::Json)))) (noState))) = true),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: the_sampling_tool_asks_by_sampling_create_message,
+  parameters: [],
+  statement: ((wiresOfStep (stepOf "test_input_required_result_sampling" (allDeclared) (noResponses) (noState))) = (ctor Option.some [(List String)] (cons "sampling/createMessage" (nil String)))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: the_roots_tool_asks_by_roots_list,
+  parameters: [],
+  statement: ((wiresOfStep (stepOf "test_input_required_result_list_roots" (allDeclared) (noResponses) (noState))) = (ctor Option.some [(List String)] (cons "roots/list" (nil String)))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: the_roots_tool_finishes_when_the_roots_are_given,
+  parameters: [],
+  statement: ((wasFinished (stepOf "test_input_required_result_list_roots" (allDeclared) (responsesOf (cons ("client_roots", (ctor Json::Json.object (cons ("roots", (ctor Json::Json.array (cons (ctor Json::Json.object (cons ("uri", (ctor Json::Json.text "file:///test/root")) (nil (String * Json::Json)))) (nil Json::Json)))) (nil (String * Json::Json))))) (nil (String * Json::Json)))) (noState))) = true),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: the_request_state_tool_asks_with_its_state,
+  parameters: [],
+  statement: ((stateAsked (stepOf "test_input_required_result_request_state" (allDeclared) (noResponses) (noState))) = (ctor Option.some [String] "request-state")),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: the_request_state_tool_finishes_with_its_state_and_a_confirmation,
+  parameters: [],
+  statement: ((wasFinished (stepOf "test_input_required_result_request_state" (allDeclared) (responsesOf (cons ("confirm", (accepted (cons ("ok", (ctor Json::Json.bool true)) (nil (String * Json::Json))))) (nil (String * Json::Json)))) (ctor Option.some [String] "request-state"))) = true),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: the_request_state_tool_asks_again_without_its_state,
+  parameters: [],
+  statement: ((wasFinished (stepOf "test_input_required_result_request_state" (allDeclared) (responsesOf (cons ("confirm", (accepted (cons ("ok", (ctor Json::Json.bool true)) (nil (String * Json::Json))))) (nil (String * Json::Json)))) (noState))) = false),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: the_multiple_inputs_tool_asks_three_kinds_at_once,
+  parameters: [],
+  statement: ((wiresOfStep (stepOf "test_input_required_result_multiple_inputs" (allDeclared) (noResponses) (noState))) = (ctor Option.some [(List String)] (cons "elicitation/create" (cons "sampling/createMessage" (cons "roots/list" (nil String)))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: the_multiple_inputs_tool_names_its_three_requests,
+  parameters: [],
+  statement: ((keysAsked (stepOf "test_input_required_result_multiple_inputs" (allDeclared) (noResponses) (noState))) = (ctor Option.some [(List String)] (cons "user_name" (cons "greeting" (cons "client_roots" (nil String)))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: the_multiple_inputs_tool_asks_again_only_for_what_is_missing,
+  parameters: [],
+  statement: ((keysAsked (stepOf "test_input_required_result_multiple_inputs" (allDeclared) (responsesOf (cons ("user_name", (accepted (cons ("name", (ctor Json::Json.text "Alice")) (nil (String * Json::Json))))) (nil (String * Json::Json)))) (ctor Option.some [String] "multiple-inputs"))) = (ctor Option.some [(List String)] (cons "greeting" (cons "client_roots" (nil String))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: the_tampered_state_tool_asks_with_its_integrity_protected_state,
+  parameters: [],
+  statement: ((stateAsked (stepOf "test_input_required_result_tampered_state" (allDeclared) (noResponses) (noState))) = (ctor Option.some [String] "tamper-test")),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_client_that_declares_only_sampling_is_asked_only_to_sample,
+  parameters: [],
+  statement: ((keysAsked (stepOf "test_input_required_result_capabilities" (Capabilities::samplingRequirement) (noResponses) (noState))) = (ctor Option.some [(List String)] (cons "sample_input" (nil String)))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_client_that_declares_only_elicitation_is_asked_only_to_elicit,
+  parameters: [],
+  statement: ((keysAsked (stepOf "test_input_required_result_capabilities" (Capabilities::elicitationRequirement) (noResponses) (noState))) = (ctor Option.some [(List String)] (cons "elicit_input" (nil String)))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_client_that_declares_both_is_asked_both,
+  parameters: [],
+  statement: ((keysAsked (stepOf "test_input_required_result_capabilities" (allDeclared) (noResponses) (noState))) = (ctor Option.some [(List String)] (cons "elicit_input" (cons "sample_input" (nil String))))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_client_that_declares_neither_is_asked_nothing,
+  parameters: [],
+  statement: ((wasFinished (stepOf "test_input_required_result_capabilities" (Capabilities::noClientCapabilities) (noResponses) (noState))) = true),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: missing_responses_are_asked_for_again_not_refused,
+  parameters: [],
+  statement: ((keysAsked (stepOf "test_input_required_result_elicitation" (allDeclared) (responsesOf (cons ("wrong_key", (accepted (cons ("data", (ctor Json::Json.text "wrong")) (nil (String * Json::Json))))) (nil (String * Json::Json)))) (noState))) = (ctor Option.some [(List String)] (cons "user_name" (nil String)))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: unknown_keys_among_the_responses_are_ignored,
+  parameters: [],
+  statement: ((wasFinished (stepOf "test_input_required_result_elicitation" (allDeclared) (responsesOf (cons ("unknown_extra_key", (accepted (cons ("foo", (ctor Json::Json.text "bar")) (nil (String * Json::Json))))) (cons ("user_name", (accepted (cons ("name", (ctor Json::Json.text "Alice")) (nil (String * Json::Json))))) (cons ("another_unexpected", (accepted (nil (String * Json::Json)))) (nil (String * Json::Json)))))) (noState))) = true),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_number_for_a_response_is_refused,
+  parameters: [],
+  statement: ((refusalOf (stepOf "test_input_required_result_elicitation" (allDeclared) (responsesOf (cons ("user_name", (ctor Json::Json.number (record Json::Decimal {mantissa := (12345 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))) (noState))) = (ctor Option.some [Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidInputResponses))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: an_object_that_is_not_an_elicit_result_is_refused,
+  parameters: [],
+  statement: ((refusalOf (stepOf "test_input_required_result_elicitation" (allDeclared) (responsesOf (cons ("user_name", (ctor Json::Json.object (cons ("name", (ctor Json::Json.text "Alice")) (nil (String * Json::Json))))) (nil (String * Json::Json)))) (noState))) = (ctor Option.some [Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidInputResponses))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: a_sampling_result_without_a_model_is_refused,
+  parameters: [],
+  statement: ((refusalOf (stepOf "test_input_required_result_sampling" (allDeclared) (responsesOf (cons ("capital_question", (ctor Json::Json.object (cons ("role", (ctor Json::Json.text "assistant")) (cons ("content", (ctor Json::Json.object (nil (String * Json::Json)))) (nil (String * Json::Json)))))) (nil (String * Json::Json)))) (noState))) = (ctor Option.some [Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidInputResponses))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: roots_that_are_not_an_array_are_refused,
+  parameters: [],
+  statement: ((refusalOf (stepOf "test_input_required_result_list_roots" (allDeclared) (responsesOf (cons ("client_roots", (ctor Json::Json.object (cons ("roots", (ctor Json::Json.text "none")) (nil (String * Json::Json))))) (nil (String * Json::Json)))) (noState))) = (ctor Option.some [Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidInputResponses))),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+
+theorem{
+  name: an_input_required_result_has_the_input_required_result_type,
+  parameters: [needed : Input::InputRequiredResult],
+  statement: ((Methods::resultTypeOf (ctor Methods::ResultBody.inputRequired needed)) = (ctor Meta::ResultType.input_required)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: only_tools_call_resources_read_and_prompts_get_support_input_required,
+  parameters: [],
+  statement: (((((Methods::supportsInputRequired (ctor Methods::Method.toolsCall)) = true) /\ ((Methods::supportsInputRequired (ctor Methods::Method.resourcesRead)) = true)) /\ ((Methods::supportsInputRequired (ctor Methods::Method.promptsGet)) = true)) /\ ((((Methods::supportsInputRequired (ctor Methods::Method.toolsList)) = false) /\ ((Methods::supportsInputRequired (ctor Methods::Method.promptsList)) = false)) /\ (((Methods::supportsInputRequired (ctor Methods::Method.serverDiscover)) = false) /\ ((Methods::supportsInputRequired (ctor Methods::Method.completionComplete)) = false)))),
+  proof: decide{}
+}
+
+theorem{
+  name: a_client_without_sampling_is_refused_a_sampling_request,
+  parameters: [],
+  statement: ((Dispatch::pendingReply (Fixture::fixtureInfo) (project (callWith "test_input_required_result_sampling" (Capabilities::noClientCapabilities) (noResponses) (noState)) meta) (samplingNeeded)) = (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.missingCapability (Capabilities::samplingRequirement))))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_client_with_sampling_is_sent_a_sampling_request,
+  parameters: [],
+  statement: ((Dispatch::pendingReply (Fixture::fixtureInfo) (project (callWith "test_input_required_result_sampling" (Capabilities::samplingRequirement) (noResponses) (noState)) meta) (samplingNeeded)) = (ctor Result.ok [Dispatch::Reply, Refusal::Refusal] (Dispatch::replyOf (Fixture::fixtureInfo) (ctor Methods::ResultBody.inputRequired (samplingNeeded))))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_missing_client_capability_is_refused_with_the_capability_code_and_a_bad_request,
+  parameters: [],
+  statement: (((Refusal::codeOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.missingCapability (Capabilities::samplingRequirement)))) = (-32021 : Int)) /\ ((Status::statusOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.missingCapability (Capabilities::samplingRequirement)))) = 400)),
+  proof: decide{}
+}
+
+theorem{
+  name: a_url_elicitation_is_written_with_its_mode_and_url,
+  parameters: [],
+  statement: ((ResultJson::inputRequestJson (ctor Input::InputRequest.elicitation (ctor Input::ElicitRequestParams.url (record Input::ElicitUrlParams {message := "m", url := "u"})))) = (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("method", (ctor Json::Json.text "elicitation/create")) (cons ("params", (ctor Json::Json.object (cons ("mode", (ctor Json::Json.text "url")) (cons ("message", (ctor Json::Json.text "m")) (cons ("url", (ctor Json::Json.text "u")) (nil (String * Json::Json))))))) (nil (String * Json::Json))))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_sampling_request_is_written_with_every_member_the_schema_names,
+  parameters: [],
+  statement: ((ResultJson::inputRequestJson (ctor Input::InputRequest.sampling (record Input::CreateMessageParams {messages := (cons (record Input::SamplingMessage {role := (ctor Common::Role.user), content := (ctor Input::SamplingContent.single (ctor Input::SamplingContentBlock.text (record Content::TextContent {text := "hi", annotations := (ctor Option.none [Common::Annotations]), meta := (ctor Option.none [Json::JsonObject])}))), meta := (ctor Option.none [Json::JsonObject])}) (nil Input::SamplingMessage)), modelPreferences := (ctor Option.some [Input::ModelPreferences] (record Input::ModelPreferences {hints := (ctor Option.some [(List Input::ModelHint)] (cons (record Input::ModelHint {name := (ctor Option.some [String] "claude")}) (nil Input::ModelHint))), costPriority := (ctor Option.some [Json::Decimal] (record Json::Decimal {mantissa := (1 : Int), exponent := (-1 : Int)})), speedPriority := (ctor Option.none [Json::Decimal]), intelligencePriority := (ctor Option.some [Json::Decimal] (record Json::Decimal {mantissa := (9 : Int), exponent := (-1 : Int)}))})), systemPrompt := (ctor Option.some [String] "s"), includeContext := (ctor Option.some [Input::IncludeContext] (ctor Input::IncludeContext.thisServer)), temperature := (ctor Option.some [Json::Decimal] (record Json::Decimal {mantissa := (5 : Int), exponent := (-1 : Int)})), maxTokens := 7, stopSequences := (ctor Option.some [(List String)] (cons "x" (nil String))), metadata := (ctor Option.some [Json::JsonObject] (Capabilities::noObject)), tools := (ctor Option.some [(List Content::Tool)] (nil Content::Tool)), toolChoice := (ctor Option.some [Input::ToolChoice] (record Input::ToolChoice {mode := (ctor Option.some [Input::ToolChoiceMode] (ctor Input::ToolChoiceMode.required))}))}))) = (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("method", (ctor Json::Json.text "sampling/createMessage")) (cons ("params", (ctor Json::Json.object (cons ("messages", (ctor Json::Json.array (cons (ctor Json::Json.object (cons ("role", (ctor Json::Json.text "user")) (cons ("content", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "text")) (cons ("text", (ctor Json::Json.text "hi")) (nil (String * Json::Json)))))) (nil (String * Json::Json))))) (nil Json::Json)))) (cons ("modelPreferences", (ctor Json::Json.object (cons ("hints", (ctor Json::Json.array (cons (ctor Json::Json.object (cons ("name", (ctor Json::Json.text "claude")) (nil (String * Json::Json)))) (nil Json::Json)))) (cons ("costPriority", (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (-1 : Int)}))) (cons ("intelligencePriority", (ctor Json::Json.number (record Json::Decimal {mantissa := (9 : Int), exponent := (-1 : Int)}))) (nil (String * Json::Json))))))) (cons ("systemPrompt", (ctor Json::Json.text "s")) (cons ("includeContext", (ctor Json::Json.text "thisServer")) (cons ("temperature", (ctor Json::Json.number (record Json::Decimal {mantissa := (5 : Int), exponent := (-1 : Int)}))) (cons ("maxTokens", (ctor Json::Json.number (record Json::Decimal {mantissa := (7 : Int), exponent := (0 : Int)}))) (cons ("stopSequences", (ctor Json::Json.array (cons (ctor Json::Json.text "x") (nil Json::Json)))) (cons ("metadata", (ctor Json::Json.object (nil (String * Json::Json)))) (cons ("tools", (ctor Json::Json.array (nil Json::Json))) (cons ("toolChoice", (ctor Json::Json.object (cons ("mode", (ctor Json::Json.text "required")) (nil (String * Json::Json))))) (nil (String * Json::Json)))))))))))))) (nil (String * Json::Json))))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_roots_request_without_params_has_only_its_method,
+  parameters: [],
+  statement: ((ResultJson::inputRequestJson (ctor Input::InputRequest.roots (ctor Option.none [Json::JsonObject]))) = (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("method", (ctor Json::Json.text "roots/list")) (nil (String * Json::Json)))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_tool_result_in_a_sampling_message_is_written,
+  parameters: [],
+  statement: ((ResultJson::samplingMessageJson (record Input::SamplingMessage {role := (ctor Common::Role.user), content := (ctor Input::SamplingContent.single (ctor Input::SamplingContentBlock.tool_result (record Input::ToolResultContent {toolUseId := "t", content := (cons (ctor Content::ContentBlock.text (record Content::TextContent {text := "ok", annotations := (ctor Option.none [Common::Annotations]), meta := (ctor Option.none [Json::JsonObject])})) (nil Content::ContentBlock)), structuredContent := (ctor Option.none [Json::Json]), isError := (ctor Option.some [Bool] true), meta := (ctor Option.none [Json::JsonObject])}))), meta := (ctor Option.none [Json::JsonObject])})) = (ctor Option.some [Json::Json] (ctor Json::Json.object (cons ("role", (ctor Json::Json.text "user")) (cons ("content", (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "tool_result")) (cons ("toolUseId", (ctor Json::Json.text "t")) (cons ("content", (ctor Json::Json.array (cons (ctor Json::Json.object (cons ("type", (ctor Json::Json.text "text")) (cons ("text", (ctor Json::Json.text "ok")) (nil (String * Json::Json))))) (nil Json::Json)))) (cons ("isError", (ctor Json::Json.bool true)) (nil (String * Json::Json)))))))) (nil (String * Json::Json))))))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: the_prompt_asks_for_its_context_by_elicitation,
+  parameters: [],
+  statement: ((promptAsked (InputFixture::answerPrompt (promptCall (noResponses)))) = (ctor Option.some [(List String)] (cons "user_context" (nil String)))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: the_prompt_is_answered_when_its_context_is_given,
+  parameters: [],
+  statement: ((promptFinished (InputFixture::answerPrompt (promptCall (responsesOf (cons ("user_context", (accepted (cons ("context", (ctor Json::Json.text "test context")) (nil (String * Json::Json))))) (nil (String * Json::Json))))))) = true),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_prompt_response_that_does_not_fit_is_refused,
+  parameters: [],
+  statement: ((InputFixture::answerPrompt (promptCall (responsesOf (cons ("user_context", (ctor Json::Json.number (record Json::Decimal {mantissa := (1 : Int), exponent := (0 : Int)}))) (nil (String * Json::Json)))))) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.invalidInputResponses))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+\end{semanticmodule}
+\end{lexlean}

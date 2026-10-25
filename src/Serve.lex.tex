@@ -126,6 +126,14 @@ definition{
 }
 
 definition{
+  name: withoutTable,
+  parameters: [response : Http::HttpResponse],
+  result: Http::HttpResponse,
+  body: (record Http::HttpResponse {status := (project response status), fields := (project response fields), notifications := (project response notifications), body := (project response body), tasks := (ctor Option.none [(List Nat)])}),
+  executable: true
+}
+
+definition{
   name: toolNameOf,
   parameters: [request : JsonRpc::Request],
   result: (Option String),
@@ -320,6 +328,14 @@ definition{
 }
 
 definition{
+  name: keyed,
+  parameters: [info : Extension::ProviderInfo, key : Bytes],
+  result: Extension::ProviderInfo,
+  body: (record Extension::ProviderInfo {serverInfo := (project info serverInfo), instructions := (project info instructions), capabilities := (project info capabilities), discoverCache := (project info discoverCache), paramRules := (project info paramRules), toolCallLimit := (project info toolCallLimit), requestStateKey := key, taskStoreTag := (project info taskStoreTag)}),
+  executable: true
+}
+
+definition{
   name: serveOpen,
   parameters: [
     info : Extension::ProviderInfo,
@@ -327,7 +343,7 @@ definition{
     request : Http::HttpRequest
   ],
   result: Http::HttpResponse,
-  body: (if (Http::isPost (project request method)) then (afterParse (project request host) info (fun [answerWith, request] (typed : Methods::ClientRequest) => (apply answerWith (project request host) typed)) (project request toolCalls) (project request fields) (JsonRead::readJson (project request body))) else (notAllowedResponse)),
+  body: (if (Http::isPost (project request method)) then (afterParse (project request host) (keyed info (project request stateKey)) (fun [answerWith, request] (typed : Methods::ClientRequest) => (apply answerWith (project request host) typed)) (project request toolCalls) (project request fields) (JsonRead::readJson (project request body))) else (notAllowedResponse)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -372,6 +388,19 @@ definition{
   body: (match (Frame::readRequest input)
     | Result.error fault => (Frame::writeResponse (internalResponse))
     | Result.ok request => (Frame::writeResponse (serveRequest info answerWith request))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: serve,
+  parameters: [
+    info : Extension::ProviderInfo,
+    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    input : Bytes
+  ],
+  result: (List Nat),
+  body: (serveTasks info (fun [answer] (host : Tasks::TaskHost) (typed : Methods::ClientRequest) => (apply answer typed)) input),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }

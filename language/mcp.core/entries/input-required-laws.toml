@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "input-required-laws"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "InputLaws"
+component = "InputLaws"
+
+[[form]]
+id = "input-required-laws"
+channel = "text"
+surface = "Input-required laws"
+canonical_source = true
+features = ["sentence-case", "singular"]

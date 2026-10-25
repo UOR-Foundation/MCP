@@ -40,16 +40,22 @@ annotate() {
 # When it passes, emit a notice of its last line and its duration, so a run that
 # executed nothing cannot look like a run that passed. COMMAND runs in a
 # subshell, so it passes anything to later steps through $GITHUB_PATH or
-# $GITHUB_OUTPUT.
+# $GITHUB_OUTPUT. COMMAND runs with errexit on, so a failing command inside a
+# helper function fails the gate, and the caller's errexit is restored after it,
+# so a failed gate in a step of several gates fails the step
+# (.github/lexlean-ci/test-gate.sh).
 gate() {
-  local label=$1 log status restore started=$SECONDS
+  local label=$1 log status had_errexit=0 started=$SECONDS
   shift
   log=$(mktemp "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/gate.XXXXXX")
-  restore=$(set +o)
+  [[ $- == *e* ]] && had_errexit=1
   set +e
-  "$@" 2>&1 | tee "$log"
+  (
+    set -e
+    "$@"
+  ) 2>&1 | tee "$log"
   status=${PIPESTATUS[0]}
-  eval "$restore"
+  ((had_errexit)) && set -e
   if ((status != 0)); then
     annotate error "$label failed (exit $status)" "$GATE_TAIL_LINES" "$log"
   else
@@ -235,4 +241,247 @@ export_matches() {
     fi
   done <<<"$exported"
   return "$status"
+}
+
+# prismpm_rev: the revision .github/prismpm.rev names, or an error.
+prismpm_rev() {
+  local file=.github/prismpm.rev matches rev
+  matches=$(grep -c '^rev = ' "$file") || true
+  if [[ $matches != 1 ]]; then
+    echo "$file must hold exactly one 'rev = ' line, found $matches" >&2
+    return 1
+  fi
+  rev=$(sed -n 's/^rev = \([0-9a-f]\{40\}\)$/\1/p' "$file")
+  if [[ -z $rev ]]; then
+    echo "$file: rev must be a 40-digit lowercase commit hash" >&2
+    return 1
+  fi
+  printf '%s\n' "$rev"
+}
+
+# The root the workflow caches the SDK binary in.
+PRISMPM_ROOT=${PRISMPM_ROOT:-$HOME/.prismpm-bin}
+
+# output_prismpm_pin: the pinned PrismPM revision as the step output `rev` and the
+# LexLean revision it is built with as `lexlean`, the key of the cache that holds the
+# binary built from them.
+output_prismpm_pin() {
+  local rev lexlean
+  rev=$(prismpm_rev)
+  lexlean=$(lexlean_rev)
+  echo "rev=$rev" >>"${GITHUB_OUTPUT:?}"
+  echo "lexlean=$lexlean" >>"${GITHUB_OUTPUT:?}"
+}
+
+# fetch_rev URL REV DEST: the tree of exactly commit REV of URL in DEST.
+fetch_rev() {
+  local url=$1 rev=$2 dest=$3
+  git init -q "$dest"
+  git -C "$dest" remote add origin "$url"
+  git -C "$dest" fetch -q --depth 1 origin "$rev"
+  git -C "$dest" checkout -q FETCH_HEAD
+  test "$(git -C "$dest" rev-parse HEAD)" = "$rev"
+}
+
+# prismpm_installed_at REV LEXLEAN: the record `install_prismpm` wrote says
+# $PRISMPM_ROOT was built from exactly these two revisions, so a cache restored for
+# another key cannot pass.
+prismpm_installed_at() {
+  test -x "$PRISMPM_ROOT/bin/prismpm" &&
+    test "$(cat "$PRISMPM_ROOT/pins" 2>/dev/null)" == "$(printf 'prismpm %s\nlexlean %s' "$1" "$2")"
+}
+
+# install_prismpm: `prismpm` at the pinned PrismPM revision, built with the LexLean
+# revision of .github/lexlean.rev in place of the LexLean it vendors, unless
+# $PRISMPM_ROOT already holds exactly that pair. One pin drives both tools (R1): the
+# compiler that certifies the core is the compiler lexlean.lock was made with.
+#
+# Nothing in PrismPM changes. The build is a copy of the PrismPM tree at the revision
+# whose vendor/lexlean is the package `cargo package` makes of the LexLean tree at
+# the revision, so Cargo.lock is the one PrismPM committed (--locked). The profile is
+# debug: PrismPM's release profile (thin LTO, one codegen unit) is killed for memory
+# on the 7 GB runners and on the machines this was developed on, and `prismpm build`
+# spends its time in the LexLean checker, which the profile of the binary does not
+# change.
+install_prismpm() {
+  local rev lexlean scratch
+  rev=$(prismpm_rev)
+  lexlean=$(lexlean_rev)
+  if ! prismpm_installed_at "$rev" "$lexlean"; then
+    rm -rf "$PRISMPM_ROOT"
+    scratch=$(mktemp -d)
+    fetch_rev https://github.com/UOR-Foundation/LexLean "$lexlean" "$scratch/lexlean"
+    fetch_rev https://github.com/UOR-Foundation/PrismPM "$rev" "$scratch/prismpm"
+    (cd "$scratch/lexlean" && cargo package -p lexlean --no-verify --allow-dirty)
+    tar -xzf "$scratch"/lexlean/target/package/lexlean-*.crate -C "$scratch"
+    rm -rf "$scratch/prismpm/vendor/lexlean"
+    mv "$scratch"/lexlean-*/ "$scratch/prismpm/vendor/lexlean"
+    (cd "$scratch/prismpm" && cargo install --path crates/prismpm --locked --debug --root "$PRISMPM_ROOT")
+    printf 'prismpm %s\nlexlean %s' "$rev" "$lexlean" >"$PRISMPM_ROOT/pins"
+    rm -rf "$scratch"
+  fi
+  prismpm_installed_at "$rev" "$lexlean"
+  echo "$PRISMPM_ROOT/bin" >>"${GITHUB_PATH:-/dev/null}"
+  "$PRISMPM_ROOT/bin/prismpm" --version
+}
+
+# sdk_copies_agree: the files this repository copies from the PrismPM standard
+# library and lexicon, `Foundation.Bytes`, `Foundation.Server.V1.Model` and the
+# `prism.arch` lexicon package, are byte for byte the ones at the pinned revision.
+sdk_copies_agree() {
+  local rev scratch status=0 file
+  rev=$(prismpm_rev)
+  scratch=$(mktemp -d)
+  git -C "$scratch" init -q
+  git -C "$scratch" remote add origin https://github.com/UOR-Foundation/PrismPM
+  git -C "$scratch" sparse-checkout set stdlib/src/Foundation language/prism.arch
+  git -C "$scratch" fetch -q --depth 1 --filter=blob:none origin "$rev"
+  git -C "$scratch" checkout -q FETCH_HEAD
+  for file in conformance/src/Foundation/Bytes.lex.tex conformance/src/Foundation/Server/V1/Model.lex.tex; do
+    if cmp -s "$file" "$scratch/stdlib/src/${file#conformance/src/}"; then
+      echo "$file equals the standard library's"
+    else
+      echo "$file differs from stdlib/src/${file#conformance/src/} at $rev" >&2
+      status=1
+    fi
+  done
+  if diff -rq language/prism.arch "$scratch/language/prism.arch"; then
+    echo "language/prism.arch equals the SDK's"
+  else
+    echo "language/prism.arch differs from the SDK's at $rev" >&2
+    status=1
+  fi
+  rm -rf "$scratch"
+  return "$status"
+}
+
+# check_node: the node on the runner satisfies the engines of the pinned
+# conformance suite (^20.19.0 || >=22.12.0), which also runs the oracle scripts.
+check_node() {
+  local version major minor
+  version=$(node --version)
+  version=${version#v}
+  major=${version%%.*}
+  minor=${version#*.}
+  minor=${minor%%.*}
+  echo "node $version"
+  if ((major > 22 || (major == 22 && minor >= 12) || (major == 20 && minor >= 19))); then
+    return 0
+  fi
+  echo "node $version does not satisfy ^20.19.0 || >=22.12.0" >&2
+  return 1
+}
+
+# install_suite DIR: the pinned conformance suite, installed with `npm ci`
+# (conformance/oracle/fetch-suite.sh). The step output `root` and the
+# MCP_CONFORMANCE_SUITE_ROOT variable of later steps name it.
+install_suite() {
+  local dir=${1:?install_suite DIR}
+  bash conformance/oracle/fetch-suite.sh "$dir"
+  echo "MCP_CONFORMANCE_SUITE_ROOT=$dir" >>"${GITHUB_ENV:-/dev/null}"
+}
+
+# run_oracle_tests: the tests of the workspace that run a node oracle or read the
+# installed suite. The workspace gate (`cargo test --workspace`, and `just vv` in the
+# locked SDK image) has neither node nor the suite and ignores them; this runs exactly
+# those with --ignored, and is green only when as many passed as the source ignores. A
+# run that selected none, or that skipped some, is not green.
+run_oracle_tests() {
+  local file=crates/lifecycle-oracle/tests/conformance.rs log expected passed status
+  : "${MCP_CONFORMANCE_SUITE_ROOT:?the installed conformance suite (install_suite)}"
+  expected=$(grep -c '^#\[ignore' "$file" || true)
+  if ((expected == 0)); then
+    echo "$file ignores no test; the oracle tests are not where the job expects them" >&2
+    return 1
+  fi
+  log=$(mktemp)
+  status=0
+  cargo test --locked -p lifecycle-oracle --test conformance -- --ignored >"$log" 2>&1 || status=$?
+  cat "$log"
+  if ((status != 0)); then
+    return "$status"
+  fi
+  passed=$(sed -n 's/^test result: ok\. \([0-9][0-9]*\) passed; 0 failed.*/\1/p' "$log")
+  if [[ $passed != "$expected" ]]; then
+    echo "${passed:-0} passed of the ignored tests, expected $expected" >&2
+    return 1
+  fi
+  echo "the $expected ignored oracle tests ran and passed"
+}
+
+# build_conformance: `prismpm build` of the conformance server application, then the
+# three generated packages laid beside the binding crate and the compiler's record
+# of the export beside the build. The build id is the step output `build`.
+build_conformance() {
+  local id
+  prismpm build | tee "${RUNNER_TEMP:?}/prismpm-build.log"
+  id=$(sed -n 's/^build published: \([0-9a-f]\{64\}\)$/\1/p' "$RUNNER_TEMP/prismpm-build.log" | tail -n 1)
+  if [[ -z $id ]]; then
+    echo "prismpm build did not print 'build published: <id>'" >&2
+    return 1
+  fi
+  echo "build=$id" >>"${GITHUB_OUTPUT:-/dev/null}"
+  bash conformance/lay-out.sh ".prism/build/$id" "$RUNNER_TEMP/production-result.json"
+}
+
+# check_core_identity: a rebuild reproduces the recorded identity of the core.
+check_core_identity() {
+  local main conformance
+  main=$(sed -n 's/^compiler_semantics = "\(.*\)"$/\1/p' lexlean.lock)
+  conformance=$(sed -n 's/^compiler_semantics = "\(.*\)"$/\1/p' lexlean.conformance.lock)
+  echo "lexlean.lock records compiler-semantics $main"
+  echo "lexlean.conformance.lock records       $conformance"
+  if [[ -z $main || $main != "$conformance" ]]; then
+    echo "The two locks were made by different compilers; .github/lexlean.rev is the one pin." >&2
+    return 1
+  fi
+  node conformance/oracle/identity.mjs \
+    --result "${RUNNER_TEMP:?}/production-result.json" \
+    --lock lexlean.conformance.lock \
+    --package conformance/mcp_conformance_core \
+    --reference crates/lifecycle-oracle/generated/mcp_lifecycle/provenance.json \
+    --check conformance/core-identity.json
+}
+
+# The directory the oracle runs write their reports and transcripts to.
+conformance_out() {
+  printf '%s\n' "${RUNNER_TEMP:?}/conformance-run"
+}
+
+# run_server_suite: the pinned suite's server runner over the served build. Exit 1
+# while any scenario fails; the last lines name the failing scenarios and the pull
+# request each waits on.
+run_server_suite() {
+  local out
+  out=$(conformance_out)
+  mkdir -p "$out"
+  node conformance/oracle/server-suite.mjs \
+    --suite-root "${MCP_CONFORMANCE_SUITE_ROOT:?}" --out "$out" \
+    "$PWD/conformance/target/release/mcp-conformance-host" serve
+}
+
+# run_schema_oracle: every message of the recorded transcript against the pinned
+# 2026-07-28 schema.
+run_schema_oracle() {
+  node conformance/oracle/schema-oracle.mjs \
+    --suite-root "${MCP_CONFORMANCE_SUITE_ROOT:?}" \
+    crates/lifecycle-oracle/suite/mcp-spec-80041ab0a139a8f4fb3adbc99f7ae9113ea59671/schema/2026-07-28/schema.json \
+    "$(conformance_out)/transcript.json"
+}
+
+# conformance_summary: the per-scenario table of the run, to the step summary and the log.
+conformance_summary() {
+  local report
+  report="$(conformance_out)/report.json"
+  test -f "$report" || { echo "no report: the suite did not run" >&2; return 1; }
+  node -e '
+    const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    const lines = ["| kind | scenario | status | checks passed | other |", "|---|---|---|---|---|"];
+    for (const s of r.scenarios) lines.push(`| ${s.kind} | ${s.scenario} | ${s.status} | ${s.passed}/${s.checks} | ${Object.entries(s.other).map(([k, v]) => k + " " + v).join(", ")} |`);
+    lines.push("", `required ${r.required.passing}/${r.required.scenarios} pass, not scored ${r.not_scored.passing}/${r.not_scored.scenarios} pass`);
+    lines.push("", `${r.failing.length} scenarios FAIL (valid: ${r.valid}); the job gate, failing = waiting.json exactly: ${r.matches_waiting}. Waiting scenarios are failures, never passes.`);
+    for (const [label, names] of [["failing and not named in waiting.json", r.unexplained], ["named as waiting but not failing", r.stale_waiting], ["skipped by the suite, not passing", r.skipped_by_the_suite]]) if (names.length) lines.push("", `${label}: ${names.join(", ")}`);
+    for (const [label, names] of Object.entries(r.waits)) lines.push("", `${label}: ${names.join(", ")}`);
+    console.log(lines.join("\n"));
+  ' "$report" | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
 }

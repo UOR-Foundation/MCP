@@ -4,6 +4,7 @@
 \useglossary{mcp.core@1.0.0}
 \importmodule{Capabilities}
 \importmodule{Common}
+\importmodule{HostEffect}
 \importmodule{Input}
 \importmodule{Json}
 \importmodule{Methods}
@@ -18,7 +19,8 @@ inductive{
   constructors: [
     {name: complete, fields: [Methods::CallToolResult]},
     {name: pending, fields: [Input::InputRequiredResult]},
-    {name: task, fields: [Tasks::CreateTaskResult]}
+    {name: task, fields: [Tasks::CreateTaskResult]},
+    {name: perform, fields: [HostEffect::EffectRequest]}
   ]
 }
 
@@ -28,7 +30,8 @@ inductive{
   parameters: [],
   constructors: [
     {name: complete, fields: [Methods::ReadResourceResult]},
-    {name: pending, fields: [Input::InputRequiredResult]}
+    {name: pending, fields: [Input::InputRequiredResult]},
+    {name: perform, fields: [HostEffect::EffectRequest]}
   ]
 }
 
@@ -38,7 +41,8 @@ inductive{
   parameters: [],
   constructors: [
     {name: complete, fields: [Methods::GetPromptResult]},
-    {name: pending, fields: [Input::InputRequiredResult]}
+    {name: pending, fields: [Input::InputRequiredResult]},
+    {name: perform, fields: [HostEffect::EffectRequest]}
   ]
 }
 
@@ -64,7 +68,9 @@ structure{
     {name: capabilities, type: Capabilities::ServerCapabilities},
     {name: discoverCache, type: Common::CacheHint},
     {name: paramRules, type: (List ParamRule)},
-    {name: toolCallLimit, type: Nat}
+    {name: toolCallLimit, type: Nat},
+    {name: requestStateKey, type: Bytes},
+    {name: taskStoreTag, type: Nat}
   ]
 }
 
@@ -131,7 +137,47 @@ definition{
   name: infoOf,
   parameters: [provider : Provider],
   result: ProviderInfo,
-  body: (record ProviderInfo {serverInfo := (project provider serverInfo), instructions := (project provider instructions), capabilities := (project provider capabilities), discoverCache := (project provider discoverCache), paramRules := (project provider paramRules), toolCallLimit := (project provider toolCallLimit)})
+  body: (record ProviderInfo {serverInfo := (project provider serverInfo), instructions := (project provider instructions), capabilities := (project provider capabilities), discoverCache := (project provider discoverCache), paramRules := (project provider paramRules), toolCallLimit := (project provider toolCallLimit), requestStateKey := 0x, taskStoreTag := 0})
+}
+
+definition{
+  name: callAnswer,
+  parameters: [answered : (Result CallOutcome Refusal::ProviderRefusal)],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match answered
+    | Result.ok outcome => (match outcome
+      | CallOutcome.complete found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.callTool found))
+      | CallOutcome.pending needed => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.inputRequired needed))
+      | CallOutcome.task created => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.taskCreated created))
+      | CallOutcome.perform request => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.effectRequested request)))
+    | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr)),
+  executable: true
+}
+
+definition{
+  name: readAnswer,
+  parameters: [answered : (Result ReadOutcome Refusal::ProviderRefusal)],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match answered
+    | Result.ok outcome => (match outcome
+      | ReadOutcome.complete found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.readResource found))
+      | ReadOutcome.pending needed => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.inputRequired needed))
+      | ReadOutcome.perform request => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.effectRequested request)))
+    | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr)),
+  executable: true
+}
+
+definition{
+  name: promptAnswer,
+  parameters: [answered : (Result PromptOutcome Refusal::ProviderRefusal)],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match answered
+    | Result.ok outcome => (match outcome
+      | PromptOutcome.complete found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.getPrompt found))
+      | PromptOutcome.pending needed => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.inputRequired needed))
+      | PromptOutcome.perform request => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.effectRequested request)))
+    | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr)),
+  executable: true
 }
 
 definition{
@@ -143,31 +189,18 @@ definition{
     | Methods::ClientRequest.toolsList params => (match (apply (project provider listTools) params)
       | Result.ok found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.listTools found))
       | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr))
-    | Methods::ClientRequest.toolsCall params => (match (apply (project provider callTool) params)
-      | Result.ok outcome => (match outcome
-        | CallOutcome.complete found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.callTool found))
-        | CallOutcome.pending needed => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.inputRequired needed))
-        | CallOutcome.task created => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.taskCreated created)))
-      | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr))
+    | Methods::ClientRequest.toolsCall params => (callAnswer (apply (project provider callTool) params))
     | Methods::ClientRequest.resourcesList params => (match (apply (project provider listResources) params)
       | Result.ok found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.listResources found))
       | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr))
-    | Methods::ClientRequest.resourcesRead params => (match (apply (project provider readResource) params)
-      | Result.ok outcome => (match outcome
-        | ReadOutcome.complete found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.readResource found))
-        | ReadOutcome.pending needed => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.inputRequired needed)))
-      | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr))
+    | Methods::ClientRequest.resourcesRead params => (readAnswer (apply (project provider readResource) params))
     | Methods::ClientRequest.resourcesTemplatesList params => (match (apply (project provider listResourceTemplates) params)
       | Result.ok found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.listResourceTemplates found))
       | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr))
     | Methods::ClientRequest.promptsList params => (match (apply (project provider listPrompts) params)
       | Result.ok found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.listPrompts found))
       | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr))
-    | Methods::ClientRequest.promptsGet params => (match (apply (project provider getPrompt) params)
-      | Result.ok outcome => (match outcome
-        | PromptOutcome.complete found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.getPrompt found))
-        | PromptOutcome.pending needed => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.inputRequired needed)))
-      | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr))
+    | Methods::ClientRequest.promptsGet params => (promptAnswer (apply (project provider getPrompt) params))
     | Methods::ClientRequest.completionComplete params => (match (apply (project provider complete) params)
       | Result.ok found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.complete found))
       | Result.error pr => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] pr))
