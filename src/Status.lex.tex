@@ -53,7 +53,8 @@ definition{
     | Refusal::ProviderRefusal.invalidInputResponses => (badRequestStatus)
     | Refusal::ProviderRefusal.misplacedInputRequired method => (serverErrorStatus)
     | Refusal::ProviderRefusal.emptyInputRequired => (serverErrorStatus)
-    | Refusal::ProviderRefusal.requestStateKeyMissing => (serverErrorStatus)),
+    | Refusal::ProviderRefusal.requestStateKeyMissing => (serverErrorStatus)
+    | Refusal::ProviderRefusal.effectRequested request => (serverErrorStatus)),
   executable: true
 }
 
@@ -175,7 +176,8 @@ theorem{
             {proof: reflexivity{}, binders: [], constructor: invalidInputResponses},
             {proof: reflexivity{}, binders: [method], constructor: misplacedInputRequired},
             {proof: reflexivity{}, binders: [], constructor: emptyInputRequired},
-            {proof: reflexivity{}, binders: [], constructor: requestStateKeyMissing}
+            {proof: reflexivity{}, binders: [], constructor: requestStateKeyMissing},
+            {proof: reflexivity{}, binders: [request], constructor: effectRequested}
           ],
           scrutinee: inner
         },

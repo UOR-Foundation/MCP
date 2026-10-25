@@ -583,6 +583,23 @@ pub fn frame_checked_on(frame: &[u8], stack_bytes: usize) -> Result<Response, Fr
     Ok(response)
 }
 
+/// Decode a response frame that the step root wrote and check it against the schema.
+///
+/// # Panics
+///
+/// Panics when the bytes are not a response frame or the schema refuses it.
+pub fn step_response_checked(frame: &[u8]) -> Response {
+    let response = decode_response(frame).expect("a response frame");
+    check_response(None, &response);
+    response
+}
+
+/// The frame the byte root writes for a frame: the answer the step root must give when
+/// no effect is requested.
+pub fn byte_root_frame(frame: &[u8]) -> Vec<u8> {
+    lifecycle_oracle::exchange_frame(frame)
+}
+
 /// Run one request through the second generated root, the one over a catalog of many
 /// tools, checking the response against the schema.
 pub fn crowd_checked(request: &Request) -> Response {

@@ -45,6 +45,7 @@ MCP's own oracles, so this repository makes no conformance claim.
 | `Numeric`, `JsonEq`, `Schema`, `Admission`, `Sanitize`, `Tools`, `ToolLaws` | the tools layer: number comparison, JSON equality, a JSON Schema 2020-12 validator, catalog admission and the parameter rules derived from `x-mcp-header`, output sanitization, `tools/list` and `tools/call`, the rate-limit decision, and their theorems ([TOOLS.md](TOOLS.md)) |
 | `Resources`, `ResourceFixture`, `ResourceLaws` | the resources layer: `resources/list`, `resources/read`, `resources/templates/list`, `prompts/list`, `prompts/get` and `completion/complete`, their refusals and cache hints, the catalogs of the conformance fixture, and their theorems ([RESOURCES.md](RESOURCES.md)) |
 | `Transport`, `TransportLaws` | the Streamable HTTP transport: the response event stream and its framing, the `Accept` negotiation, the `Origin` and `Host` allow-list against DNS rebinding, and their theorems ([TRANSPORT.md](TRANSPORT.md)) |
+| `HostEffect`, `StepServe`, `StepFixture`, `StepLaws` | a provider's request for a host effect as a typed outcome (`CallOutcome.perform`, `ReadOutcome.perform`, `PromptOutcome.perform`), the step serve that reads PrismPM's turn and writes its step, the fixture root `stepFixtureRun`, and their theorems ([PROVIDER-EFFECTS.md](PROVIDER-EFFECTS.md)) |
 
 What is not modeled: the `subscriptions/listen` stream (its params and result types are
 declared, but the method is not dispatched), server notifications other than progress and task

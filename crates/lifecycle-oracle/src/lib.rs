@@ -62,12 +62,38 @@ mod lifecycle;
 #[path = "../generated/mcp_crowd/src/lib.rs"]
 mod crowd;
 
+// The third root, the step serve over a provider that requests host effects, for the
+// provider effect tests (`PROVIDER-EFFECTS.md`). The fixture itself requests none.
+#[allow(
+    dead_code,
+    unused,
+    missing_docs,
+    clippy::type_complexity,
+    clippy::too_many_arguments,
+    clippy::large_enum_variant,
+    clippy::result_large_err,
+    clippy::result_unit_err,
+    clippy::single_match,
+    clippy::manual_unwrap_or,
+    clippy::manual_unwrap_or_default,
+    clippy::manual_map,
+    clippy::manual_ok_err,
+    clippy::collapsible_match,
+    clippy::infallible_destructuring_match
+)]
+#[rustfmt::skip]
+#[path = "../generated/mcp_step/src/lib.rs"]
+mod step;
+
 /// The text of the generated package this crate compiled, so a test can hash the
 /// file the oracle ran against the digest the export recorded.
 pub const GENERATED_SOURCE: &str = include_str!("../generated/mcp_lifecycle/src/lib.rs");
 
 /// The text of the second generated package, the root `UorMcp.Crowd.crowdRun`.
 pub const CROWD_SOURCE: &str = include_str!("../generated/mcp_crowd/src/lib.rs");
+
+/// The text of the third generated package, the root `UorMcp.StepFixture.stepFixtureRun`.
+pub const STEP_SOURCE: &str = include_str!("../generated/mcp_step/src/lib.rs");
 
 /// The stack the root runs on: 2 MiB, which is the size Rust gives a spawned thread
 /// when nothing says otherwise. The export states no `recursion` effect and no
@@ -348,6 +374,155 @@ pub fn exchange_crowd_frame_on(frame: &[u8], stack_bytes: usize) -> Vec<u8> {
         })
         .expect("a worker thread starts");
     words_to_bytes(worker.join().expect("the crowd root did not panic"))
+}
+
+/// A step of the root of a server application that may request host effects: PrismPM's
+/// replay driver reads it (`PROVIDER-EFFECTS.md`, "The turn and the step").
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Step {
+    /// The word 0 and the response frame.
+    Done(Vec<u8>),
+    /// The word 1, the tag of the effect to perform and the payload of its request.
+    Perform {
+        /// The effect tag, four bytes big-endian on the wire.
+        tag: u32,
+        /// The bytes of the request of the effect.
+        payload: Vec<u8>,
+    },
+}
+
+/// Why a step is not a step the driver reads.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StepError {
+    /// The step ends inside the word or the tag.
+    Truncated,
+    /// The first word is neither 0 nor 1.
+    Unknown(u32),
+}
+
+/// Encode a turn the way PrismPM's replay driver writes it: the request frame as a
+/// length-prefixed chunk, the count of completed effects, and for each its tag and its
+/// outcome as a length-prefixed chunk, every length, count and tag four bytes big-endian.
+pub fn encode_turn(request_frame: &[u8], completed: &[(u32, Vec<u8>)]) -> Vec<u8> {
+    let mut out = Vec::new();
+    put_chunk(&mut out, request_frame);
+    put_u32(&mut out, completed.len());
+    for (tag, outcome) in completed {
+        out.extend_from_slice(&tag.to_be_bytes());
+        put_chunk(&mut out, outcome);
+    }
+    out
+}
+
+/// Decode the step the root wrote.
+///
+/// # Errors
+///
+/// Returns [`StepError`] when the bytes are not one of the two forms of a step.
+pub fn decode_step(bytes: &[u8]) -> Result<Step, StepError> {
+    let word = |at: usize| -> Result<u32, StepError> {
+        let end = at.checked_add(4).ok_or(StepError::Truncated)?;
+        let bytes = bytes.get(at..end).ok_or(StepError::Truncated)?;
+        Ok(u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+    };
+    match word(0)? {
+        0 => Ok(Step::Done(bytes[4..].to_vec())),
+        1 => Ok(Step::Perform {
+            tag: word(4)?,
+            payload: bytes[8..].to_vec(),
+        }),
+        other => Err(StepError::Unknown(other)),
+    }
+}
+
+/// [`exchange_frame_on`] for the third root, `UorMcp.StepFixture.stepFixtureRun`: a turn
+/// in, the bytes of a step out.
+///
+/// # Panics
+///
+/// Panics when the realization reports an overflow, and aborts the process when the
+/// stack is too small for the turn.
+pub fn exchange_step_on(turn: &[u8], stack_bytes: usize) -> Vec<u8> {
+    let input = turn.to_vec();
+    let worker = std::thread::Builder::new()
+        .stack_size(stack_bytes)
+        .spawn(move || {
+            let mut list = step::run(step::Bytes::lit(&input))
+                .expect("the step root does not overflow on this input");
+            let mut out = Vec::new();
+            while let Some((head, tail)) = list.uncons() {
+                out.push(head);
+                list = tail;
+            }
+            out
+        })
+        .expect("a worker thread starts");
+    words_to_bytes(worker.join().expect("the step root did not panic"))
+}
+
+/// [`exchange_step_on`] on the default [`STACK_BYTES`] stack.
+pub fn exchange_step(turn: &[u8]) -> Vec<u8> {
+    exchange_step_on(turn, STACK_BYTES)
+}
+
+/// What a driver saw while it answered one request.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Driven {
+    /// The response frame of the last turn.
+    pub response: Vec<u8>,
+    /// The effects the root asked for, in order: the tag and the payload of each.
+    pub performed: Vec<(u32, Vec<u8>)>,
+    /// How many times the root was called.
+    pub turns: usize,
+}
+
+/// Why a driver stopped without a response.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DriveError {
+    /// The root wrote bytes that are not a step.
+    Step(StepError),
+    /// The root asked for more effects than the budget allows.
+    Budget,
+}
+
+/// Drive the root the way PrismPM's generated driver does: call it with the turn, perform
+/// each effect it asks for through `host` (the tag and the payload in, the outcome out),
+/// append the completed effect to the turn and call it again, until it is done or
+/// `budget` effects were performed.
+///
+/// # Errors
+///
+/// Returns [`DriveError`] when the root writes something that is not a step or asks for
+/// more than `budget` effects.
+pub fn drive(
+    request_frame: &[u8],
+    budget: usize,
+    mut host: impl FnMut(u32, &[u8]) -> Vec<u8>,
+) -> Result<Driven, DriveError> {
+    let mut completed: Vec<(u32, Vec<u8>)> = Vec::new();
+    let mut performed: Vec<(u32, Vec<u8>)> = Vec::new();
+    let mut turns = 0;
+    loop {
+        turns += 1;
+        let written = exchange_step(&encode_turn(request_frame, &completed));
+        match decode_step(&written).map_err(DriveError::Step)? {
+            Step::Done(response) => {
+                return Ok(Driven {
+                    response,
+                    performed,
+                    turns,
+                });
+            }
+            Step::Perform { tag, payload } => {
+                if completed.len() >= budget {
+                    return Err(DriveError::Budget);
+                }
+                let outcome = host(tag, &payload);
+                performed.push((tag, payload));
+                completed.push((tag, outcome));
+            }
+        }
+    }
 }
 
 /// One HTTP exchange through the generated root.

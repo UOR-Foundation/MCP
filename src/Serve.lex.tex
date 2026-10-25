@@ -246,7 +246,7 @@ definition{
 }
 
 definition{
-  name: respond,
+  name: respondTasks,
   parameters: [host : Tasks::TaskHost, accepts : Bool, handled : Dispatch::Handled],
   result: Http::HttpResponse,
   body: (match (project handled outcome)
@@ -254,6 +254,15 @@ definition{
       | Option.none => (internalResponse)
       | Option.some found => (withStore host (Methods::storedOf (project reply body)) (withNotes accepts (jsonResponse (Status::okStatus) (RpcWire::resultResponse (project handled id) found)) (allNotes (notesOnto (project reply notes) (nil (List Nat))) (taskNotes (Methods::storedOf (project reply body)))))))
     | Result.error refusal => (jsonResponse (Status::statusOf refusal) (RpcWire::errorResponse (ctor Option.some [JsonRpc::RequestId] (project handled id)) (Refusal::errorObjectOf refusal)))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: respond,
+  parameters: [accepts : Bool, handled : Dispatch::Handled],
+  result: Http::HttpResponse,
+  body: (respondTasks (record Tasks::TaskHost {nowMs := (0 : Int), now := "", freshId := "", table := (JsonText::emptyBytes)}) accepts handled),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -269,7 +278,7 @@ definition{
     rpc : JsonRpc::Request
   ],
   result: Http::HttpResponse,
-  body: (respond host (Transport::acceptsStream fields) (Dispatch::handleWith info answer used (ctor Option.some [Validation::Headers] (Http::headersOf fields (project info paramRules) (toolNameOf rpc) (project rpc method))) (Validation::supportedVersions) rpc)),
+  body: (respondTasks host (Transport::acceptsStream fields) (Dispatch::handleWith info answer used (ctor Option.some [Validation::Headers] (Http::headersOf fields (project info paramRules) (toolNameOf rpc) (project rpc method))) (Validation::supportedVersions) rpc)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }

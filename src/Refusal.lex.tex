@@ -3,6 +3,7 @@
 \useglossary{lexlean.std.nat@1.2.0}
 \useglossary{mcp.core@1.0.0}
 \importmodule{Capabilities}
+\importmodule{HostEffect}
 \importmodule{Json}
 \importmodule{JsonRpc}
 \importmodule{Numeric}
@@ -75,7 +76,8 @@ inductive{
     {name: invalidInputResponses, fields: []},
     {name: misplacedInputRequired, fields: [String]},
     {name: emptyInputRequired, fields: []},
-    {name: requestStateKeyMissing, fields: []}
+    {name: requestStateKeyMissing, fields: []},
+    {name: effectRequested, fields: [HostEffect::EffectRequest]}
   ]
 }
 
@@ -111,7 +113,8 @@ definition{
     | ProviderRefusal.invalidInputResponses => (JsonRpc::invalidParamsCode)
     | ProviderRefusal.misplacedInputRequired method => (JsonRpc::internalErrorCode)
     | ProviderRefusal.emptyInputRequired => (JsonRpc::internalErrorCode)
-    | ProviderRefusal.requestStateKeyMissing => (JsonRpc::internalErrorCode)),
+    | ProviderRefusal.requestStateKeyMissing => (JsonRpc::internalErrorCode)
+    | ProviderRefusal.effectRequested request => (JsonRpc::internalErrorCode)),
   executable: true
 }
 
@@ -231,7 +234,8 @@ definition{
       | ProviderRefusal.invalidInputResponses => (ctor Option.none [Json::Json])
       | ProviderRefusal.misplacedInputRequired method => (ctor Option.none [Json::Json])
       | ProviderRefusal.emptyInputRequired => (ctor Option.none [Json::Json])
-      | ProviderRefusal.requestStateKeyMissing => (ctor Option.none [Json::Json]))),
+      | ProviderRefusal.requestStateKeyMissing => (ctor Option.none [Json::Json])
+      | ProviderRefusal.effectRequested request => (ctor Option.none [Json::Json]))),
   executable: true
 }
 
@@ -259,7 +263,8 @@ definition{
       | ProviderRefusal.invalidInputResponses => "Invalid params: inputResponses is not a valid InputResponses object"
       | ProviderRefusal.misplacedInputRequired method => "Internal error"
       | ProviderRefusal.emptyInputRequired => "Internal error"
-      | ProviderRefusal.requestStateKeyMissing => "Internal error")),
+      | ProviderRefusal.requestStateKeyMissing => "Internal error"
+      | ProviderRefusal.effectRequested request => "Internal error")),
   executable: true
 }
 
