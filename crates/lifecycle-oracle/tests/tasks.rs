@@ -1479,7 +1479,7 @@ fn a_frame_that_ends_after_the_tool_calls_count_is_served_without_a_host_section
     let body = json_of(&response);
     assert_eq!(
         body["result"]["tools"].as_array().expect("tools").len(),
-        25,
+        35,
         "{body}"
     );
     // a call that would make a task has no identifier to give it: a server error, no table

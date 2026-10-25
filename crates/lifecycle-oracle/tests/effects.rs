@@ -725,7 +725,7 @@ fn the_fixture_imports_neither_the_effect_module_nor_the_step_serve_pe_09() {
         !fixture.contains("effectRequested") && !fixture.contains("EffectRequest"),
         "the fixture provider names an effect request"
     );
-    assert!(fixture.contains("Serve::serve (fixtureInfo) (ref fixtureAnswer) input"));
+    assert!(fixture.contains("Serve::serveTasks (fixtureInfo) (ref fixtureAnswerWith) input"));
 }
 
 #[test]
