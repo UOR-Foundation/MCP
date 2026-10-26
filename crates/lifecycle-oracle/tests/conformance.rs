@@ -288,7 +288,7 @@ fn the_server_suite_verdict_is_read_from_the_per_scenario_checks_cf_03() {
         );
         let pr = &entry["pr"];
         assert!(
-            pr.is_null() || [30, 32].contains(&pr.as_u64().expect("a pull request number")),
+            pr.is_null() || pr.as_u64() == Some(30),
             "{name} waits on an unknown pull request"
         );
         assert!(entry["reason"]
@@ -301,9 +301,14 @@ fn the_server_suite_verdict_is_read_from_the_per_scenario_checks_cf_03() {
             );
         }
         if name.starts_with("tasks-") {
-            assert_eq!(
-                entry["pr"], 32,
-                "{name} is delivered by the tasks extension"
+            // the suite's own check rejects the extension's result (MCP#44); no pull
+            // request delivers a new pin, and the reason names the check
+            assert!(entry["pr"].is_null(), "{name} waits on the suite pin");
+            assert!(
+                entry["reason"].as_str().is_some_and(
+                    |reason| reason.contains("wire-schema-valid") && reason.contains("MCP#44")
+                ),
+                "{name} names the check that fails and the issue"
             );
         }
     }
@@ -328,9 +333,27 @@ fn the_server_suite_verdict_is_read_from_the_per_scenario_checks_cf_03() {
     // the job passes only when the failing scenarios are exactly these.
     for (name, entry) in waiting["waiting"].as_object().expect("waiting") {
         let issue = entry["issue"].as_u64().expect("an issue number");
-        let expected = if name.starts_with("tasks-") { 12 } else { 10 };
+        let expected = if name.starts_with("tasks-") { 44 } else { 10 };
         assert_eq!(issue, expected, "{name} names the issue that delivers it");
     }
+    // The tasks scenarios: eight fail the suite's wire-schema-valid and wait on the pin, one
+    // passes, one is skipped by the suite.
+    let tasks: Vec<&String> = waiting["waiting"]
+        .as_object()
+        .expect("waiting")
+        .keys()
+        .filter(|name| name.starts_with("tasks-"))
+        .collect();
+    assert_eq!(tasks.len(), 8, "{tasks:?}");
+    for passing in ["tasks-required-task-error", "tasks-status-notifications"] {
+        assert!(
+            waiting["waiting"].get(passing).is_none(),
+            "{passing} does not wait"
+        );
+    }
+    assert!(waiting["suite_skipped"]
+        .get("tasks-status-notifications")
+        .is_some());
     let verdict = read("conformance/oracle/verdict.mjs");
     for needle in ["matchesWaiting", "unexplained", "stale", "unnamed"] {
         assert!(
