@@ -271,19 +271,31 @@ three packages equal to a fresh export.
 
 ## Not met
 
-* The acceptance of #12 is that the ten scenarios pass against the conformance build (#13). That build
-  does not exist yet and the scenarios have not been run. Not met.
-* `tasks-status-notifications` has no request at the pinned commit; its row has no vector. The
-  notifications are modeled and tested here, and their stream is #11's.
-* `tasks-mrtr-composition` and the `input_required` rounds of `test_tool_with_task` depend on the
-  input-required results of #10. This branch carries the part they need and nothing more: the tool
-  asks with an `elicitation/create` request and the result of that round is written by `TaskJson`. When #10 lands,
-  its encoder replaces this one and the scenario is re-run.
+* The acceptance of #12 is that the ten scenarios pass against the conformance build (#13). They run
+  against it (`CONFORMANCE-RUN.md`): `tasks-required-task-error` passes (3 of 3 checks) and
+  `tasks-status-notifications` is skipped by the suite, which sends no request. The other eight each
+  pass every check but one. That one is the suite's own `wire-schema-valid`: at the pinned suite
+  commit `232a9014` it holds the result of every `tools/call` to the core schema's `CallToolResult`,
+  which requires `content`, and the `CreateTaskResult` the extension requires has none.
+  `modelcontextprotocol/conformance#468` (`cf022cb`, after the pin) accepts it. The eight are listed
+  in `conformance/waiting.json` with MCP#44, which asks for the pin to move. Not met until it does;
+  the core is not changed to satisfy a check that contradicts the extension, and the schema oracle
+  finds every message of the run valid against the specification's schema and the extension's.
+* `tasks-status-notifications` is skipped by the suite at the pinned commit (it awaits a
+  `subscriptions/listen` rewrite); its row has no vector. The notifications are modeled and tested
+  here, and their stream is #11's.
 * A task whose plan parks on a sampling request has no wire form; the fixture never parks on one.
 * The extension's `subscriptions/listen` subscription by task id, and the `-32021` it returns to a
   client that lists task ids without declaring the extension, are #11's.
-* The host adapter keeps the table, the clock and the identifiers (PrismPM#216). The test host is not
-  the adapter.
+* The host adapter keeps the table, the clock and the identifiers (PrismPM#216). The conformance
+  host (`conformance/bindings/mcp-binding`) is the adapter's host for the run; the tests drive the
+  core with a host of their own. Two requests that overlap read the table before either stores it, and
+  the later store wins; the suite sends its requests one after another.
+* The conformance application declares the table at most 512 KiB in either direction
+  (`TABLE_MAXIMUM` in `tests/common/application.rs`); a larger table is outside what the run carries.
+* The five `input-required-result-*` scenarios that wait on #30 (`conformance/waiting.json`, as on
+  `main`) need the key of `requestState`, which the conformance application does not carry; they are
+  not this change's.
 * The suite validates each response against its own wire schema; here every response is validated
   against the specification's schema and the extension's by another validator. That is falsifying
   evidence, not the oracle for the protocol.
