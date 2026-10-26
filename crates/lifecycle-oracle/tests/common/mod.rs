@@ -13,7 +13,7 @@ use lifecycle_oracle::{
     decode_response, encode_request, exchange_crowd_frame_on, exchange_frame_on,
     parse_event_stream, FrameError, Request, Response,
 };
-use serde_json::Value;
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 /// The commit of the conformance suite the vectors are taken from.

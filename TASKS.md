@@ -215,7 +215,7 @@ a table are covered by the tests of `tests/tasks.rs`, which run LexLean's export
 | TK-12 | `tests/tasks.rs` probes only; the scenario has no request at the pin |
 | TK-14 | `TaskLaws.lex.tex`, checked by `lexlean verify`, and the test that it states every transition and every refusal |
 | TK-15 | `tests/tasks.rs`: unreadable tables, a missing identifier, an identifier a live task has, a cut or non-UTF-8 host section, the table returned only when touched, 301 tasks on the standard stack |
-| TK-17 | `tests/effects.rs`: the store of the table through the step root of the tests and through the conformance root, no effect for a read, a refusal or a failed check, the table stored equal to the one the byte serve returns; `StepLaws`, checked by `lexlean verify`, for the store request and the tag |
+| TK-17 | `tests/effects.rs`: the store of the table through the step root of the tests and through the conformance root, no effect for a refusal or a failed check, the table of a read stored again, the table stored equal to the one the byte serve returns; `StepLaws`, checked by `lexlean verify`, for the store request and the tag |
 | TK-16 | `tests/tasks.rs`: the vendored files against the checksums of the authorities, every request site and every check id of the vendored scenarios against the vectors |
 
 ## The vectors

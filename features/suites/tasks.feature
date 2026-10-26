@@ -96,7 +96,7 @@ Feature: Tasks
   Scenario: The step serve writes the task table through one host effect and never in the response frame: a response that wrote a table is a perform of the store effect, under the tag the provider declares, whose payload is the table preceded by its length in four bytes; once the host's outcome of that effect is in the log, the response is written without the table; a response that wrote no table, a request that was refused and a request that fails a check ask for no effect; a tag that does not fit four bytes is not a perform. The byte serve still returns the table in its response frame.
     Given the step root over the fixture provider and a host that performs the store
     When a task is created, read and cancelled through the driver
-    Then each creation and cancellation performs the store once, a read performs none, the response frames carry no table and the stored table is the one the byte serve returns
+    Then each creation, read and cancellation performs the store once, the response frames carry no table and the stored table is the one the byte serve returns
 
   @TK-16 @build
   Scenario: The ten tasks scenarios at the pinned suite commit and the pinned ext-tasks commit are accounted for: every request they send is a step of vectors/tasks.json with its file and line, every check id they emit is covered or listed with its reason, the vendored files match the checksums the authorities record, and the requirements file runs the scenarios as extension scenarios that are not scored.

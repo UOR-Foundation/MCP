@@ -890,12 +890,13 @@ fn check_store_of_a_task_lifecycle(
         "the step serve and the byte serve write the same body"
     );
 
-    // reading it with the table held writes no table and performs no effect
+    // reading it stores the table the byte serve returns for it, as for every request that
+    // touched a task, and the response carries no table
     let get = serde_json::json!({"taskId": "task-0001"});
     let (_, frame) = task_frame("tasks/get", &get, "task-0001", &table, 500);
-    let read = driver(&frame, BUDGET, &mut never).expect("a read is answered");
-    assert!(read.performed.is_empty(), "a read asks for no effect");
-    assert_eq!(read.turns, 1);
+    let read = drive_with(driver, &frame, store);
+    assert_eq!(read.performed.len(), 1, "a read of a task stores its table");
+    assert_eq!(read.performed[0].1[4..], byte_serve_table(&frame)[..]);
     let body = json_of(&step_response_checked(&read.response));
     assert_eq!(body["result"]["status"], "working", "{body}");
 
