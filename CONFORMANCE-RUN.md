@@ -108,8 +108,11 @@ counted, not excused:
 
 ## What passes today
 
-Run of the core of this commit (core digest below), spec 2026-07-28, 117 HTTP exchanges,
-236 JSON-RPC messages, 60 refused probes, 1 transport refusal, every message valid.
+Run of the core of this commit (core digest below), spec 2026-07-28,
+420 JSON-RPC messages, 39 refused probes, 1 transport refusal, every message valid: the schema
+oracle held 194 of them to the tasks extension's schema, and counted one `inputResponses` entry,
+a key the suite made up for a task that was not waiting for it, as ignored (the extension tells a
+server to ignore it).
 
 Required: 32 of 37 pass. Not scored: 4 of 13 pass, 1 is skipped by the suite, 8 fail. Every failing scenario waits on #30 (five required) or #44 (eight `tasks-*`).
 
