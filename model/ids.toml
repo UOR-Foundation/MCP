@@ -706,7 +706,7 @@ statement = "The pinned conformance suite's server runner, at specification revi
 id = "CF-04"
 level = "build"
 suite = "conformance"
-statement = "Every JSON-RPC message of the transcripts recorded during that run, each request, each result, each error and each event of a stream, validates against the pinned 2026-07-28 schema.json, a response against the definition of the request it answers, and a body that is not a JSON-RPC message is a failure and not a skipped message."
+statement = "Every JSON-RPC message of the transcripts recorded during that run, each request, each result, each error and each event of a stream, validates against the pinned 2026-07-28 schema.json, a response against the definition of the request it answers, and a body that is not a JSON-RPC message is a failure and not a skipped message. The messages of the tasks extension, which the specification's schema does not define, validate against the pinned ext-tasks schema.json: a request or notification by the method it names, its result by the definition of the same name, and a result whose resultType is task by CreateTaskResult; the oracle refuses to run when that file is not the pinned one, and without it those messages are findings. The inputResponses of a tasks/update under a key that is not outstanding for the task are not held to the schema of an input response, because the extension tells a server to ignore them; they are counted, and the values under outstanding keys are held to it."
 
 [[id]]
 id = "CF-05"

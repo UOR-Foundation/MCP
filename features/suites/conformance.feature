@@ -22,9 +22,9 @@ Feature: Conformance build and oracle run
 
   @CF-04 @build
   Scenario: The recorded transcripts validate against the pinned schema.
-    Given a transcript of the exchanges of the run and the pinned schema.json
+    Given a transcript of the exchanges of the run, the pinned schema.json and the pinned ext-tasks schema.json
     When the schema oracle reads every message
-    Then each message is valid for the definition it is held to, and an invalid message, an orphan response or a body that is not JSON is reported with its exchange
+    Then each message is valid for the definition it is held to, a message of the tasks extension is held to the extension's schema and is a finding without it, the inputResponses of a tasks/update under a key that is not outstanding are counted and not held to the schema of an input response, and an invalid message, an orphan response or a body that is not JSON is reported with its exchange
 
   @CF-05 @build
   Scenario: A planted defect fails the run with the suite's diagnostic.

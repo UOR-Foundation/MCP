@@ -369,6 +369,20 @@ fn the_recorded_transcripts_validate_against_the_pinned_schema_cf_04() {
         "CI validates the transcripts against the pinned schema"
     );
     assert!(ci.contains("run_schema_oracle"));
+
+    // The tasks extension's messages are held to its own pinned schema, by digest.
+    let extension = "crates/lifecycle-oracle/suite/ext-tasks-899c1bbc869567670093face3591b39c28ce3219/schema/2026-07-28/schema.json";
+    let digest = hex(&Sha256::digest(
+        std::fs::read(root().join(extension)).expect("the extension schema is vendored"),
+    ));
+    assert!(
+        helpers.contains(&format!("--extension {extension}")),
+        "CI gives the oracle the pinned extension schema"
+    );
+    assert!(
+        helpers.contains(&format!("--extension-sha256 {digest}")),
+        "CI gives the oracle the digest of the vendored extension schema"
+    );
 }
 
 #[test]
