@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-task-laws"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "TaskLaws"
+component = "TaskLaws"
+
+[[form]]
+id = "mcp-task-laws"
+channel = "text"
+surface = "MCP task laws"
+canonical_source = true
+features = ["sentence-case", "singular"]

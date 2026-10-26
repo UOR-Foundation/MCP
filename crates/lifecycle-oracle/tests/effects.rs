@@ -14,12 +14,13 @@ mod common;
 use std::collections::BTreeSet;
 
 use common::{
-    after_calls, all_vectors, allowed_hosts_of, byte_root_frame, call, check_response, json_of,
-    post_owned, request_of, root, rpc, standard, step_response_checked, META,
+    after_calls, all_vectors, allowed_hosts_of, byte_root_frame, call, check_response, iso,
+    json_of, post_owned, request_of, root, rpc, standard, step_response_checked, tasks_request,
+    META,
 };
 use lifecycle_oracle::{
-    decode_step, drive, encode_request, encode_request_allowing, encode_turn, exchange_step,
-    DriveError, Driven, Request, Response, Step, StepError,
+    decode_step, drive, drive_conformance, encode_request, encode_request_allowing, encode_turn,
+    exchange_step, DriveError, Driven, Request, Response, Step, StepError, TaskHost,
 };
 use serde_json::Value;
 
@@ -413,14 +414,22 @@ fn refused_requests() -> Vec<Refused> {
         let body = rpc("tools/frob", &format!(r#"{{"_meta":{META}}}"#), "1");
         post_owned(&standard("tools/frob", None), &body)
     };
-    let not_offered = {
-        // The fixture declares no tasks extension, so tasks/get is not a method it offers.
+    let undeclared = {
+        // The fixture serves the tasks extension to a client that declares it; this one does not.
         let body = rpc(
             "tasks/get",
             &format!(r#"{{"taskId":"t","_meta":{META}}}"#),
             "1",
         );
         post_owned(&standard("tasks/get", Some("t")), &body)
+    };
+    let not_offered = {
+        let body = rpc(
+            "logging/setLevel",
+            &format!(r#"{{"level":"info","_meta":{META}}}"#),
+            "1",
+        );
+        post_owned(&standard("logging/setLevel", None), &body)
     };
     let undecodable = {
         let body = rpc(
@@ -492,6 +501,12 @@ fn refused_requests() -> Vec<Refused> {
             code: Some(-32601),
         },
         Refused {
+            what: "a tasks method from a client that did not declare the extension",
+            request: undeclared,
+            status: 400,
+            code: Some(-32021),
+        },
+        Refused {
             what: "a method the provider does not offer",
             request: not_offered,
             status: 404,
@@ -523,7 +538,13 @@ fn a_request_that_fails_a_check_of_the_core_performs_no_effect_pe_04() {
         assert_eq!(seen.turns, 1, "{}", case.what);
         assert!(seen.performed.is_empty(), "{}", case.what);
         let response = step_response_checked(&seen.response);
-        assert_eq!(response.status, case.status, "{}", case.what);
+        assert_eq!(
+            response.status,
+            case.status,
+            "{} {}",
+            case.what,
+            String::from_utf8_lossy(&response.body)
+        );
         if case.code.is_some() {
             assert_eq!(code_of(&json_of(&response)), case.code, "{}", case.what);
         }
@@ -696,7 +717,7 @@ fn the_named_laws_of_the_step_are_declared_pe_08() {
         "a_message_that_is_not_a_request_never_reaches_the_provider",
         "a_refused_check_is_never_an_effect",
         "a_handled_request_that_ended_in_an_effect_is_a_perform",
-        "a_handled_request_that_did_not_end_in_an_effect_is_done",
+        "a_handled_request_that_did_not_end_in_an_effect_is_finished_as_the_byte_serve_responds",
         "a_tag_that_does_not_fit_thirty_two_bits_is_not_a_perform",
         "an_effect_request_is_an_internal_error_with_no_data",
         "an_effect_request_is_a_server_error_status",
@@ -725,20 +746,26 @@ fn the_fixture_imports_neither_the_effect_module_nor_the_step_serve_pe_09() {
         !fixture.contains("effectRequested") && !fixture.contains("EffectRequest"),
         "the fixture provider names an effect request"
     );
-    assert!(fixture.contains("Serve::serve (fixtureInfo) (ref fixtureAnswer) input"));
+    assert!(fixture.contains("Serve::serveTasks (fixtureInfo) (ref fixtureAnswerWith) input"));
 }
 
 #[test]
-fn the_conformance_declaration_still_names_fixture_run_as_its_core_pe_09() {
+fn the_conformance_declaration_names_the_step_serve_over_the_fixture_as_its_core_pe_09() {
     let declaration = std::fs::read_to_string(root().join("conformance/src/Application.lex.tex"))
         .expect("the declaration reads");
-    assert!(declaration.contains("UorMcp.Fixture.fixtureRun"));
+    assert!(declaration.contains("UorMcp.ConformanceFixture.conformanceRun"));
     assert!(!declaration.contains("StepFixture"));
+    // The root is the step serve over the unchanged fixture provider, and the one effect it
+    // can request is the store of the task table (TK-17).
+    let conformance = source("ConformanceFixture");
+    assert!(conformance.contains("StepServe::serveStep (conformanceInfo) (ref conformanceAnswer)"));
+    assert!(conformance.contains("Fixture::fixtureAnswerWith (project asked host)"));
+    assert!(!conformance.contains("effectRequested") && !conformance.contains("EffectRequest"));
     let identity: Value = serde_json::from_slice(
         &std::fs::read(root().join("conformance/core-identity.json")).expect("the identity"),
     )
     .expect("the identity is JSON");
-    assert_eq!(identity["root"], "UorMcp.Fixture.fixtureRun");
+    assert_eq!(identity["root"], "UorMcp.ConformanceFixture.conformanceRun");
 }
 
 #[test]
@@ -764,4 +791,198 @@ fn the_driver_stops_a_root_that_asks_for_more_effects_than_its_budget_pe_03() {
         drive(&frame, 1, |tag, _| format!("o{tag}").into_bytes()),
         Err(DriveError::Budget)
     );
+}
+
+// ---- TK-17: the store of the task table ----
+
+/// The tag the step fixture declares for the store (`Fixture.fixtureInfo`), and the tag the
+/// conformance root declares (`ConformanceFixture.storeEffectTag`, the fifth effect).
+const FIXTURE_STORE_TAG: u32 = 0;
+const CONFORMANCE_STORE_TAG: u32 = 4;
+const TASKS_AT: u64 = 1_790_000_000_000;
+
+/// The request frame of a task request sent at `TASKS_AT + after` with `table` held.
+fn task_frame(
+    method: &str,
+    params: &Value,
+    name: &str,
+    table: &[u8],
+    after: u64,
+) -> (Request, Vec<u8>) {
+    let mut request = tasks_request(method, params, name);
+    request.host = TaskHost {
+        now_ms: TASKS_AT + after,
+        now: iso(TASKS_AT + after),
+        fresh_id: "task-0001".to_owned(),
+        table: table.to_vec(),
+    };
+    let frame = encode_request(&request);
+    (request, frame)
+}
+
+/// A generated root driven through the step protocol with a host that performs effects.
+type Driver = fn(&[u8], usize, &mut dyn FnMut(u32, &[u8]) -> Vec<u8>) -> Result<Driven, DriveError>;
+
+fn create_params() -> Value {
+    serde_json::json!({"name": "slow_compute", "arguments": {"seconds": 2, "label": "store"}})
+}
+
+/// The table the byte serve returns for the same frame: the host the byte root would store.
+fn byte_serve_table(frame: &[u8]) -> Vec<u8> {
+    step_response_checked(&byte_root_frame(frame))
+        .tasks
+        .expect("the byte serve returns the table it wrote")
+}
+
+fn drive_with(root_driver: Driver, frame: &[u8], store: u32) -> Driven {
+    root_driver(frame, BUDGET, &mut |tag, payload| {
+        assert_eq!(
+            tag, store,
+            "the core asked for an effect other than the store"
+        );
+        assert!(
+            u32::try_from(payload.len() - 4)
+                .is_ok_and(|length| payload[..4] == length.to_be_bytes()),
+            "the payload is the table preceded by its length"
+        );
+        0u32.to_be_bytes().to_vec()
+    })
+    .expect("the root answers")
+}
+
+fn step_driver(
+    frame: &[u8],
+    budget: usize,
+    host: &mut dyn FnMut(u32, &[u8]) -> Vec<u8>,
+) -> Result<Driven, DriveError> {
+    drive(frame, budget, host)
+}
+
+fn conformance_driver(
+    frame: &[u8],
+    budget: usize,
+    host: &mut dyn FnMut(u32, &[u8]) -> Vec<u8>,
+) -> Result<Driven, DriveError> {
+    drive_conformance(frame, budget, host)
+}
+
+fn check_store_of_a_task_lifecycle(driver: Driver, store: u32) {
+    // creating a task stores the table once and the response frame carries none
+    let (_, frame) = task_frame("tools/call", &create_params(), "slow_compute", &[], 0);
+    let created = drive_with(driver, &frame, store);
+    assert_eq!(created.performed.len(), 1, "one store");
+    assert_eq!(
+        created.turns, 2,
+        "the root is called again with the outcome"
+    );
+    let response = step_response_checked(&created.response);
+    assert!(
+        response.tasks.is_none(),
+        "the response frame carries no table"
+    );
+    assert_eq!(response.status, 200);
+    let body = json_of(&response);
+    assert_eq!(body["result"]["resultType"], "task", "{body}");
+    assert_eq!(body["result"]["taskId"], "task-0001", "{body}");
+    let table = created.performed[0].1[4..].to_vec();
+    let tasks: Value = serde_json::from_slice(&table).expect("the table is JSON");
+    assert_eq!(tasks.as_array().map(Vec::len), Some(1), "{tasks}");
+    assert_eq!(
+        table,
+        byte_serve_table(&frame),
+        "the table stored is the table the byte serve returns"
+    );
+    assert_eq!(
+        step_response_checked(&byte_root_frame(&frame)).body,
+        response.body,
+        "the step serve and the byte serve write the same body"
+    );
+
+    // reading it stores the table the byte serve returns for it, as for every request that
+    // touched a task, and the response carries no table
+    let get = serde_json::json!({"taskId": "task-0001"});
+    let (_, frame) = task_frame("tasks/get", &get, "task-0001", &table, 500);
+    let read = drive_with(driver, &frame, store);
+    assert_eq!(read.performed.len(), 1, "a read of a task stores its table");
+    assert_eq!(read.performed[0].1[4..], byte_serve_table(&frame)[..]);
+    let body = json_of(&step_response_checked(&read.response));
+    assert_eq!(body["result"]["status"], "working", "{body}");
+
+    // cancelling changes the table: it is stored again, and it is the table that changed
+    let (_, frame) = task_frame("tasks/cancel", &get, "task-0001", &table, 700);
+    let cancelled = drive_with(driver, &frame, store);
+    assert_eq!(cancelled.performed.len(), 1, "one store");
+    let stored = cancelled.performed[0].1[4..].to_vec();
+    assert_ne!(stored, table, "the table changed");
+    assert_eq!(stored, byte_serve_table(&frame));
+    let body = json_of(&step_response_checked(&cancelled.response));
+    assert_eq!(body["result"]["resultType"], "complete", "{body}");
+    let held: Value = serde_json::from_slice(&stored).expect("the table is JSON");
+    assert_eq!(held[0]["task"]["status"], "cancelled", "{held}");
+}
+
+#[test]
+fn a_task_table_is_stored_through_one_effect_and_is_not_in_the_response_tk_17() {
+    check_store_of_a_task_lifecycle(step_driver, FIXTURE_STORE_TAG);
+}
+
+#[test]
+fn the_conformance_root_stores_the_table_under_the_fifth_effect_tk_17() {
+    check_store_of_a_task_lifecycle(conformance_driver, CONFORMANCE_STORE_TAG);
+}
+
+#[test]
+fn a_refused_request_and_a_failed_check_ask_for_no_effect_tk_17() {
+    // a client that did not declare the extension cannot create a task: refused, no table
+    let mut request = post_owned(
+        &standard("tools/call", Some("slow_compute")),
+        &call("slow_compute", r#"{"seconds":2,"label":"x"}"#, "1"),
+    );
+    request.host = TaskHost {
+        now_ms: TASKS_AT,
+        now: iso(TASKS_AT),
+        fresh_id: "task-0001".to_owned(),
+        table: Vec::new(),
+    };
+    let frame = encode_request(&request);
+    for driver in [step_driver, conformance_driver] {
+        let driven = driver(&frame, BUDGET, &mut never).expect("a refusal is done");
+        assert!(driven.performed.is_empty());
+        assert!(step_response_checked(&driven.response).tasks.is_none());
+    }
+    // a request that fails a check before the provider asks for nothing
+    let mut bad = tasks_request("tools/call", &create_params(), "slow_compute");
+    bad.fields
+        .retain(|(name, _)| !name.eq_ignore_ascii_case(b"Mcp-Method"));
+    bad.host = request.host.clone();
+    let frame = encode_request(&bad);
+    for driver in [step_driver, conformance_driver] {
+        let driven = driver(&frame, BUDGET, &mut never).expect("a failed check is done");
+        assert!(driven.performed.is_empty());
+    }
+}
+
+#[test]
+fn the_byte_serve_returns_the_table_in_its_response_frame_tk_17() {
+    let (_, frame) = task_frame("tools/call", &create_params(), "slow_compute", &[], 0);
+    let response = step_response_checked(&byte_root_frame(&frame));
+    assert!(response.tasks.is_some(), "the byte serve carries the table");
+}
+
+#[test]
+fn the_store_effect_is_a_perform_of_the_declared_tag_in_the_sources_tk_17() {
+    let step = source("StepServe");
+    assert!(step.contains("name: storeRequest,"));
+    assert!(step.contains("tag := (project info taskStoreTag)"));
+    let laws = source("StepLaws");
+    for theorem in [
+        "a_table_that_is_not_yet_stored_is_stored_before_the_response_is_done",
+        "a_table_that_is_stored_leaves_the_response_without_it",
+        "the_store_request_is_made_under_the_tag_of_the_provider",
+    ] {
+        assert!(
+            laws.contains(&format!("name: {theorem},")),
+            "StepLaws lacks {theorem}"
+        );
+    }
 }

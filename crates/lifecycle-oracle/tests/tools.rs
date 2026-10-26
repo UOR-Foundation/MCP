@@ -17,7 +17,7 @@ use lifecycle_oracle::{Request, Response};
 use serde_json::{json, Value};
 
 /// The names of the fixture catalog, in the order `Fixture.fixtureTools` declares them.
-const NAMES: [&str; 28] = [
+const NAMES: [&str; 35] = [
     "echo",
     "execute_sql",
     "test_missing_capability",
@@ -46,6 +46,13 @@ const NAMES: [&str; 28] = [
     "test_input_required_result_multi_round",
     "test_input_required_result_tampered_state",
     "test_input_required_result_capabilities",
+    "greet",
+    "slow_compute",
+    "failing_job",
+    "protocol_error_job",
+    "confirm_delete",
+    "multi_input",
+    "test_tool_with_task",
 ];
 
 fn list(params: &str) -> Request {

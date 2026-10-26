@@ -224,7 +224,8 @@ definition{
     | Methods::ResultBody.complete found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)
     | Methods::ResultBody.getTask found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)
     | Methods::ResultBody.acknowledged => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)
-    | Methods::ResultBody.taskCreated found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)),
+    | Methods::ResultBody.taskCreated found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)
+    | Methods::ResultBody.stored found => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }

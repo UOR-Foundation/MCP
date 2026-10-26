@@ -1,0 +1,275 @@
+\begin{lexlean}{TaskServe}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Capabilities}
+\importmodule{Content}
+\importmodule{Input}
+\importmodule{Json}
+\importmodule{Meta}
+\importmodule{Methods}
+\importmodule{Refusal}
+\importmodule{TaskJson}
+\importmodule{Tasks}
+\importmodule{Tools}
+\title{MCP task serving}
+\begin{semanticmodule}
+inductive{
+  name: TaskSupport,
+  type_parameters: [],
+  parameters: [],
+  constructors: [{name: optional, fields: []}, {name: required, fields: []}]
+}
+
+inductive{
+  name: TaskCall,
+  type_parameters: [],
+  parameters: [],
+  constructors: [
+    {name: plain, fields: [Methods::Progressed]},
+    {name: deferred, fields: [TaskSupport, Methods::Progressed, Tasks::TaskPlan]},
+    {name: needsInput, fields: [Input::InputRequiredResult]}
+  ]
+}
+
+definition{name: ttlMs, parameters: [], result: Int, body: (60000 : Int), executable: true}
+
+definition{name: pollMs, parameters: [], result: Int, body: (1000 : Int), executable: true}
+
+definition{
+  name: missingTasks,
+  parameters: [],
+  result: Refusal::ProviderRefusal,
+  body: (ctor Refusal::ProviderRefusal.missingCapability (Capabilities::tasksRequirement)),
+  executable: true
+}
+
+definition{
+  name: unreadableTable,
+  parameters: [],
+  result: Refusal::ProviderRefusal,
+  body: (ctor Refusal::ProviderRefusal.internal "the task table is not readable"),
+  executable: true
+}
+
+definition{
+  name: noFreshId,
+  parameters: [],
+  result: Refusal::ProviderRefusal,
+  body: (ctor Refusal::ProviderRefusal.internal "the host supplied no task id"),
+  executable: true
+}
+
+definition{
+  name: idInUse,
+  parameters: [],
+  result: Refusal::ProviderRefusal,
+  body: (ctor Refusal::ProviderRefusal.internal "the host supplied a task id that a task already has"),
+  executable: true
+}
+
+definition{
+  name: seed,
+  parameters: [host : Tasks::TaskHost, plan : Tasks::TaskPlan],
+  result: Tasks::TaskEntry,
+  body: (record Tasks::TaskEntry {task := (ctor Tasks::DetailedTask.working (record Tasks::TaskFields {taskId := (project host freshId), statusMessage := (ctor Option.none [String]), createdAt := (project host now), lastUpdatedAt := (project host now), ttlMs := (ctor Option.some [Int] (ttlMs)), pollIntervalMs := (ctor Option.some [Int] (pollMs))})), createdMs := (project host nowMs), plan := plan}),
+  executable: true
+}
+
+definition{
+  name: createdBody,
+  parameters: [host : Tasks::TaskHost, plan : Tasks::TaskPlan],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (if (prim equal (project host freshId) "" : Bool) then (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (noFreshId)) else (match (TaskJson::readTable (project host table))
+    | Option.none => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (unreadableTable))
+    | Option.some table => (match (Tasks::findEntry (project host freshId) table (project host nowMs))
+      | Option.some taken => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (idInUse))
+      | Option.none => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.taskCreated (record Tasks::CreateTaskResult {status := (ctor Tasks::TaskStatus.working), fields := (Tasks::fieldsOf (project (seed host plan) task)), entry := (seed host plan)})))))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: declaredBy,
+  parameters: [params : Methods::CallToolParams],
+  result: Bool,
+  body: (Capabilities::clientDeclaresTasks (project (project params meta) clientCapabilities)),
+  executable: true
+}
+
+definition{
+  name: fallThrough,
+  parameters: [support : TaskSupport, tool : Content::Tool, sync : Methods::Progressed],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match support
+    | TaskSupport.optional => (Tools::checkExecuted tool sync)
+    | TaskSupport.required => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (missingTasks))),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: decided,
+  parameters: [
+    host : Tasks::TaskHost,
+    tool : Content::Tool,
+    params : Methods::CallToolParams,
+    call : TaskCall
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match call
+    | TaskCall.plain done => (Tools::checkExecuted tool done)
+    | TaskCall.needsInput needed => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Methods::ResultBody.inputRequired needed))
+    | TaskCall.deferred support sync plan => (if (declaredBy params) then (createdBody host plan) else (fallThrough support tool sync))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: afterArguments,
+  parameters: [
+    host : Tasks::TaskHost,
+    tool : Content::Tool,
+    params : Methods::CallToolParams,
+    call : TaskCall,
+    verdict : (Result (Option Methods::ResultBody) Refusal::ProviderRefusal)
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match verdict
+    | Result.error refusal => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] refusal)
+    | Result.ok invalid => (match invalid
+      | Option.some body => (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] body)
+      | Option.none => (decided host tool params call))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: callWith,
+  parameters: [
+    host : Tasks::TaskHost,
+    tool : Content::Tool,
+    params : Methods::CallToolParams,
+    called : (Option TaskCall),
+    ordinary : (Result Methods::ResultBody Refusal::ProviderRefusal)
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match called
+    | Option.none => ordinary
+    | Option.some call => (afterArguments host tool params call (Tools::argumentVerdict tool params))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: answerCall,
+  parameters: [
+    host : Tasks::TaskHost,
+    tools : (List Content::Tool),
+    taskCall : (Fn (Methods::CallToolParams) (Option TaskCall)),
+    ordinary : (Result Methods::ResultBody Refusal::ProviderRefusal),
+    params : Methods::CallToolParams
+  ],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match (Tools::findTool (project params name) tools)
+    | Option.none => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.unknownTool (project params name)))
+    | Option.some tool => (callWith host tool params (apply taskCall params) ordinary)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: located,
+  parameters: [host : Tasks::TaskHost, meta : Meta::RequestMeta, taskId : String],
+  result: (Result Tasks::TaskEntry Refusal::ProviderRefusal),
+  body: (if (Capabilities::clientDeclaresTasks (project meta clientCapabilities)) then (match (TaskJson::readTable (project host table))
+    | Option.none => (ctor Result.error [Tasks::TaskEntry, Refusal::ProviderRefusal] (unreadableTable))
+    | Option.some table => (match (Tasks::findEntry taskId table (project host nowMs))
+      | Option.none => (ctor Result.error [Tasks::TaskEntry, Refusal::ProviderRefusal] (ctor Refusal::ProviderRefusal.unknownTask taskId))
+      | Option.some found => (ctor Result.ok [Tasks::TaskEntry, Refusal::ProviderRefusal] found))) else (ctor Result.error [Tasks::TaskEntry, Refusal::ProviderRefusal] (missingTasks))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: storedBody,
+  parameters: [stepped : Tasks::Stepped, shape : Tasks::StoredShape, earlier : Bool],
+  result: Methods::ResultBody,
+  body: (ctor Methods::ResultBody.stored (record Tasks::StoredTask {entry := (project stepped entry), shape := shape, changed := ((project stepped changed) || earlier)})),
+  executable: true
+}
+
+definition{
+  name: readFound,
+  parameters: [host : Tasks::TaskHost, found : Tasks::TaskEntry],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (storedBody (Tasks::settle found (project host nowMs) (project host now)) (ctor Tasks::StoredShape.read) false)),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: serveGet,
+  parameters: [host : Tasks::TaskHost, params : Methods::GetTaskParams],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match (located host (project params meta) (project params taskId))
+    | Result.error refusal => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] refusal)
+    | Result.ok found => (readFound host found)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: updateFound,
+  parameters: [host : Tasks::TaskHost, found : Tasks::TaskEntry, answers : Json::JsonObject],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (let settled : Tasks::Stepped := (Tasks::settle found (project host nowMs) (project host now)); (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (storedBody (Tasks::answer (project settled entry) answers (project host nowMs) (project host now)) (ctor Tasks::StoredShape.acked) (project settled changed)))),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: serveUpdate,
+  parameters: [host : Tasks::TaskHost, params : Methods::UpdateTaskParams],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match (located host (project params meta) (project params taskId))
+    | Result.error refusal => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] refusal)
+    | Result.ok found => (updateFound host found (project params inputResponses))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: cancelFound,
+  parameters: [host : Tasks::TaskHost, found : Tasks::TaskEntry],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (ctor Result.ok [Methods::ResultBody, Refusal::ProviderRefusal] (storedBody (Tasks::cancel found (project host nowMs) (project host now)) (ctor Tasks::StoredShape.acked) false)),
+  axioms: [propext],
+  executable: true
+}
+
+definition{
+  name: serveCancel,
+  parameters: [host : Tasks::TaskHost, params : Methods::CancelTaskParams],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match (located host (project params meta) (project params taskId))
+    | Result.error refusal => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] refusal)
+    | Result.ok found => (cancelFound host found)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: tableAfter,
+  parameters: [host : Tasks::TaskHost, found : Tasks::StoredTask],
+  result: (Option (Option (List Nat))),
+  body: (match (TaskJson::readTable (project host table))
+    | Option.none => (ctor Option.some [(Option (List Nat))] (ctor Option.none [(List Nat)]))
+    | Option.some table => (match (TaskJson::tableBytes (Tasks::withEntry (project found entry) table (project host nowMs)))
+      | Option.none => (ctor Option.none [(Option (List Nat))])
+      | Option.some written => (ctor Option.some [(Option (List Nat))] (ctor Option.some [(List Nat)] written)))),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+\end{semanticmodule}
+\end{lexlean}

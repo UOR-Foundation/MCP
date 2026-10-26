@@ -11,12 +11,20 @@
 //! `cargo run -p lifecycle-oracle --example conformance_application -- --write`
 //! writes it.
 
-use lifecycle_oracle::{decode_response, encode_request, exchange_frame, Request};
-use serde_json::Value;
+use lifecycle_oracle::{decode_response, drive_conformance, encode_request, Request, TaskHost};
+use serde_json::{json, Value};
 
 use super::{
-    hex, request_of, resources_vector_file, tools_vector_file, transport_vector_file, vector_file,
+    hex, iso, request_of, resources_vector_file, tasks_request, tools_vector_file,
+    transport_vector_file, vector_file,
 };
+
+/// The instant of the acceptance vectors, in the host's millisecond counter.
+pub const ACCEPTANCE_MS: u64 = 1_790_000_000_000;
+
+/// The tag of the effect that stores the task table: its position in the declaration
+/// (`task.store` is the fifth effect), and the tag `ConformanceFixture.storeEffectTag` names.
+pub const STORE_TAG: u32 = 4;
 
 /// The vectors the declaration serves, by the ID of the vector file they come from.
 /// Each is a request the pinned scenarios send, so the declaration's vectors exercise
@@ -25,6 +33,21 @@ pub const SERVED: [&str; 11] = [
     "ST-05", "TS-01", "TS-02", "TS-05", "TS-08", "SP-01", "RS-01", "RS-02", "RS-09", "ST-01",
     "ST-14",
 ];
+
+/// A host effect the core asked for while an acceptance vector was answered: the payload
+/// of the request and the outcome the transcript supplies.
+pub struct Step {
+    pub request: Vec<u8>,
+    pub outcome: Vec<u8>,
+}
+
+/// One acceptance vector of the tasks extension: the request frame, the response frame
+/// and the effects the core asked for between them.
+pub struct TaskVector {
+    pub frame_request: Vec<u8>,
+    pub frame_response: Vec<u8>,
+    pub steps: Vec<Step>,
+}
 
 /// One vector of the declaration: the request and the answer, as HTTP messages and as
 /// the frames the core reads and writes.
@@ -75,6 +98,7 @@ pub fn vector(id: &str) -> Vector {
         request.body.len().to_string().into_bytes(),
     ));
     request.tool_calls = 0;
+    request.host = acceptance_host(1, &[]);
 
     let mut http_request = format!(
         "{} {} HTTP/1.1\r\n",
@@ -92,8 +116,16 @@ pub fn vector(id: &str) -> Vector {
     http_request.extend_from_slice(&request.body);
 
     let frame_request = encode_request(&request);
-    let frame_response = exchange_frame(&frame_request);
+    let driven = drive_conformance(&frame_request, 0, |tag, _| {
+        panic!("the vector {id} asked for the effect {tag}")
+    })
+    .expect("the conformance root answers without an effect");
+    let frame_response = driven.response;
     let response = decode_response(&frame_response).expect("the core writes a response frame");
+    assert!(
+        response.tasks.is_none(),
+        "the response frame of {id} carries a task table"
+    );
     assert!(
         response.notifications.is_empty(),
         "the response frame of {id} carries notifications"
@@ -122,6 +154,98 @@ pub fn vector(id: &str) -> Vector {
         frame_request,
         frame_response,
     }
+}
+
+/// The host fields of an acceptance vector: the instant, the identifier a task created by
+/// the request would have, and the table the previous request left.
+fn acceptance_host(issued: u32, table: &[u8]) -> TaskHost {
+    TaskHost {
+        now_ms: ACCEPTANCE_MS,
+        now: iso(ACCEPTANCE_MS),
+        fresh_id: format!("task-{issued:04}"),
+        table: table.to_vec(),
+    }
+}
+
+/// The effect of the host that stores the table: it completes, and the transcript
+/// records the table the core wrote.
+fn store_outcome(tag: u32, _payload: &[u8]) -> Vec<u8> {
+    assert_eq!(
+        tag, STORE_TAG,
+        "the core asked for an effect other than the store"
+    );
+    0u32.to_be_bytes().to_vec()
+}
+
+/// The vectors that exercise the one effect the core requests: a task is created (the core
+/// stores the table), read back with the table the host holds (the core stores the table it
+/// read, as the byte serve returns it for every request that touched a task), cancelled
+/// (the core stores the table again) and asked for a task the table does not hold (refused,
+/// no effect).
+pub fn task_vectors() -> Vec<TaskVector> {
+    let mut out = Vec::new();
+    let mut table: Vec<u8> = Vec::new();
+    let sequence = [
+        (
+            "tools/call",
+            json!({"name": "slow_compute", "arguments": {"seconds": 2, "label": "acceptance"}}),
+            "slow_compute",
+            true,
+        ),
+        (
+            "tasks/get",
+            json!({"taskId": "task-0001"}),
+            "task-0001",
+            true,
+        ),
+        (
+            "tasks/cancel",
+            json!({"taskId": "task-0001"}),
+            "task-0001",
+            true,
+        ),
+        // a task the table does not hold is refused and the core asks for no effect
+        (
+            "tasks/get",
+            json!({"taskId": "task-9999"}),
+            "task-9999",
+            false,
+        ),
+    ];
+    for (issued, (method, params, name, stores)) in sequence.into_iter().enumerate() {
+        let mut request = tasks_request(method, &params, name);
+        request.host = acceptance_host(u32::try_from(issued).expect("few") + 1, &table);
+        let frame_request = encode_request(&request);
+        let driven = drive_conformance(&frame_request, 1, store_outcome)
+            .expect("the conformance root answers the task vector");
+        let response = decode_response(&driven.response).expect("a response frame");
+        assert!(
+            response.tasks.is_none(),
+            "the response frame of {method} carries a table"
+        );
+        assert_eq!(
+            driven.performed.len(),
+            usize::from(stores),
+            "{method} stores the table exactly when it writes one"
+        );
+        let steps: Vec<Step> = driven
+            .performed
+            .iter()
+            .map(|(_, payload)| Step {
+                request: payload.clone(),
+                outcome: 0u32.to_be_bytes().to_vec(),
+            })
+            .collect();
+        if let Some((_, payload)) = driven.performed.first() {
+            table = payload[4..].to_vec();
+        }
+        out.push(TaskVector {
+            frame_request,
+            frame_response: driven.response,
+            steps,
+        });
+    }
+    out
 }
 
 fn bytes(value: &[u8]) -> String {
@@ -171,12 +295,65 @@ fn word(value: u32) -> String {
     format!("({value} : UInt32)")
 }
 
+/// The largest table the conformance host carries in either direction, in bytes.
+pub const TABLE_MAXIMUM: u32 = 524_288;
+
+fn section(name: &str, kind: &str, effect: &str, field: &str) -> String {
+    record(
+        "FrameSection",
+        &[
+            ("name", text(name)),
+            ("kind", constructor("FrameKind", kind)),
+            ("effect", text(effect)),
+            ("field", text(field)),
+            ("values", "(nil String)".to_owned()),
+        ],
+    )
+}
+
+fn effect(
+    name: &str,
+    request: &[(&str, &str)],
+    result: &[(&str, &str)],
+    request_maximum: u32,
+    result_maximum: u32,
+) -> String {
+    const MODEL: &str = "Foundation.Server.V1.Model";
+    let fields = |entries: &[(&str, &str)]| -> String {
+        let items: Vec<String> = entries
+            .iter()
+            .map(|(field, kind)| {
+                record(
+                    "HostField",
+                    &[
+                        ("name", text(field)),
+                        ("kind", constructor("HostKind", kind)),
+                    ],
+                )
+            })
+            .collect();
+        list(&format!("{MODEL}::HostField"), &items)
+    };
+    record(
+        "HostEffect",
+        &[
+            ("name", text(name)),
+            ("request", fields(request)),
+            ("result", fields(result)),
+            ("failures", "(nil String)".to_owned()),
+            ("requestMaximum", word(request_maximum)),
+            ("resultMaximum", word(result_maximum)),
+        ],
+    )
+}
+
 /// The module text of `conformance/src/Application.lex.tex`.
 pub fn render() -> String {
     const MODEL: &str = "Foundation.Server.V1.Model";
     let vectors: Vec<Vector> = SERVED.iter().map(|id| vector(id)).collect();
 
-    let acceptance: Vec<String> = vectors
+    let tasks = task_vectors();
+    let mut acceptance: Vec<String> = vectors
         .iter()
         .map(|v| {
             record(
@@ -184,6 +361,46 @@ pub fn render() -> String {
                 &[
                     ("request", bytes(&v.frame_request)),
                     ("response", bytes(&v.frame_response)),
+                ],
+            )
+        })
+        .collect();
+    acceptance.extend(tasks.iter().map(|v| {
+        record(
+            "AcceptanceVector",
+            &[
+                ("request", bytes(&v.frame_request)),
+                ("response", bytes(&v.frame_response)),
+            ],
+        )
+    }));
+    let transcripts: Vec<String> = tasks
+        .iter()
+        .enumerate()
+        .filter(|(_, v)| !v.steps.is_empty())
+        .map(|(index, v)| {
+            let steps: Vec<String> = v
+                .steps
+                .iter()
+                .map(|step| {
+                    record(
+                        "HostStep",
+                        &[
+                            ("effect", text("task.store")),
+                            ("request", bytes(&step.request)),
+                            ("outcome", bytes(&step.outcome)),
+                        ],
+                    )
+                })
+                .collect();
+            record(
+                "HostTranscript",
+                &[
+                    (
+                        "vector",
+                        word(u32::try_from(vectors.len() + index).expect("few vectors")),
+                    ),
+                    ("steps", list(&format!("{MODEL}::HostStep"), &steps)),
                 ],
             )
         })
@@ -244,71 +461,61 @@ pub fn render() -> String {
                 "frame",
                 list(
                     &format!("{MODEL}::FrameSection"),
-                    &[record(
-                        "FrameSection",
-                        &[
-                            ("name", text("tool_calls")),
-                            ("kind", constructor("FrameKind", "U32")),
-                            ("effect", text("tool.calls")),
-                            ("field", text("calls")),
-                            ("values", "(nil String)".to_owned()),
-                        ],
-                    )],
+                    &[
+                        section("tool_calls", "U32", "tool.calls", "calls"),
+                        section("now_ms", "U64", "clock.now", "ms"),
+                        section("now", "Text", "clock.now", "iso"),
+                        section("fresh_task_id", "Text", "task.id", "id"),
+                        section("task_table", "Bytes", "task.table", "table"),
+                    ],
                 ),
             ),
             ("vectors", list(&format!("{MODEL}::ServedVector"), &served)),
         ],
     );
 
-    let effect = record(
-        "HostEffect",
-        &[
-            ("name", text("tool.calls")),
-            (
-                "request",
-                list(
-                    &format!("{MODEL}::HostField"),
-                    &[record(
-                        "HostField",
-                        &[
-                            ("name", text("counted")),
-                            ("kind", constructor("HostKind", "Flag")),
-                        ],
-                    )],
-                ),
-            ),
-            (
-                "result",
-                list(
-                    &format!("{MODEL}::HostField"),
-                    &[record(
-                        "HostField",
-                        &[
-                            ("name", text("calls")),
-                            ("kind", constructor("HostKind", "U32")),
-                        ],
-                    )],
-                ),
-            ),
-            ("failures", "(nil String)".to_owned()),
-            ("requestMaximum", word(8)),
-            ("resultMaximum", word(16)),
-        ],
-    );
+    let effects = [
+        effect(
+            "tool.calls",
+            &[("counted", "Flag")],
+            &[("calls", "U32")],
+            8,
+            16,
+        ),
+        effect("clock.now", &[], &[("ms", "U64"), ("iso", "Text")], 8, 64),
+        effect("task.id", &[], &[("id", "Text")], 8, 128),
+        effect(
+            "task.table",
+            &[],
+            &[("table", "Bytes")],
+            8,
+            TABLE_MAXIMUM + 8,
+        ),
+        effect(
+            "task.store",
+            &[("table", "Bytes")],
+            &[],
+            TABLE_MAXIMUM + 8,
+            8,
+        ),
+    ];
     let host = record(
         "HostProtocol",
         &[
             ("protocol", text("prismpm/host-effects/1")),
             (
                 "description",
-                text("The conformance build asks its host for one thing: how many tools/call requests the client has made in the current window, not counting the one being served.\n"),
+                text("The conformance build asks its host for four things that fill the request frame, how many tools/call requests the client has made in the current window (not counting the one being served), the host's clock, an identifier for a task the request may create and the table of tasks the host holds, and for one thing the core requests, that the host store the table of tasks the request changed.\n"),
             ),
             ("usageCode", "(64 : UInt8)".to_owned()),
             ("ioCode", "(74 : UInt8)".to_owned()),
             ("faultCode", "(70 : UInt8)".to_owned()),
-            ("effectBudget", word(0)),
-            ("effects", list(&format!("{MODEL}::HostEffect"), &[effect])),
-            ("transcripts", format!("(nil {MODEL}::HostTranscript)")),
+            ("effectBudget", word(1)),
+            ("effects", list(&format!("{MODEL}::HostEffect"), &effects)),
+            (
+                "transcripts",
+                list(&format!("{MODEL}::HostTranscript"), &transcripts),
+            ),
         ],
     );
 
@@ -330,7 +537,7 @@ pub fn render() -> String {
                 record(
                     "ServerCore",
                     &[
-                        ("root", text("UorMcp.Fixture.fixtureRun")),
+                        ("root", text("UorMcp.ConformanceFixture.conformanceRun")),
                         ("package", text("mcp_conformance_core")),
                         ("version", text("1.0.0")),
                     ],

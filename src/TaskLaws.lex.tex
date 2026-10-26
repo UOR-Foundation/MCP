@@ -1,0 +1,471 @@
+\begin{lexlean}{TaskLaws}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Capabilities}
+\importmodule{Content}
+\importmodule{Input}
+\importmodule{Json}
+\importmodule{JsonRpc}
+\importmodule{Methods}
+\importmodule{Refusal}
+\importmodule{Status}
+\importmodule{TaskJson}
+\importmodule{TaskServe}
+\importmodule{Tasks}
+\importmodule{Tools}
+\title{MCP task laws}
+\begin{semanticmodule}
+definition{
+  name: sampleFields,
+  parameters: [],
+  result: Tasks::TaskFields,
+  body: (record Tasks::TaskFields {taskId := "t1", statusMessage := (ctor Option.none [String]), createdAt := "c", lastUpdatedAt := "c", ttlMs := (ctor Option.some [Int] (60000 : Int)), pollIntervalMs := (ctor Option.some [Int] (1000 : Int))}),
+  executable: true
+}
+
+definition{
+  name: unlimitedFields,
+  parameters: [],
+  result: Tasks::TaskFields,
+  body: (record Tasks::TaskFields {taskId := "t2", statusMessage := (ctor Option.none [String]), createdAt := "c", lastUpdatedAt := "c", ttlMs := (ctor Option.none [Int]), pollIntervalMs := (ctor Option.none [Int])}),
+  executable: true
+}
+
+definition{
+  name: sampleResult,
+  parameters: [],
+  result: Json::JsonObject,
+  body: (record Json::JsonObject {members := (cons ("content", (ctor Json::Json.array (nil Json::Json))) (nil (String * Json::Json)))}),
+  executable: true
+}
+
+definition{
+  name: askFor,
+  parameters: [key : String],
+  result: (String * Input::InputRequest),
+  body: (key, (ctor Input::InputRequest.roots (ctor Option.none [Json::JsonObject]))),
+  executable: true
+}
+
+definition{
+  name: planThatFinishesAt,
+  parameters: [finish : Int],
+  result: Tasks::TaskPlan,
+  body: (record Tasks::TaskPlan {parkAfterMs := (0 : Int), parked := (nil (String * Input::InputRequest)), finishAfterMs := finish, outcome := (ctor Tasks::PlanOutcome.completes (sampleResult))}),
+  executable: true
+}
+
+definition{
+  name: planThatParksAt,
+  parameters: [park : Int],
+  result: Tasks::TaskPlan,
+  body: (record Tasks::TaskPlan {parkAfterMs := park, parked := (cons (askFor "k") (nil (String * Input::InputRequest))), finishAfterMs := (0 : Int), outcome := (ctor Tasks::PlanOutcome.completes (sampleResult))}),
+  executable: true
+}
+
+definition{
+  name: entryOf,
+  parameters: [task : Tasks::DetailedTask, plan : Tasks::TaskPlan],
+  result: Tasks::TaskEntry,
+  body: (record Tasks::TaskEntry {task := task, createdMs := (0 : Int), plan := plan}),
+  executable: true
+}
+
+definition{
+  name: workingEntry,
+  parameters: [finish : Int],
+  result: Tasks::TaskEntry,
+  body: (entryOf (ctor Tasks::DetailedTask.working (sampleFields)) (planThatFinishesAt finish)),
+  executable: true
+}
+
+definition{
+  name: waitingEntry,
+  parameters: [keys : (List (String * Input::InputRequest))],
+  result: Tasks::TaskEntry,
+  body: (entryOf (ctor Tasks::DetailedTask.input_required (sampleFields) keys) (planThatFinishesAt (0 : Int))),
+  executable: true
+}
+
+definition{
+  name: membersOf,
+  parameters: [task : Tasks::DetailedTask],
+  result: Json::JsonObject,
+  body: (match (TaskJson::detailedMembers task)
+    | Option.none => (record Json::JsonObject {members := (nil (String * Json::Json))})
+    | Option.some members => (record Json::JsonObject {members := members})),
+  executable: true
+}
+
+definition{
+  name: statusAfter,
+  parameters: [stepped : Tasks::Stepped],
+  result: Tasks::TaskStatus,
+  body: (Tasks::statusOf (project (project stepped entry) task)),
+  executable: true
+}
+
+definition{
+  name: answerOf,
+  parameters: [key : String],
+  result: Json::JsonObject,
+  body: (record Json::JsonObject {members := (cons (key, (ctor Json::Json.object (nil (String * Json::Json)))) (nil (String * Json::Json)))}),
+  executable: true
+}
+
+theorem{
+  name: a_completed_task_is_not_settled,
+  parameters: [
+    fields : Tasks::TaskFields,
+    result : Json::JsonObject,
+    plan : Tasks::TaskPlan,
+    nowMs : Int,
+    now : String
+  ],
+  statement: ((Tasks::settle (entryOf (ctor Tasks::DetailedTask.completed fields result) plan) nowMs now) = (Tasks::kept (entryOf (ctor Tasks::DetailedTask.completed fields result) plan))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_failed_task_is_not_settled,
+  parameters: [
+    fields : Tasks::TaskFields,
+    error : JsonRpc::ErrorObject,
+    plan : Tasks::TaskPlan,
+    nowMs : Int,
+    now : String
+  ],
+  statement: ((Tasks::settle (entryOf (ctor Tasks::DetailedTask.failed fields error) plan) nowMs now) = (Tasks::kept (entryOf (ctor Tasks::DetailedTask.failed fields error) plan))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_cancelled_task_is_not_settled,
+  parameters: [fields : Tasks::TaskFields, plan : Tasks::TaskPlan, nowMs : Int, now : String],
+  statement: ((Tasks::settle (entryOf (ctor Tasks::DetailedTask.cancelled fields) plan) nowMs now) = (Tasks::kept (entryOf (ctor Tasks::DetailedTask.cancelled fields) plan))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_completed_task_is_not_answered,
+  parameters: [
+    fields : Tasks::TaskFields,
+    result : Json::JsonObject,
+    plan : Tasks::TaskPlan,
+    answers : Json::JsonObject,
+    nowMs : Int,
+    now : String
+  ],
+  statement: ((Tasks::answer (entryOf (ctor Tasks::DetailedTask.completed fields result) plan) answers nowMs now) = (Tasks::kept (entryOf (ctor Tasks::DetailedTask.completed fields result) plan))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_failed_task_is_not_answered,
+  parameters: [
+    fields : Tasks::TaskFields,
+    error : JsonRpc::ErrorObject,
+    plan : Tasks::TaskPlan,
+    answers : Json::JsonObject,
+    nowMs : Int,
+    now : String
+  ],
+  statement: ((Tasks::answer (entryOf (ctor Tasks::DetailedTask.failed fields error) plan) answers nowMs now) = (Tasks::kept (entryOf (ctor Tasks::DetailedTask.failed fields error) plan))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_cancelled_task_is_not_answered,
+  parameters: [
+    fields : Tasks::TaskFields,
+    plan : Tasks::TaskPlan,
+    answers : Json::JsonObject,
+    nowMs : Int,
+    now : String
+  ],
+  statement: ((Tasks::answer (entryOf (ctor Tasks::DetailedTask.cancelled fields) plan) answers nowMs now) = (Tasks::kept (entryOf (ctor Tasks::DetailedTask.cancelled fields) plan))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_working_task_is_not_answered,
+  parameters: [
+    fields : Tasks::TaskFields,
+    plan : Tasks::TaskPlan,
+    answers : Json::JsonObject,
+    nowMs : Int,
+    now : String
+  ],
+  statement: ((Tasks::answer (entryOf (ctor Tasks::DetailedTask.working fields) plan) answers nowMs now) = (Tasks::kept (entryOf (ctor Tasks::DetailedTask.working fields) plan))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_completed_task_is_not_cancelled,
+  parameters: [
+    fields : Tasks::TaskFields,
+    result : Json::JsonObject,
+    plan : Tasks::TaskPlan,
+    nowMs : Int,
+    now : String
+  ],
+  statement: ((Tasks::cancel (entryOf (ctor Tasks::DetailedTask.completed fields result) plan) nowMs now) = (Tasks::kept (entryOf (ctor Tasks::DetailedTask.completed fields result) plan))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_failed_task_is_not_cancelled,
+  parameters: [
+    fields : Tasks::TaskFields,
+    error : JsonRpc::ErrorObject,
+    plan : Tasks::TaskPlan,
+    nowMs : Int,
+    now : String
+  ],
+  statement: ((Tasks::cancel (entryOf (ctor Tasks::DetailedTask.failed fields error) plan) nowMs now) = (Tasks::kept (entryOf (ctor Tasks::DetailedTask.failed fields error) plan))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_cancelled_task_is_cancelled_once,
+  parameters: [fields : Tasks::TaskFields, plan : Tasks::TaskPlan, nowMs : Int, now : String],
+  statement: ((Tasks::cancel (entryOf (ctor Tasks::DetailedTask.cancelled fields) plan) nowMs now) = (Tasks::kept (entryOf (ctor Tasks::DetailedTask.cancelled fields) plan))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_waiting_task_is_cancelled,
+  parameters: [
+    fields : Tasks::TaskFields,
+    requests : (List (String * Input::InputRequest)),
+    plan : Tasks::TaskPlan,
+    nowMs : Int,
+    now : String
+  ],
+  statement: ((Tasks::cancel (entryOf (ctor Tasks::DetailedTask.input_required fields requests) plan) nowMs now) = (record Tasks::Stepped {entry := (entryOf (ctor Tasks::DetailedTask.cancelled (Tasks::touch fields now)) plan), changed := true})),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_waiting_task_is_not_settled,
+  parameters: [
+    fields : Tasks::TaskFields,
+    requests : (List (String * Input::InputRequest)),
+    plan : Tasks::TaskPlan,
+    nowMs : Int,
+    now : String
+  ],
+  statement: ((Tasks::settle (entryOf (ctor Tasks::DetailedTask.input_required fields requests) plan) nowMs now) = (Tasks::kept (entryOf (ctor Tasks::DetailedTask.input_required fields requests) plan))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_working_task_before_its_time_is_cancelled,
+  parameters: [],
+  statement: ((statusAfter (Tasks::cancel (workingEntry (2000 : Int)) (10 : Int) "n")) = (ctor Tasks::TaskStatus.cancelled)),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_working_task_that_finished_is_not_cancelled,
+  parameters: [],
+  statement: ((statusAfter (Tasks::cancel (workingEntry (2000 : Int)) (2000 : Int) "n")) = (ctor Tasks::TaskStatus.completed)),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_working_task_stays_working_until_its_time,
+  parameters: [],
+  statement: ((((statusAfter (Tasks::settle (workingEntry (2000 : Int)) (1999 : Int) "n")) = (ctor Tasks::TaskStatus.working)) /\ ((statusAfter (Tasks::settle (workingEntry (2000 : Int)) (2000 : Int) "n")) = (ctor Tasks::TaskStatus.completed))) /\ ((project (Tasks::settle (workingEntry (2000 : Int)) (1999 : Int) "n") changed) = false)),
+  proof: constructor{
+    branches: [constructor{branches: [reflexivity{}, reflexivity{}]}, reflexivity{}]
+  },
+  axioms: [propext]
+}
+
+theorem{
+  name: a_task_parks_for_input_when_it_is_time,
+  parameters: [],
+  statement: ((((statusAfter (Tasks::settle (entryOf (ctor Tasks::DetailedTask.working (sampleFields)) (planThatParksAt (500 : Int))) (499 : Int) "n")) = (ctor Tasks::TaskStatus.working)) /\ ((statusAfter (Tasks::settle (entryOf (ctor Tasks::DetailedTask.working (sampleFields)) (planThatParksAt (500 : Int))) (500 : Int) "n")) = (ctor Tasks::TaskStatus.input_required))) /\ ((project (project (Tasks::settle (entryOf (ctor Tasks::DetailedTask.working (sampleFields)) (planThatParksAt (500 : Int))) (500 : Int) "n") entry) plan) = (Tasks::parkedPlan (planThatParksAt (500 : Int))))),
+  proof: constructor{
+    branches: [constructor{branches: [reflexivity{}, reflexivity{}]}, reflexivity{}]
+  },
+  axioms: [propext]
+}
+
+theorem{
+  name: answering_the_last_request_resumes_the_task,
+  parameters: [],
+  statement: ((statusAfter (Tasks::answer (waitingEntry (cons (askFor "k") (nil (String * Input::InputRequest)))) (answerOf "k") (5 : Int) "n")) = (ctor Tasks::TaskStatus.completed)),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: answering_one_of_two_requests_leaves_the_other,
+  parameters: [],
+  statement: (((statusAfter (Tasks::answer (waitingEntry (cons (askFor "a") (cons (askFor "b") (nil (String * Input::InputRequest))))) (answerOf "a") (5 : Int) "n")) = (ctor Tasks::TaskStatus.input_required)) /\ ((Tasks::answer (waitingEntry (cons (askFor "a") (cons (askFor "b") (nil (String * Input::InputRequest))))) (answerOf "a") (5 : Int) "n") = (record Tasks::Stepped {entry := (entryOf (ctor Tasks::DetailedTask.input_required (Tasks::touch (sampleFields) "n") (cons (askFor "b") (nil (String * Input::InputRequest)))) (planThatFinishesAt (0 : Int))), changed := true}))),
+  proof: constructor{branches: [reflexivity{}, reflexivity{}]},
+  axioms: [propext]
+}
+
+theorem{
+  name: an_answer_to_a_key_nobody_asked_changes_nothing,
+  parameters: [],
+  statement: ((Tasks::answer (waitingEntry (cons (askFor "a") (nil (String * Input::InputRequest)))) (answerOf "stranger") (5 : Int) "n") = (Tasks::kept (waitingEntry (cons (askFor "a") (nil (String * Input::InputRequest)))))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: a_step_keeps_the_task_identity,
+  parameters: [fields : Tasks::TaskFields, now : String],
+  statement: ((((project (Tasks::touch fields now) taskId) = (project fields taskId)) /\ ((project (Tasks::touch fields now) createdAt) = (project fields createdAt))) /\ ((((project (Tasks::touch fields now) ttlMs) = (project fields ttlMs)) /\ ((project (Tasks::touch fields now) lastUpdatedAt) = now)) /\ ((project (Tasks::touch fields now) pollIntervalMs) = (project fields pollIntervalMs)))),
+  proof: constructor{
+    branches: [
+      constructor{branches: [reflexivity{}, reflexivity{}]},
+      constructor{branches: [constructor{branches: [reflexivity{}, reflexivity{}]}, reflexivity{}]}
+    ]
+  }
+}
+
+theorem{
+  name: a_task_is_expired_only_when_its_ttl_has_elapsed,
+  parameters: [],
+  statement: ((((Tasks::isExpired (workingEntry (0 : Int)) (59999 : Int)) = false) /\ ((Tasks::isExpired (workingEntry (0 : Int)) (60000 : Int)) = true)) /\ ((Tasks::isExpired (entryOf (ctor Tasks::DetailedTask.working (unlimitedFields)) (planThatFinishesAt (0 : Int))) (999999999999 : Int)) = false)),
+  proof: constructor{
+    branches: [constructor{branches: [reflexivity{}, reflexivity{}]}, reflexivity{}]
+  },
+  axioms: [propext]
+}
+
+theorem{
+  name: an_entry_is_found_by_its_identifier_while_it_lives,
+  parameters: [],
+  statement: ((((Tasks::findEntry "t1" (cons (workingEntry (0 : Int)) (nil Tasks::TaskEntry)) (59999 : Int)) = (ctor Option.some [Tasks::TaskEntry] (workingEntry (0 : Int)))) /\ ((Tasks::findEntry "t1" (cons (workingEntry (0 : Int)) (nil Tasks::TaskEntry)) (60000 : Int)) = (ctor Option.none [Tasks::TaskEntry]))) /\ ((Tasks::findEntry "other" (cons (workingEntry (0 : Int)) (nil Tasks::TaskEntry)) (0 : Int)) = (ctor Option.none [Tasks::TaskEntry]))),
+  proof: constructor{
+    branches: [constructor{branches: [reflexivity{}, reflexivity{}]}, reflexivity{}]
+  },
+  axioms: [propext]
+}
+
+theorem{
+  name: an_entry_replaces_the_one_with_its_identifier,
+  parameters: [],
+  statement: ((Tasks::withEntry (workingEntry (5 : Int)) (cons (workingEntry (9 : Int)) (nil Tasks::TaskEntry)) (0 : Int)) = (cons (workingEntry (5 : Int)) (nil Tasks::TaskEntry))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: an_expired_entry_leaves_the_table_with_the_next_change,
+  parameters: [],
+  statement: ((Tasks::withEntry (entryOf (ctor Tasks::DetailedTask.working (unlimitedFields)) (planThatFinishesAt (0 : Int))) (cons (workingEntry (0 : Int)) (nil Tasks::TaskEntry)) (60000 : Int)) = (cons (entryOf (ctor Tasks::DetailedTask.working (unlimitedFields)) (planThatFinishesAt (0 : Int))) (nil Tasks::TaskEntry))),
+  proof: reflexivity{},
+  axioms: [propext]
+}
+
+theorem{
+  name: reading_or_acknowledging_an_unchanged_task_notifies_nobody,
+  parameters: [entry : Tasks::TaskEntry],
+  statement: (((Tasks::notifies (record Tasks::StoredTask {entry := entry, shape := (ctor Tasks::StoredShape.read), changed := false})) = false) /\ ((Tasks::notifies (record Tasks::StoredTask {entry := entry, shape := (ctor Tasks::StoredShape.acked), changed := false})) = false)),
+  proof: constructor{branches: [reflexivity{}, reflexivity{}]}
+}
+
+theorem{
+  name: a_changed_task_that_is_read_or_acknowledged_notifies,
+  parameters: [entry : Tasks::TaskEntry],
+  statement: (((Tasks::notifies (record Tasks::StoredTask {entry := entry, shape := (ctor Tasks::StoredShape.read), changed := true})) = true) /\ ((Tasks::notifies (record Tasks::StoredTask {entry := entry, shape := (ctor Tasks::StoredShape.acked), changed := true})) = true)),
+  proof: constructor{branches: [reflexivity{}, reflexivity{}]}
+}
+
+theorem{
+  name: a_working_task_is_written_without_a_result_an_error_or_requests,
+  parameters: [],
+  statement: (((Json::lookup "result" (membersOf (ctor Tasks::DetailedTask.working (sampleFields)))) = (ctor Json::Lookup.absent)) /\ (((Json::lookup "error" (membersOf (ctor Tasks::DetailedTask.working (sampleFields)))) = (ctor Json::Lookup.absent)) /\ ((Json::lookup "inputRequests" (membersOf (ctor Tasks::DetailedTask.working (sampleFields)))) = (ctor Json::Lookup.absent)))),
+  proof: constructor{
+    branches: [reflexivity{}, constructor{branches: [reflexivity{}, reflexivity{}]}]
+  }
+}
+
+theorem{
+  name: no_task_is_written_with_a_request_state,
+  parameters: [],
+  statement: ((Json::lookup "requestState" (membersOf (ctor Tasks::DetailedTask.working (sampleFields)))) = (ctor Json::Lookup.absent)),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_completed_task_is_written_with_its_result,
+  parameters: [],
+  statement: ((Json::lookup "result" (membersOf (ctor Tasks::DetailedTask.completed (sampleFields) (sampleResult)))) = (ctor Json::Lookup.present (ctor Json::Json.object (project (sampleResult) members)))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_waiting_task_is_written_with_its_requests,
+  parameters: [],
+  statement: ((Json::isPresent (Json::lookup "inputRequests" (membersOf (ctor Tasks::DetailedTask.input_required (sampleFields) (cons (askFor "k") (nil (String * Input::InputRequest))))))) = true),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: a_task_without_a_ttl_is_written_with_a_null_ttl,
+  parameters: [],
+  statement: ((Json::lookup "ttlMs" (membersOf (ctor Tasks::DetailedTask.working (unlimitedFields)))) = (ctor Json::Lookup.present (ctor Json::Json.null))),
+  proof: reflexivity{}
+}
+
+theorem{
+  name: an_unknown_task_is_invalid_params,
+  parameters: [taskId : String],
+  statement: (((Refusal::codeOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.unknownTask taskId))) = (-32602 : Int)) /\ ((Status::statusOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.unknownTask taskId))) = 400)),
+  proof: constructor{branches: [reflexivity{}, reflexivity{}]}
+}
+
+theorem{
+  name: a_task_method_without_the_extension_is_a_missing_capability_that_names_it,
+  parameters: [],
+  statement: (((Refusal::codeOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.missingCapability (Capabilities::tasksRequirement)))) = (-32021 : Int)) /\ ((Status::statusOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.missingCapability (Capabilities::tasksRequirement)))) = 400)),
+  proof: constructor{branches: [reflexivity{}, reflexivity{}]}
+}
+
+theorem{
+  name: an_unreadable_table_is_an_internal_error_with_no_data,
+  parameters: [],
+  statement: (((Refusal::codeOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.internal "the task table is not readable"))) = (-32603 : Int)) /\ ((Refusal::dataOf (ctor Refusal::Refusal.provider (ctor Refusal::ProviderRefusal.internal "the task table is not readable"))) = (ctor Option.none [Json::Json]))),
+  proof: constructor{branches: [reflexivity{}, reflexivity{}]}
+}
+
+theorem{
+  name: a_tool_that_needs_a_task_is_not_answered_without_one,
+  parameters: [tool : Content::Tool, sync : Methods::Progressed],
+  statement: ((TaskServe::fallThrough (ctor TaskServe::TaskSupport.required) tool sync) = (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] (TaskServe::missingTasks))),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: a_tool_that_may_use_a_task_is_answered_at_once_without_one,
+  parameters: [tool : Content::Tool, sync : Methods::Progressed],
+  statement: ((TaskServe::fallThrough (ctor TaskServe::TaskSupport.optional) tool sync) = (Tools::checkExecuted tool sync)),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+\end{semanticmodule}
+\end{lexlean}

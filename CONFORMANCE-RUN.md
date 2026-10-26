@@ -11,10 +11,10 @@ is evidence for what it checks, not a proof about the core.
 
 | Part | Where |
 | --- | --- |
-| The declaration, a PrismPM `ServerApplication` whose core is `UorMcp.Fixture.fixtureRun` | `conformance/src/Application.lex.tex`, generated from the vectors of the pinned scenarios: `cargo run -p lifecycle-oracle --example conformance_application -- --write` |
+| The declaration, a PrismPM `ServerApplication` whose core is `UorMcp.ConformanceFixture.conformanceRun`, the step serve over the fixture provider | `conformance/src/Application.lex.tex`, generated from the vectors of the pinned scenarios: `cargo run -p lifecycle-oracle --example conformance_application -- --write` |
 | The LexLean and PrismPM projects the declaration is built in | `lexlean.conformance.toml`, `lexlean.conformance.lock`, `prismpm.toml`; the main project (`lexlean.toml`) does not see them |
 | The copies of PrismPM's `Foundation.Bytes`, `Foundation.Server.V1.Model` and the `prism.arch` lexicon | `conformance/src/Foundation`, `language/prism.arch`; byte for byte the files at the revision of `.github/prismpm.rev` (authority `A-PRISMPM-SERVER-APPLICATION`) |
-| The binding: the host effect `tool.calls`, the count of `tools/call` requests in the last 60 s | `conformance/bindings/mcp-binding` |
+| The binding: the host effects `tool.calls` (the count of `tools/call` requests in the last 60 s), `clock.now`, `task.id` and `task.table`, which fill the request frame, and `task.store`, which the core requests to store the task table | `conformance/bindings/mcp-binding` |
 | The consumer workspace: the generated core and host packages beside the binding | `conformance/Cargo.toml`; the three generated packages are not committed |
 | The oracles | `conformance/oracle/`: `server-suite.mjs`, `recorder.mjs`, `verdict.mjs`, `schema-oracle.mjs`, `identity.mjs`, `fetch-suite.sh` |
 | What is not a pass, and which pull request it waits on | `conformance/waiting.json` |
@@ -74,14 +74,14 @@ the runner refuses any other file) and decides:
 * every failing check is reported as `scenario: check id: message`, the suite's own text;
 * the job passes (exit 0) only when the set of failing scenarios equals the set
   `conformance/waiting.json` lists as waiting, each entry naming its issue and pull request
-  (MCP#10 and #30, MCP#12 and #32). A failing scenario that is not listed fails the job
+  (MCP#10 and #30; MCP#44, which has no pull request). A failing scenario that is not listed fails the job
   (`FAILING and not named in waiting.json`, printed first); a listed scenario that does not
   fail fails the job (`named as waiting but not failing`); an entry that names neither an issue
   nor a pull request fails the job. The last lines of the diagnostic group the failing scenarios
   by the pull request that is to deliver what they need.
 * a waiting scenario is still a failure: it is `fail` in the table and in `report.json`, which says
   `valid: false`, the step summary groups it under the pull request it waits on, and the scenarios
-  passing are counted without it (27 of 37 required today). The list classifies; it never turns a
+  passing are counted without it (32 of 37 required today). The list classifies; it never turns a
   failure into a pass, and it is shortened in the pull request that delivers a scenario.
 
 One scenario cannot pass on any server at this pin: `tasks-status-notifications` sends no
@@ -108,10 +108,13 @@ counted, not excused:
 
 ## What passes today
 
-Run of the core of this commit (core digest below), spec 2026-07-28, 117 HTTP exchanges,
-236 JSON-RPC messages, 60 refused probes, 1 transport refusal, every message valid.
+Run of the core of this commit (core digest below), spec 2026-07-28,
+420 JSON-RPC messages, 39 refused probes, 1 transport refusal, every message valid: the schema
+oracle held 194 of them to the tasks extension's schema, and counted one `inputResponses` entry,
+a key the suite made up for a task that was not waiting for it, as ignored (the extension tells a
+server to ignore it).
 
-Required: 32 of 37 pass. Not scored: 3 of 13 pass, 1 is skipped by the suite, 9 fail. Every failing scenario waits on #30 or #32.
+Required: 32 of 37 pass. Not scored: 4 of 13 pass, 1 is skipped by the suite, 8 fail. Every failing scenario waits on #30 (five required) or #44 (eight `tasks-*`).
 
 | # | kind | scenario | result | checks | waits on |
 |---|---|---|---|---|---|
@@ -152,16 +155,16 @@ Required: 32 of 37 pass. Not scored: 3 of 13 pass, 1 is skipped by the suite, 9 
 | 35 | required | `input-required-result-capability-check` | **fail** | 1 of 2 | #10 (PR #30) |
 | 36 | required | `input-required-result-ignore-extra-params` | pass | 2 of 2 |  |
 | 37 | required | `input-required-result-validate-input` | pass | 3 of 3 |  |
-| 38 | not scored | `tasks-lifecycle` | **fail** | 1 of 9 | #12 (PR #32) |
-| 39 | not scored | `tasks-capability-negotiation` | **fail** | 1 of 5 | #12 (PR #32) |
-| 40 | not scored | `tasks-wire-fields` | **fail** | 1 of 4 | #12 (PR #32) |
-| 41 | not scored | `tasks-request-state-removal` | **fail** | 1 of 2 | #12 (PR #32) |
-| 42 | not scored | `tasks-mrtr-input` | **fail** | 1 of 4 | #12 (PR #32) |
-| 43 | not scored | `tasks-request-headers` | **fail** | 2 of 5 | #12 (PR #32) |
-| 44 | not scored | `tasks-dispatch-and-envelope` | **fail** | 3 of 9 | #12 (PR #32) |
+| 38 | not scored | `tasks-lifecycle` | **fail** | 8 of 9 | #44 (the suite's wire-schema-valid) |
+| 39 | not scored | `tasks-capability-negotiation` | **fail** | 4 of 5 | #44 (the suite's wire-schema-valid) |
+| 40 | not scored | `tasks-wire-fields` | **fail** | 3 of 4 | #44 (the suite's wire-schema-valid) |
+| 41 | not scored | `tasks-request-state-removal` | **fail** | 2 of 3 | #44 (the suite's wire-schema-valid) |
+| 42 | not scored | `tasks-mrtr-input` | **fail** | 3 of 4 | #44 (the suite's wire-schema-valid) |
+| 43 | not scored | `tasks-request-headers` | **fail** | 4 of 5 | #44 (the suite's wire-schema-valid) |
+| 44 | not scored | `tasks-dispatch-and-envelope` | **fail** | 8 of 9 | #44 (the suite's wire-schema-valid) |
 | 45 | not scored | `tasks-status-notifications` | skipped by the suite | 0 of 1 (1 skipped) |  |
-| 46 | not scored | `tasks-required-task-error` | **fail** | 1 of 2 | #12 (PR #32) |
-| 47 | not scored | `tasks-mrtr-composition` | **fail** | 1 of 2 | #12 (PR #32) |
+| 46 | not scored | `tasks-required-task-error` | pass | 3 of 3 |  |
+| 47 | not scored | `tasks-mrtr-composition` | **fail** | 1 of 2 | #44 (the suite's wire-schema-valid) |
 | 48 | not scored | `json-schema-2020-12` | pass | 8 of 8 |  |
 | 49 | not scored | `http-header-validation` | pass | 14 of 14 |  |
 | 50 | not scored | `http-custom-header-server-validation` | pass | 10 of 10 |  |
@@ -185,8 +188,19 @@ report with their check ids.
   section, the count of tool calls, and no key, so the core refuses them with an internal error.
   The key section of the application is the open work. The other nine `input-required-result-*`
   scenarios pass.
-* Nine `tasks-*` scenarios (not scored): the tools and the `tasks/*` methods they call are
-  registered by MCP#12, PR #32. `tasks-status-notifications` is skipped by the suite.
+* Eight `tasks-*` scenarios (not scored) fail one check each, the suite's own `wire-schema-valid`,
+  and pass every other: `lifecycle`, `capability-negotiation`, `wire-fields`,
+  `request-state-removal`, `mrtr-input`, `request-headers`, `dispatch-and-envelope` and
+  `mrtr-composition` (8 of 9, 4 of 5, 3 of 4, 2 of 3, 3 of 4, 4 of 5, 8 of 9 and 1 of 2 checks).
+  The check holds the result of every `tools/call` to the core schema's `CallToolResult`, which
+  requires `content`; a task-creating call is answered with the extension's `CreateTaskResult`
+  (`resultType: "task"`, `Result & Task`), which has none, and the suite at the pinned commit
+  `232a9014` knows no such result. `modelcontextprotocol/conformance#468` (`cf022cb`, after the
+  pin) accepts it. MCP#44 is the decision to move the pin; the core is not changed to satisfy a
+  check that the extension contradicts. The schema oracle, which holds the messages of the
+  extension to the extension's schema, finds every one of them valid.
+  `tasks-required-task-error` passes (3 of 3). `tasks-status-notifications` is skipped by the
+  suite.
 
 ### `server-stateless` and the two diagnostic tools
 

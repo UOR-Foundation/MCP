@@ -113,7 +113,7 @@ fn the_conformance_build_is_a_server_application_over_the_fixture_core_cf_01() {
     for needle in [
         "result: Foundation.Server.V1.Model::ServerApplication,",
         "profile := \"prismpm/server-application/1\"",
-        "root := \"UorMcp.Fixture.fixtureRun\"",
+        "root := \"UorMcp.ConformanceFixture.conformanceRun\"",
         "package := \"mcp_conformance_core\"",
         "cargoName := \"mcp-conformance\"",
         "bindings/mcp-binding",
@@ -130,15 +130,17 @@ fn the_conformance_build_is_a_server_application_over_the_fixture_core_cf_01() {
         "the build serves loopback only"
     );
 
-    // The core is the fixture root of this repository, and it is a production root.
-    let fixture = read("src/Fixture.lex.tex");
-    assert!(fixture.contains("name: fixtureRun,"));
+    // The core is the conformance root of this repository, a production root: the step
+    // serve over the fixture provider, which asks the host to store the task table.
+    let fixture = read("src/ConformanceFixture.lex.tex");
+    assert!(fixture.contains("name: conformanceRun,"));
     assert!(fixture.contains("production: {effects: [allocation, overflow], targets: [rust-std]}"));
+    assert!(fixture.contains("StepServe::serveStep (conformanceInfo)"));
 
     // The declaration is part of a LexLean project and a PrismPM project of its own.
     let project = read("lexlean.conformance.toml");
     assert!(project.contains(
-        "entrypoints = [\"conformance/src/Application.lex.tex\", \"src/Fixture.lex.tex\"]"
+        "entrypoints = [\"conformance/src/Application.lex.tex\", \"src/ConformanceFixture.lex.tex\"]"
     ));
     let prismpm = read("prismpm.toml");
     assert!(prismpm.contains("lexlean_project = \"lexlean.conformance.toml\""));
@@ -205,11 +207,49 @@ fn the_vectors_of_the_declaration_are_the_core_packages_answers_cf_02() {
          cargo run -p lifecycle-oracle --example conformance_application -- --write"
     );
     assert_eq!(common::application::SERVED.len(), 11);
+    let tasks = common::application::task_vectors();
     assert_eq!(
         rendered.matches("AcceptanceVector {request :=").count(),
-        common::application::SERVED.len(),
-        "one acceptance vector for each served vector"
+        common::application::SERVED.len() + tasks.len(),
+        "one acceptance vector for each served vector and for each task vector"
     );
+    // The core asks the host for one effect, the store of the task table, and the
+    // declaration exercises it: a transcript step for each vector that wrote a table.
+    assert_eq!(
+        rendered
+            .matches("HostStep {effect := \"task.store\"")
+            .count(),
+        tasks.iter().map(|vector| vector.steps.len()).sum::<usize>()
+    );
+    assert!(
+        tasks.iter().any(|vector| !vector.steps.is_empty()),
+        "a transcript exercises task.store"
+    );
+    assert!(
+        tasks.iter().any(|vector| vector.steps.is_empty()),
+        "a task vector that writes no table asks for no effect"
+    );
+    // The tag of an effect is its position in the declaration: the store is the fifth, and
+    // the conformance root names that tag.
+    let declared: Vec<usize> = [
+        "tool.calls",
+        "clock.now",
+        "task.id",
+        "task.table",
+        "task.store",
+    ]
+    .iter()
+    .map(|name| {
+        rendered
+            .find(&format!("HostEffect {{name := \"{name}\""))
+            .unwrap_or_else(|| panic!("the declaration holds the effect {name}"))
+    })
+    .collect();
+    assert!(declared.windows(2).all(|pair| pair[0] < pair[1]));
+    assert_eq!(common::application::STORE_TAG, 4);
+    assert!(read("src/ConformanceFixture.lex.tex").contains(
+        "definition{name: storeEffectTag, parameters: [], result: Nat, body: 4, executable: true}"
+    ));
     // No served vector depends on the host's count, which starts at zero in each run.
     for id in common::application::SERVED {
         let vector = common::application::vector(id);
@@ -249,7 +289,7 @@ fn the_server_suite_verdict_is_read_from_the_per_scenario_checks_cf_03() {
         );
         let pr = &entry["pr"];
         assert!(
-            pr.is_null() || [30, 32].contains(&pr.as_u64().expect("a pull request number")),
+            pr.is_null() || pr.as_u64() == Some(30),
             "{name} waits on an unknown pull request"
         );
         assert!(entry["reason"]
@@ -262,9 +302,14 @@ fn the_server_suite_verdict_is_read_from_the_per_scenario_checks_cf_03() {
             );
         }
         if name.starts_with("tasks-") {
-            assert_eq!(
-                entry["pr"], 32,
-                "{name} is delivered by the tasks extension"
+            // the suite's own check rejects the extension's result (MCP#44); no pull
+            // request delivers a new pin, and the reason names the check
+            assert!(entry["pr"].is_null(), "{name} waits on the suite pin");
+            assert!(
+                entry["reason"].as_str().is_some_and(
+                    |reason| reason.contains("wire-schema-valid") && reason.contains("MCP#44")
+                ),
+                "{name} names the check that fails and the issue"
             );
         }
     }
@@ -289,9 +334,27 @@ fn the_server_suite_verdict_is_read_from_the_per_scenario_checks_cf_03() {
     // the job passes only when the failing scenarios are exactly these.
     for (name, entry) in waiting["waiting"].as_object().expect("waiting") {
         let issue = entry["issue"].as_u64().expect("an issue number");
-        let expected = if name.starts_with("tasks-") { 12 } else { 10 };
+        let expected = if name.starts_with("tasks-") { 44 } else { 10 };
         assert_eq!(issue, expected, "{name} names the issue that delivers it");
     }
+    // The tasks scenarios: eight fail the suite's wire-schema-valid and wait on the pin, one
+    // passes, one is skipped by the suite.
+    let tasks: Vec<&String> = waiting["waiting"]
+        .as_object()
+        .expect("waiting")
+        .keys()
+        .filter(|name| name.starts_with("tasks-"))
+        .collect();
+    assert_eq!(tasks.len(), 8, "{tasks:?}");
+    for passing in ["tasks-required-task-error", "tasks-status-notifications"] {
+        assert!(
+            waiting["waiting"].get(passing).is_none(),
+            "{passing} does not wait"
+        );
+    }
+    assert!(waiting["suite_skipped"]
+        .get("tasks-status-notifications")
+        .is_some());
     let verdict = read("conformance/oracle/verdict.mjs");
     for needle in ["matchesWaiting", "unexplained", "stale", "unnamed"] {
         assert!(
@@ -330,6 +393,20 @@ fn the_recorded_transcripts_validate_against_the_pinned_schema_cf_04() {
         "CI validates the transcripts against the pinned schema"
     );
     assert!(ci.contains("run_schema_oracle"));
+
+    // The tasks extension's messages are held to its own pinned schema, by digest.
+    let extension = "crates/lifecycle-oracle/suite/ext-tasks-899c1bbc869567670093face3591b39c28ce3219/schema/2026-07-28/schema.json";
+    let digest = hex(&Sha256::digest(
+        std::fs::read(root().join(extension)).expect("the extension schema is vendored"),
+    ));
+    assert!(
+        helpers.contains(&format!("--extension {extension}")),
+        "CI gives the oracle the pinned extension schema"
+    );
+    assert!(
+        helpers.contains(&format!("--extension-sha256 {digest}")),
+        "CI gives the oracle the digest of the vendored extension schema"
+    );
 }
 
 #[test]
@@ -364,7 +441,7 @@ fn a_planted_defect_fails_the_run_with_the_suites_diagnostic_cf_05() {
 fn the_core_artifact_is_recorded_by_digest_cf_06() {
     let identity = json("conformance/core-identity.json");
     assert_eq!(identity["spec"], "mcp-conformance/core-identity/1");
-    assert_eq!(identity["root"], "UorMcp.Fixture.fixtureRun");
+    assert_eq!(identity["root"], "UorMcp.ConformanceFixture.conformanceRun");
     assert_eq!(identity["package"]["name"], "mcp_conformance_core");
     assert_eq!(identity["package"]["version"], "1.0.0");
     let program = identity["program_sha256"]
@@ -377,12 +454,12 @@ fn the_core_artifact_is_recorded_by_digest_cf_06() {
 
     // The program is the one this repository already exports for the same root: the
     // compiled program does not depend on the compiler that exported it.
-    let provenance = json("crates/lifecycle-oracle/generated/mcp_lifecycle/provenance.json");
+    let provenance = json("crates/lifecycle-oracle/generated/mcp_conformance/provenance.json");
     assert_eq!(
         provenance["program"], program,
         "the core is not the committed export of the root"
     );
-    assert_eq!(identity["same_program_as"]["package"], "mcp_lifecycle");
+    assert_eq!(identity["same_program_as"]["package"], "mcp_conformance");
     assert_eq!(identity["same_program_as"]["program_sha256"], program);
 
     // The record is of the sources the build was made from.
@@ -465,7 +542,7 @@ fn the_identity_checker_refuses_another_core_cf_06() {
         .arg(&dir)
         .args([
             "--reference",
-            "crates/lifecycle-oracle/generated/mcp_lifecycle/provenance.json",
+            "crates/lifecycle-oracle/generated/mcp_conformance/provenance.json",
             "--check",
             "conformance/core-identity.json",
         ])

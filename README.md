@@ -27,7 +27,7 @@ MCP's own oracles, so this repository makes no conformance claim.
 | `Capabilities` | client and server capabilities and the `io.modelcontextprotocol/tasks` extension identifier |
 | `Content` | content blocks, resources, resource templates, prompts and tools |
 | `Input` | multi-round-trip input: elicitation, sampling and roots requests and responses, `InputRequiredResult`, and the capability each request needs |
-| `Tasks` | the tasks extension state machine, `DetailedTask` and `CreateTaskResult` |
+| `Tasks`, `TaskJson`, `TaskServe`, `TaskFixture`, `TaskLaws` | the tasks extension: the task state machine (`DetailedTask`, `CreateTaskResult`, the plan a task follows, `settle`, `answer` and `cancel`), the wire form of a task and of the host's task table, `tasks/get`, `tasks/update`, `tasks/cancel` and the decision of `tools/call` to answer a task, the seven fixture tools of the tasks scenarios, and the theorems of the lifecycle ([TASKS.md](TASKS.md)) |
 | `Meta` | the request `_meta` keys (`protocolVersion`, `clientCapabilities`, `clientInfo`, `logLevel`, `progressToken`), `resultType` and the result `_meta` with `serverInfo` |
 | `Methods` | the server method names, typed params and results for `server/discover`, `tools/list`, `tools/call`, `resources/list`, `resources/read`, `resources/templates/list`, `prompts/list`, `prompts/get`, `completion/complete`, `tasks/get`, `tasks/update` and `tasks/cancel`, and which methods may answer `input_required` or `task` |
 | `Refusal` | the typed, closed refusals (`-32602`, `-32601`, `-32020`, `-32022`, `-32021`, `-32603`) and their JSON-RPC error objects |
@@ -45,20 +45,20 @@ MCP's own oracles, so this repository makes no conformance claim.
 | `Numeric`, `JsonEq`, `Schema`, `Admission`, `Sanitize`, `Tools`, `ToolLaws` | the tools layer: number comparison, JSON equality, a JSON Schema 2020-12 validator, catalog admission and the parameter rules derived from `x-mcp-header`, output sanitization, `tools/list` and `tools/call`, the rate-limit decision, and their theorems ([TOOLS.md](TOOLS.md)) |
 | `Resources`, `ResourceFixture`, `ResourceLaws` | the resources layer: `resources/list`, `resources/read`, `resources/templates/list`, `prompts/list`, `prompts/get` and `completion/complete`, their refusals and cache hints, the catalogs of the conformance fixture, and their theorems ([RESOURCES.md](RESOURCES.md)) |
 | `Transport`, `TransportLaws` | the Streamable HTTP transport: the response event stream and its framing, the `Accept` negotiation, the `Origin` and `Host` allow-list against DNS rebinding, and their theorems ([TRANSPORT.md](TRANSPORT.md)) |
+| `ConformanceFixture` | the root of the conformance build, `conformanceRun`: the step serve over the fixture provider, which asks the host to store the task table ([TASKS.md](TASKS.md), [CONFORMANCE-RUN.md](CONFORMANCE-RUN.md)) |
 | `HostEffect`, `StepServe`, `StepFixture`, `StepLaws` | a provider's request for a host effect as a typed outcome (`CallOutcome.perform`, `ReadOutcome.perform`, `PromptOutcome.perform`), the step serve that reads PrismPM's turn and writes its step, the fixture root `stepFixtureRun`, and their theorems ([PROVIDER-EFFECTS.md](PROVIDER-EFFECTS.md)) |
 
-What is not modeled: the JSON encoding of the result bodies of `tasks/get`, `tasks/update`,
-`tasks/cancel` and of the interim `task` result,
-the `subscriptions/listen` stream (its params and result types are declared,
-but the method is not dispatched), server notifications other than progress, and host effects
-(sockets, the loopback binding, closing a stream).
+What is not modeled: the `subscriptions/listen` stream (its params and result types are declared,
+but the method is not dispatched), server notifications other than progress and task
+status, and host effects (sockets, the loopback binding, closing a stream). The core keeps no
+state: the host holds the task table ([TASKS.md](TASKS.md)).
 
-- The claim registers in `model/` hold the JSON text codec (JC-01 to JC-14) and the
+- The claim registers in `model/` hold the JSON text codec (JC-01 to JC-14), the
   stateless lifecycle and HTTP header capabilities of #7 (LC-01 to LC-16, HH-01 to HH-13),
   the tools of #8 (TL-01 to TL-18), the resources, resource templates, prompts,
-  completion and caching capabilities of #9 (RP-01 to RP-19) the Streamable HTTP
-  transport of #11 (SH-01 to SH-10) and the input-required results of #10
-  (IR-01 to IR-19).
+  completion and caching capabilities of #9 (RP-01 to RP-19), the Streamable HTTP
+  transport of #11 (SH-01 to SH-10), the input-required results of #10
+  (IR-01 to IR-19) and the tasks extension of #12 (TK-01 to TK-16).
   The conformance build and the oracle run of #13 (CF-01 to CF-07) are in
   [CONFORMANCE-RUN.md](CONFORMANCE-RUN.md): the pinned suite's server scenarios and the
   2026-07-28 schema are run over the served core, and that file lists, scenario by scenario,

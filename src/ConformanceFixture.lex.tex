@@ -1,0 +1,67 @@
+\begin{lexlean}{ConformanceFixture}
+\useglossary{lexlean.std.bool@1.2.0}
+\useglossary{lexlean.std.nat@1.2.0}
+\useglossary{mcp.core@1.0.0}
+\importmodule{Extension}
+\importmodule{Fixture}
+\importmodule{HostEffect}
+\importmodule{Methods}
+\importmodule{Refusal}
+\importmodule{StepServe}
+\title{MCP conformance root}
+\begin{semanticmodule}
+definition{name: storeEffectTag, parameters: [], result: Nat, body: 4, executable: true}
+
+definition{
+  name: conformanceInfo,
+  parameters: [],
+  result: Extension::ProviderInfo,
+  body: (record Extension::ProviderInfo {serverInfo := (project (Fixture::fixtureInfo) serverInfo), instructions := (project (Fixture::fixtureInfo) instructions), capabilities := (project (Fixture::fixtureInfo) capabilities), discoverCache := (project (Fixture::fixtureInfo) discoverCache), paramRules := (project (Fixture::fixtureInfo) paramRules), toolCallLimit := (project (Fixture::fixtureInfo) toolCallLimit), requestStateKey := (project (Fixture::fixtureInfo) requestStateKey), taskStoreTag := (storeEffectTag)}),
+  axioms: [Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: conformanceAnswer,
+  parameters: [asked : StepServe::Asked],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (Fixture::fixtureAnswerWith (project asked host) (project asked request)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: conformanceRun,
+  parameters: [input : Bytes],
+  result: (List Nat),
+  body: (StepServe::serveStep (conformanceInfo) (ref conformanceAnswer) input),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true,
+  production: {effects: [allocation, overflow], targets: [rust-std]}
+}
+
+theorem{
+  name: the_conformance_root_stores_a_task_table_under_the_fifth_declared_effect,
+  parameters: [],
+  statement: ((project (conformanceInfo) taskStoreTag) = 4),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: the_conformance_store_tag_fits_four_bytes,
+  parameters: [],
+  statement: ((HostEffect::tagFits (project (conformanceInfo) taskStoreTag)) = true),
+  proof: reflexivity{},
+  axioms: [Quot.sound, propext]
+}
+
+theorem{
+  name: the_conformance_root_is_the_step_serve_of_the_fixture_provider,
+  parameters: [input : Bytes],
+  statement: ((conformanceRun input) = (StepServe::serveStep (conformanceInfo) (ref conformanceAnswer) input)),
+  proof: reflexivity{},
+  axioms: [Classical.choice, Quot.sound, propext]
+}
+\end{semanticmodule}
+\end{lexlean}

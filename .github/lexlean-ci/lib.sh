@@ -439,7 +439,7 @@ check_core_identity() {
     --result "${RUNNER_TEMP:?}/production-result.json" \
     --lock lexlean.conformance.lock \
     --package conformance/mcp_conformance_core \
-    --reference crates/lifecycle-oracle/generated/mcp_lifecycle/provenance.json \
+    --reference crates/lifecycle-oracle/generated/mcp_conformance/provenance.json \
     --check conformance/core-identity.json
 }
 
@@ -461,10 +461,13 @@ run_server_suite() {
 }
 
 # run_schema_oracle: every message of the recorded transcript against the pinned
-# 2026-07-28 schema.
+# 2026-07-28 schema, and the messages of the tasks extension against the pinned
+# ext-tasks schema (the oracle checks the file against the digest given here).
 run_schema_oracle() {
   node conformance/oracle/schema-oracle.mjs \
     --suite-root "${MCP_CONFORMANCE_SUITE_ROOT:?}" \
+    --extension crates/lifecycle-oracle/suite/ext-tasks-899c1bbc869567670093face3591b39c28ce3219/schema/2026-07-28/schema.json \
+    --extension-sha256 bf30afb7ac251e3e22c037b7a685f60ef6603031b5484c0d08b1fa0bbe86d460 \
     crates/lifecycle-oracle/suite/mcp-spec-80041ab0a139a8f4fb3adbc99f7ae9113ea59671/schema/2026-07-28/schema.json \
     "$(conformance_out)/transcript.json"
 }

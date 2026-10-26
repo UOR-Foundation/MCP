@@ -13,7 +13,7 @@ use lifecycle_oracle::{
     decode_response, encode_request, exchange_crowd_frame_on, exchange_frame_on,
     parse_event_stream, FrameError, Request, Response,
 };
-use serde_json::Value;
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 /// The commit of the conformance suite the vectors are taken from.
@@ -22,6 +22,11 @@ pub const PIN: &str = "232a9014457eaf4c59559916e3d616d2f7f28f05";
 /// The commit of the MCP specification whose `schema/2026-07-28/schema.json` every
 /// response is checked against.
 pub const SPEC_PIN: &str = "80041ab0a139a8f4fb3adbc99f7ae9113ea59671";
+
+/// The commit of the `ext-tasks` repository whose `schema/2026-07-28/schema.json` types the
+/// task results and the task status notification (`TASKS.md`, "Authorities"). The
+/// specification's own schema has no task type: the extension keeps its schema apart.
+pub const EXT_TASKS_PIN: &str = "899c1bbc869567670093face3591b39c28ce3219";
 
 /// The workspace root.
 pub fn root() -> PathBuf {
@@ -94,6 +99,14 @@ pub fn spec_root() -> PathBuf {
         .join(format!("mcp-spec-{SPEC_PIN}"))
 }
 
+/// The vendored copy of the tasks extension's schema and text; its directory name carries
+/// the pin.
+pub fn ext_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("suite")
+        .join(format!("ext-tasks-{EXT_TASKS_PIN}"))
+}
+
 /// The text of one vendored suite file.
 pub fn suite_text(path: &str) -> String {
     std::fs::read_to_string(suite_root().join(path)).expect("the vendored file reads")
@@ -162,6 +175,7 @@ pub fn post(headers: &[(&str, &str)], body: &str) -> Request {
             .collect(),
         body: body.as_bytes().to_vec(),
         tool_calls: 0,
+        host: lifecycle_oracle::TaskHost::default(),
         state_key: Vec::new(),
     }
 }
@@ -208,6 +222,7 @@ pub fn request_of(vector: &Value) -> Request {
         tool_calls: request.get("tool_calls").map_or(0, |n| {
             u32::try_from(n.as_u64().expect("tool_calls")).expect("u32")
         }),
+        host: lifecycle_oracle::TaskHost::default(),
         state_key: Vec::new(),
     }
 }
@@ -307,30 +322,60 @@ struct Checker {
 
 const SCHEMA_URL: &str = "https://schema.invalid/mcp/2026-07-28/schema.json";
 
+const EXT_SCHEMA_URL: &str = "https://schema.invalid/mcp-ext-tasks/2026-07-28/schema.json";
+
+fn compile_checker(path: &Path, url: &str) -> Checker {
+    let schema: Value = serde_json::from_slice(&std::fs::read(path).expect("schema reads"))
+        .expect("the schema is JSON");
+    let mut schemas = Schemas::new();
+    let mut compiler = Compiler::new();
+    compiler
+        .add_resource(url, schema.clone())
+        .expect("the schema is a resource");
+    let mut defs = BTreeMap::new();
+    for name in schema["$defs"].as_object().expect("$defs").keys() {
+        let index = compiler
+            .compile(&format!("{url}#/$defs/{name}"), &mut schemas)
+            .unwrap_or_else(|e| panic!("{name} compiles: {e}"));
+        defs.insert(name.clone(), index);
+    }
+    Checker {
+        schemas,
+        schema,
+        defs,
+    }
+}
+
 fn checker() -> &'static Checker {
     static CHECKER: OnceLock<Checker> = OnceLock::new();
     CHECKER.get_or_init(|| {
-        let path = spec_root().join("schema/2026-07-28/schema.json");
-        let schema: Value = serde_json::from_slice(&std::fs::read(&path).expect("schema reads"))
-            .expect("the schema is JSON");
-        let mut schemas = Schemas::new();
-        let mut compiler = Compiler::new();
-        compiler
-            .add_resource(SCHEMA_URL, schema.clone())
-            .expect("the schema is a resource");
-        let mut defs = BTreeMap::new();
-        for name in schema["$defs"].as_object().expect("$defs").keys() {
-            let index = compiler
-                .compile(&format!("{SCHEMA_URL}#/$defs/{name}"), &mut schemas)
-                .unwrap_or_else(|e| panic!("{name} compiles: {e}"));
-            defs.insert(name.clone(), index);
-        }
-        Checker {
-            schemas,
-            schema,
-            defs,
-        }
+        compile_checker(
+            &spec_root().join("schema/2026-07-28/schema.json"),
+            SCHEMA_URL,
+        )
     })
+}
+
+fn ext_checker() -> &'static Checker {
+    static CHECKER: OnceLock<Checker> = OnceLock::new();
+    CHECKER.get_or_init(|| {
+        compile_checker(
+            &ext_root().join("schema/2026-07-28/schema.json"),
+            EXT_SCHEMA_URL,
+        )
+    })
+}
+
+/// Validate `value` against the definition `name` of the vendored tasks extension schema.
+pub fn validate_ext(name: &str, value: &Value) -> Result<(), String> {
+    let c = ext_checker();
+    let index = *c
+        .defs
+        .get(name)
+        .unwrap_or_else(|| panic!("the tasks extension schema defines {name}"));
+    c.schemas
+        .validate(value, index)
+        .map_err(|e| format!("{name} (ext-tasks): {e:#}"))
 }
 
 /// Validate `value` against the definition `name` of the vendored schema.
@@ -393,7 +438,26 @@ fn result_def(method: &str) -> Option<&'static str> {
 /// protocol (MCP#6 binds that).
 pub fn validate_body(method: Option<&str>, body: &Value) -> Result<(), String> {
     validate_against("JSONRPCResponse", body)?;
-    if body.get("result").is_some() {
+    if let Some(result) = body.get("result") {
+        // A task result is typed by the extension's schema, not by the specification's:
+        // `tools/call` may answer a CreateTaskResult, and the three task methods have
+        // their own results.
+        let ext = match (method, result.get("resultType").and_then(Value::as_str)) {
+            (Some("tools/call"), Some("task")) => Some("CreateTaskResult"),
+            (Some("tasks/get"), _) => Some("GetTaskResult"),
+            (Some("tasks/update"), _) => Some("UpdateTaskResult"),
+            (Some("tasks/cancel"), _) => Some("CancelTaskResult"),
+            _ => None,
+        };
+        if let Some(def) = ext {
+            return validate_ext(def, result);
+        }
+        // An interim result: the specification's schema types it.
+        if method == Some("tools/call")
+            && result.get("resultType").and_then(Value::as_str) == Some("input_required")
+        {
+            return validate_against("InputRequiredResult", result);
+        }
         if let Some(def) = method.and_then(result_def) {
             validate_against(def, body)?;
         }
@@ -416,7 +480,7 @@ pub fn validate_body(method: Option<&str>, body: &Value) -> Result<(), String> {
 }
 
 /// The method of a request body, when it is a JSON object with a text `method`.
-fn method_of(request: &Request) -> Option<String> {
+pub fn method_of(request: &Request) -> Option<String> {
     serde_json::from_slice::<Value>(&request.body)
         .ok()?
         .get("method")?
@@ -453,6 +517,22 @@ pub fn check_response(method: Option<&str>, response: &Response) {
         "the notification field of the frame is reserved and empty since issue 11"
     );
     for note in &notes_of(response) {
+        if note["method"] == "notifications/tasks" {
+            // The specification's schema has no task type; the extension's schema types
+            // the notification, and the generic JSON-RPC shape is checked as well.
+            for check in [
+                validate_against("JSONRPCNotification", note),
+                validate_ext("TaskStatusNotification", note),
+            ] {
+                if let Err(why) = check {
+                    panic!(
+                        "the schema refuses the root's notification: {why}
+notification: {note}"
+                    );
+                }
+            }
+            continue;
+        }
         for def in ["JSONRPCNotification", "ProgressNotification"] {
             if let Err(why) = validate_against(def, note) {
                 panic!("the schema refuses the root's notification: {why}\nnotification: {note}");
@@ -545,7 +625,7 @@ pub fn send(request: &Request) -> (Response, Value) {
 }
 
 /// One check of a vector against the response body and the bodies of earlier vectors.
-fn check(
+pub fn check(
     vector: &str,
     check: &Value,
     body: &Value,
@@ -822,4 +902,51 @@ pub fn outcome(request: &Request) -> (u32, Option<i64>) {
         response.status,
         body.pointer("/error/code").and_then(Value::as_i64),
     )
+}
+
+/// Days since 1970-01-01 to a civil date (Howard Hinnant's `civil_from_days`).
+fn civil(days: i64) -> (i64, i64, i64) {
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    (year, month, day)
+}
+
+/// An instant of the counter as ISO 8601 text.
+pub fn iso(ms: u64) -> String {
+    let secs = ms / 1000;
+    let milli = ms % 1000;
+    let (year, month, day) = civil(i64::try_from(secs / 86_400).expect("a day count"));
+    let rem = secs % 86_400;
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}.{milli:03}Z",
+        rem / 3600,
+        rem % 3600 / 60,
+        rem % 60
+    )
+}
+
+/// A POST of `method` with `params` by a client that declared the tasks extension.
+pub fn tasks_request(method: &str, params: &Value, name: &str) -> Request {
+    let mut params = params.clone();
+    params["_meta"] = json!({
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientCapabilities": {
+            "elicitation": {},
+            "sampling": {},
+            "extensions": {"io.modelcontextprotocol/tasks": {}}
+        }
+    });
+    let mut fields = standard(method, Some(name));
+    fields.push((
+        "Accept".to_owned(),
+        "application/json, text/event-stream".to_owned(),
+    ));
+    post_owned(&fields, &rpc(method, &params.to_string(), "9"))
 }

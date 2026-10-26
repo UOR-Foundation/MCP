@@ -26,6 +26,7 @@ then params.
 | `src/HeaderLaws.lex.tex` | kernel-checked laws for header names, values, sentinels and Base64 |
 | `src/Validation.lex.tex`, `src/Dispatch.lex.tex`, `src/Extension.lex.tex`, `src/Refusal.lex.tex` | extended: `Headers` carries a header fault and the parameter headers, `Dispatch.handleWith` takes the provider's data and answer function, `ProviderInfo` and `ParamRule` |
 | `crates/lifecycle-oracle/generated/mcp_lifecycle` | LexLean's export of `fixtureRun`, unedited |
+| `crates/lifecycle-oracle/generated/mcp_conformance` | LexLean's export of `UorMcp.ConformanceFixture.conformanceRun` (the conformance build's core), unedited |
 | `crates/lifecycle-oracle/vectors/suite.json` | the vectors taken from the pinned scenarios |
 | `crates/lifecycle-oracle/tests/schema.rs`, `tests/common/mod.rs` | LC-15: every response a test produces is validated against the specification's JSON Schema |
 | `crates/lifecycle-oracle/tests/stress.rs` | LC-16: the largest frames the tests build, on a 2 MiB stack |
@@ -45,8 +46,9 @@ the SHA-256 of `lexlean.lock` that its packages were exported from (SPEC section
 names each target by its descriptor digest. `cargo xtask export` reads those values from
 `lexlean check`, `lexlean.lock` and `lexlean production targets`, writes them into every
 request, runs `lexlean production build --request` on each (this one names the roots
-`UorMcp.Crowd.crowdRun`, package `mcp_crowd`, and `UorMcp.Fixture.fixtureRun`, package
-`mcp_lifecycle`, both 1.0.0, target `rust-std`) and replaces the packages committed beside
+`UorMcp.Crowd.crowdRun`, package `mcp_crowd`, `UorMcp.Fixture.fixtureRun`, package
+`mcp_lifecycle`, `UorMcp.StepFixture.stepFixtureRun`, package `mcp_step`, and
+`UorMcp.ConformanceFixture.conformanceRun`, package `mcp_conformance`, all 1.0.0, target `rust-std`) and replaces the packages committed beside
 it with the export. A source edit committed without it is
 refused by `lexlean production build` as `LLC0204`; a hand-edited package is refused by the
 byte comparison (see [CI.md](CI.md)). A re-export of the committed sources
@@ -76,12 +78,17 @@ u32 field_count
   u32 value_length    value
 u32 body_length       body
 u32 tool_calls                          the host's count of tool calls for this client in the current window
+u64 now_ms                              the host's monotonic millisecond clock, eight bytes big-endian
+u32 now_length    now                   the same instant as ISO 8601 text, UTF-8
+u32 id_length     fresh_task_id         the identifier of a task this request may create, UTF-8
+u32 table_length  task_table            the host's table of tasks, a JSON array as the previous response returned it, or empty
 [u32 key_length  key]                   the host's requestState key, 32 bytes or more, optional (INPUT-REQUIRED.md)
 [u32 name_count, then name_count times u32 name_length and name]   the host's allow-list of Origin and Host names, optional
 ```
 
 and nothing after the allow-list. A frame that ends after the count carries no key and no allow-list, and one that ends after the key carries
-no allow-list, so a frame written before issues #10 and #11 is still read ([TRANSPORT.md](TRANSPORT.md#the-allow-list)). A response frame:
+no allow-list, so a frame written before issues #10 and #11 is still read ([TRANSPORT.md](TRANSPORT.md#the-allow-list)); the
+four fields after the count are not optional ([TASKS.md](TASKS.md)). A response frame:
 
 ```
 u32 status
@@ -91,7 +98,14 @@ u32 field_count
 u32 notification_count                  always 0 since issue #11 (reserved)
   u32 length          notification      one compact JSON-RPC notification, repeated notification_count times
 u32 body_length       body
+[u32 1, u32 table_length  task_table]   only when the core returns a task table: the table the host stores from now on
 ```
+
+and nothing after the body when the core returns no table. The byte serve (`Serve.serve`,
+`Serve.serveTasks`) writes the table in the response frame. The step serve never does: PrismPM's
+adapter refuses a response frame with a byte after the body, so `StepServe.serveStep` asks the host to
+store the table through one effect and writes the response without it ([TASKS.md](TASKS.md#the-hosts-side),
+[PROVIDER-EFFECTS.md](PROVIDER-EFFECTS.md)).
 
 `tool_calls` is the one input the core cannot compute, because it is state: how many
 `tools/call` requests the host has already admitted for this client in the current
@@ -100,10 +114,14 @@ identity (the connection, a token subject or an address); the core only compares
 with `rate.tool_calls`, the limit the provider declares ([TOOLS.md](TOOLS.md#the-rate-limit)).
 An adapter with no limit sends 0.
 
-Progress notifications are in the body. When the request accepts `text/event-stream` and the
-core answers 200 with notifications, the body is an event stream the core encoded (the
-notifications first and the result last) and the `Content-Type` is `text/event-stream`;
-otherwise the body is the single JSON object and no notification is sent
+The clock, the identifier and the table are the state the core cannot keep, and
+[TASKS.md](TASKS.md#the-hosts-side) states what the host owes the core for them. A host that
+runs no tasks sends `0`, empty text and an empty table, and ignores the answer.
+
+Progress notifications and task status notifications are in the body. When the request accepts
+`text/event-stream` and the core answers 200 with notifications, the body is an event stream the
+core encoded (the notifications first and the result last) and the `Content-Type` is
+`text/event-stream`; otherwise the body is the single JSON object and no notification is sent
 ([TRANSPORT.md](TRANSPORT.md)). The adapter writes the body as it is.
 
 `key` is the second input the core cannot hold: the secret reference `request-state-key`. The
@@ -131,10 +149,13 @@ The core decides every status and every field of the response. The adapter:
   export states no `recursion` effect and no function of the package calls itself except
   as a loop;
 * counts the tool calls it admits per client and window and passes the count in
-  `tool_calls`, passes the host names it was configured with after the count, and writes the
+  `tool_calls`, passes the host names it was configured with after the task fields, and writes the
   response body as it is, closing an event stream after its last event;
+* holds the task table, gives the core the instant and an unused task identifier with every
+  request, and replaces its table with the one a response returns when `stored` is 1;
 * treats a response with status 500 and the fixed internal-error body as the core's
-  answer to a frame it could not read (a truncated frame or trailing bytes).
+  answer to a frame it could not read (a truncated frame, trailing bytes, or a host section
+  whose text is not UTF-8).
 
 Header names are case-insensitive (RFC 9110 section 5.1). Repeated fields: for each
 header the core reads (`MCP-Protocol-Version`, `Mcp-Method`, `Mcp-Name`, and each

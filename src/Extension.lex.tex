@@ -69,7 +69,8 @@ structure{
     {name: discoverCache, type: Common::CacheHint},
     {name: paramRules, type: (List ParamRule)},
     {name: toolCallLimit, type: Nat},
-    {name: requestStateKey, type: Bytes}
+    {name: requestStateKey, type: Bytes},
+    {name: taskStoreTag, type: Nat}
   ]
 }
 
@@ -136,7 +137,7 @@ definition{
   name: infoOf,
   parameters: [provider : Provider],
   result: ProviderInfo,
-  body: (record ProviderInfo {serverInfo := (project provider serverInfo), instructions := (project provider instructions), capabilities := (project provider capabilities), discoverCache := (project provider discoverCache), paramRules := (project provider paramRules), toolCallLimit := (project provider toolCallLimit), requestStateKey := 0x})
+  body: (record ProviderInfo {serverInfo := (project provider serverInfo), instructions := (project provider instructions), capabilities := (project provider capabilities), discoverCache := (project provider discoverCache), paramRules := (project provider paramRules), toolCallLimit := (project provider toolCallLimit), requestStateKey := 0x, taskStoreTag := 0})
 }
 
 definition{

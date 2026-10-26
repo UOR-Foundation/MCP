@@ -15,6 +15,7 @@
 \importmodule{ResultJson}
 \importmodule{Serve}
 \importmodule{StepServe}
+\importmodule{Tasks}
 \importmodule{Tools}
 \title{MCP step fixture}
 \begin{semanticmodule}
@@ -228,11 +229,12 @@ definition{
   name: callAnswer,
   parameters: [
     completed : (List HostEffect::Completed),
+    host : Tasks::TaskHost,
     request : Methods::ClientRequest,
     params : Methods::CallToolParams
   ],
   result: (Result Methods::ResultBody Refusal::ProviderRefusal),
-  body: (if (isEffectTool params) then (Tools::answerCall (effectTools) (fun [completed] (given : Methods::CallToolParams) => (behave completed given)) params) else (if (Fixture::isTool params "provider_effect") then (Extension::callAnswer (callOutcome completed)) else (Fixture::fixtureAnswer request))),
+  body: (if (isEffectTool params) then (Tools::answerCall (effectTools) (fun [completed] (given : Methods::CallToolParams) => (behave completed given)) params) else (if (Fixture::isTool params "provider_effect") then (Extension::callAnswer (callOutcome completed)) else (Fixture::fixtureAnswerWith host request))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -242,27 +244,27 @@ definition{
   parameters: [asked : StepServe::Asked],
   result: (Result Methods::ResultBody Refusal::ProviderRefusal),
   body: (match (project asked request)
-    | Methods::ClientRequest.toolsCall params => (callAnswer (project asked completed) (project asked request) params)
-    | Methods::ClientRequest.resourcesRead params => (if (prim equal (project params uri) "effect://item" : Bool) then (Extension::readAnswer (readOutcome (project asked completed) params)) else (Fixture::fixtureAnswer (project asked request)))
-    | Methods::ClientRequest.promptsGet params => (if (prim equal (project params name) "effect_prompt" : Bool) then (Extension::promptAnswer (promptOutcome (project asked completed) params)) else (Fixture::fixtureAnswer (project asked request)))
-    | Methods::ClientRequest.serverDiscover params => (Fixture::fixtureAnswer (project asked request))
-    | Methods::ClientRequest.toolsList params => (Fixture::fixtureAnswer (project asked request))
-    | Methods::ClientRequest.resourcesList params => (Fixture::fixtureAnswer (project asked request))
-    | Methods::ClientRequest.resourcesTemplatesList params => (Fixture::fixtureAnswer (project asked request))
-    | Methods::ClientRequest.promptsList params => (Fixture::fixtureAnswer (project asked request))
-    | Methods::ClientRequest.completionComplete params => (Fixture::fixtureAnswer (project asked request))
-    | Methods::ClientRequest.tasksGet params => (Fixture::fixtureAnswer (project asked request))
-    | Methods::ClientRequest.tasksUpdate params => (Fixture::fixtureAnswer (project asked request))
-    | Methods::ClientRequest.tasksCancel params => (Fixture::fixtureAnswer (project asked request))),
+    | Methods::ClientRequest.toolsCall params => (callAnswer (project asked completed) (project asked host) (project asked request) params)
+    | Methods::ClientRequest.resourcesRead params => (if (prim equal (project params uri) "effect://item" : Bool) then (Extension::readAnswer (readOutcome (project asked completed) params)) else (Fixture::fixtureAnswerWith (project asked host) (project asked request)))
+    | Methods::ClientRequest.promptsGet params => (if (prim equal (project params name) "effect_prompt" : Bool) then (Extension::promptAnswer (promptOutcome (project asked completed) params)) else (Fixture::fixtureAnswerWith (project asked host) (project asked request)))
+    | Methods::ClientRequest.serverDiscover params => (Fixture::fixtureAnswerWith (project asked host) (project asked request))
+    | Methods::ClientRequest.toolsList params => (Fixture::fixtureAnswerWith (project asked host) (project asked request))
+    | Methods::ClientRequest.resourcesList params => (Fixture::fixtureAnswerWith (project asked host) (project asked request))
+    | Methods::ClientRequest.resourcesTemplatesList params => (Fixture::fixtureAnswerWith (project asked host) (project asked request))
+    | Methods::ClientRequest.promptsList params => (Fixture::fixtureAnswerWith (project asked host) (project asked request))
+    | Methods::ClientRequest.completionComplete params => (Fixture::fixtureAnswerWith (project asked host) (project asked request))
+    | Methods::ClientRequest.tasksGet params => (Fixture::fixtureAnswerWith (project asked host) (project asked request))
+    | Methods::ClientRequest.tasksUpdate params => (Fixture::fixtureAnswerWith (project asked host) (project asked request))
+    | Methods::ClientRequest.tasksCancel params => (Fixture::fixtureAnswerWith (project asked host) (project asked request))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
 definition{
   name: byteAnswer,
-  parameters: [request : Methods::ClientRequest],
+  parameters: [host : Tasks::TaskHost, request : Methods::ClientRequest],
   result: (Result Methods::ResultBody Refusal::ProviderRefusal),
-  body: (effectAnswer (record StepServe::Asked {completed := (nil HostEffect::Completed), request := request})),
+  body: (effectAnswer (record StepServe::Asked {completed := (nil HostEffect::Completed), host := host, request := request})),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -282,7 +284,7 @@ definition{
   name: routed,
   parameters: [input : Bytes, turn : StepServe::Turn],
   result: (List Nat),
-  body: (if (bytesTarget (Frame::readRequest (project turn request))) then (Serve::serve (Fixture::fixtureInfo) (ref byteAnswer) (project turn request)) else (StepServe::serveStep (Fixture::fixtureInfo) (ref effectAnswer) input)),
+  body: (if (bytesTarget (Frame::readRequest (project turn request))) then (Serve::serveTasks (Fixture::fixtureInfo) (ref byteAnswer) (project turn request)) else (StepServe::serveStep (Fixture::fixtureInfo) (ref effectAnswer) input)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }

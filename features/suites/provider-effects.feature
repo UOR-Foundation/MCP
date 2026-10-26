@@ -51,7 +51,7 @@ Feature: A provider requests a host effect as a typed outcome
     Then the step encodings, the turn round trip, the refusal cases and the done-or-perform split are stated and proved
 
   @PE-09 @build
-  Scenario: The conformance fixture requests no effect.
-    Given the fixture module, the fixture root and the conformance declaration
+  Scenario: The conformance fixture provider requests no effect, and the conformance build names the step serve over it, whose only effect request is the store of a task table.
+    Given the fixture module, the fixture root, the conformance root and the conformance declaration
     When their imports and the answers of the step serve are read
-    Then the fixture imports neither the effect module nor the step serve, every vector is answered done, and the declaration still names fixtureRun
+    Then the fixture imports neither the effect module nor the step serve, every vector is answered done, and the declaration names conformanceRun

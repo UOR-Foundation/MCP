@@ -17,6 +17,9 @@
 \importmodule{ResourceFixture}
 \importmodule{ResultJson}
 \importmodule{Serve}
+\importmodule{TaskFixture}
+\importmodule{TaskServe}
+\importmodule{Tasks}
 \importmodule{Tools}
 \title{MCP conformance fixture}
 \begin{semanticmodule}
@@ -32,7 +35,7 @@ definition{
   name: toolsCapabilities,
   parameters: [],
   result: Capabilities::ServerCapabilities,
-  body: (record Capabilities::ServerCapabilities {experimental := (ctor Option.none [Json::JsonObject]), logging := (ctor Option.none [Json::JsonObject]), completions := (ctor Option.none [Json::JsonObject]), prompts := (ctor Option.none [Capabilities::ListChangedCapability]), resources := (ctor Option.none [Capabilities::ResourcesCapability]), tools := (ctor Option.some [Capabilities::ListChangedCapability] (record Capabilities::ListChangedCapability {listChanged := (ctor Option.none [Bool])})), extensions := (ctor Option.none [Json::JsonObject])}),
+  body: (record Capabilities::ServerCapabilities {experimental := (ctor Option.none [Json::JsonObject]), logging := (ctor Option.none [Json::JsonObject]), completions := (ctor Option.none [Json::JsonObject]), prompts := (ctor Option.none [Capabilities::ListChangedCapability]), resources := (ctor Option.none [Capabilities::ResourcesCapability]), tools := (ctor Option.some [Capabilities::ListChangedCapability] (record Capabilities::ListChangedCapability {listChanged := (ctor Option.none [Bool])})), extensions := (ctor Option.some [Json::JsonObject] (record Json::JsonObject {members := (cons ((Capabilities::tasksExtensionId), (ctor Json::Json.object (nil (String * Json::Json)))) (nil (String * Json::Json)))}))}),
   executable: true
 }
 
@@ -40,7 +43,7 @@ definition{
   name: fixtureCapabilities,
   parameters: [],
   result: Capabilities::ServerCapabilities,
-  body: (record Capabilities::ServerCapabilities {experimental := (ctor Option.none [Json::JsonObject]), logging := (ctor Option.none [Json::JsonObject]), completions := (ctor Option.some [Json::JsonObject] (Capabilities::noObject)), prompts := (ctor Option.some [Capabilities::ListChangedCapability] (record Capabilities::ListChangedCapability {listChanged := (ctor Option.none [Bool])})), resources := (ctor Option.some [Capabilities::ResourcesCapability] (record Capabilities::ResourcesCapability {subscribe := (ctor Option.none [Bool]), listChanged := (ctor Option.none [Bool])})), tools := (ctor Option.some [Capabilities::ListChangedCapability] (record Capabilities::ListChangedCapability {listChanged := (ctor Option.none [Bool])})), extensions := (ctor Option.none [Json::JsonObject])}),
+  body: (record Capabilities::ServerCapabilities {experimental := (ctor Option.none [Json::JsonObject]), logging := (ctor Option.none [Json::JsonObject]), completions := (ctor Option.some [Json::JsonObject] (Capabilities::noObject)), prompts := (ctor Option.some [Capabilities::ListChangedCapability] (record Capabilities::ListChangedCapability {listChanged := (ctor Option.none [Bool])})), resources := (ctor Option.some [Capabilities::ResourcesCapability] (record Capabilities::ResourcesCapability {subscribe := (ctor Option.none [Bool]), listChanged := (ctor Option.none [Bool])})), tools := (ctor Option.some [Capabilities::ListChangedCapability] (record Capabilities::ListChangedCapability {listChanged := (ctor Option.none [Bool])})), extensions := (ctor Option.some [Json::JsonObject] (record Json::JsonObject {members := (cons ((Capabilities::tasksExtensionId), (ctor Json::Json.object (nil (String * Json::Json)))) (nil (String * Json::Json)))}))}),
   executable: true
 }
 
@@ -159,7 +162,7 @@ definition{
   name: fixtureTools,
   parameters: [],
   result: (List Content::Tool),
-  body: (prim append (baseTools) (InputFixture::interactiveTools) : (List Content::Tool)),
+  body: (prim append (prim append (baseTools) (InputFixture::interactiveTools) : (List Content::Tool)) (TaskFixture::taskTools) : (List Content::Tool)),
   executable: true
 }
 
@@ -167,7 +170,7 @@ definition{
   name: fixtureInfo,
   parameters: [],
   result: Extension::ProviderInfo,
-  body: (record Extension::ProviderInfo {serverInfo := (fixtureServerInfo), instructions := (ctor Option.none [String]), capabilities := (fixtureCapabilities), discoverCache := (fixtureCache), paramRules := (Admission::rulesOf (fixtureTools)), toolCallLimit := (callLimit), requestStateKey := 0x}),
+  body: (record Extension::ProviderInfo {serverInfo := (fixtureServerInfo), instructions := (ctor Option.none [String]), capabilities := (fixtureCapabilities), discoverCache := (fixtureCache), paramRules := (Admission::rulesOf (fixtureTools)), toolCallLimit := (callLimit), requestStateKey := 0x, taskStoreTag := 0}),
   axioms: [Quot.sound, propext],
   executable: true
 }
@@ -366,6 +369,38 @@ definition{
 }
 
 definition{
+  name: fixtureServeWith,
+  parameters: [host : Tasks::TaskHost, request : Methods::ClientRequest],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match request
+    | Methods::ClientRequest.toolsCall params => (TaskServe::answerCall host (fixtureTools) (ref TaskFixture::taskCall) (fixtureServe request) params)
+    | Methods::ClientRequest.tasksGet params => (TaskServe::serveGet host params)
+    | Methods::ClientRequest.tasksUpdate params => (TaskServe::serveUpdate host params)
+    | Methods::ClientRequest.tasksCancel params => (TaskServe::serveCancel host params)
+    | Methods::ClientRequest.serverDiscover params => (fixtureServe request)
+    | Methods::ClientRequest.toolsList params => (fixtureServe request)
+    | Methods::ClientRequest.resourcesList params => (fixtureServe request)
+    | Methods::ClientRequest.resourcesRead params => (fixtureServe request)
+    | Methods::ClientRequest.resourcesTemplatesList params => (fixtureServe request)
+    | Methods::ClientRequest.promptsList params => (fixtureServe request)
+    | Methods::ClientRequest.promptsGet params => (fixtureServe request)
+    | Methods::ClientRequest.completionComplete params => (fixtureServe request)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
+  name: fixtureAnswerWith,
+  parameters: [host : Tasks::TaskHost, request : Methods::ClientRequest],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (match (Tools::admissionRefusal (fixtureTools))
+    | Option.some refusal => (ctor Result.error [Methods::ResultBody, Refusal::ProviderRefusal] refusal)
+    | Option.none => (fixtureServeWith host request)),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
   name: fixtureAnswer,
   parameters: [request : Methods::ClientRequest],
   result: (Result Methods::ResultBody Refusal::ProviderRefusal),
@@ -380,7 +415,7 @@ definition{
   name: fixtureRun,
   parameters: [input : Bytes],
   result: (List Nat),
-  body: (Serve::serve (fixtureInfo) (ref fixtureAnswer) input),
+  body: (Serve::serveTasks (fixtureInfo) (ref fixtureAnswerWith) input),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true,
   production: {effects: [allocation, overflow], targets: [rust-std]}

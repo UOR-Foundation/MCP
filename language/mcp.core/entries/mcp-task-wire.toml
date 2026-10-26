@@ -1,0 +1,17 @@
+spec = "lexlean/entry/1"
+id = "mcp-task-wire"
+category = "label-word"
+surface_arity = 0
+frame = "atom"
+
+[denotation]
+kind = "document"
+module = "TaskJson"
+component = "TaskJson"
+
+[[form]]
+id = "mcp-task-wire"
+channel = "text"
+surface = "MCP task wire"
+canonical_source = true
+features = ["sentence-case", "singular"]

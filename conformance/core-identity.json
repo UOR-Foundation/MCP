@@ -1,7 +1,7 @@
 {
   "spec": "mcp-conformance/core-identity/1",
-  "root": "UorMcp.Fixture.fixtureRun",
-  "program_sha256": "f4033e2e9978b23e879f4ddafff01aef2246efe761c516224a01693bfabedfc3",
+  "root": "UorMcp.ConformanceFixture.conformanceRun",
+  "program_sha256": "e95e5363acbb9e398639953dd1cbf172625d9e7e830d78f15bbe1153ab561bb4",
   "package": {
     "name": "mcp_conformance_core",
     "version": "1.0.0",
@@ -18,25 +18,25 @@
       },
       {
         "path": "package.json",
-        "sha256": "529ebd047456492c24f341026c093bd8eee7d8113e08fd808b3f612d432591d8",
-        "byte_length": 1436634
+        "sha256": "a0f1520886e989a3843d91c56319a4b6e30db2244980dfe1ead8ace920d5c549",
+        "byte_length": 1657582
       },
       {
         "path": "provenance.json",
-        "sha256": "a106bae4f2d80830308e0267de7291355b51c9c8cccc3c93af756643aae4cc0f",
+        "sha256": "c5bd387f3ff486ed514f22b68299ccd1a3d668587bff3201205c14cbd61c87cf",
         "byte_length": 673
       },
       {
         "path": "src/lib.rs",
-        "sha256": "f9cd302ce1ca78ab8774677aec04af7fca29b18d65ee53ea862e91aaf5a3fc55",
-        "byte_length": 747305
+        "sha256": "4bf53ec38117fdde5f0f5c7c6bb8a04c6a90fde3ea6d52b735d44ce3267529d7",
+        "byte_length": 849797
       }
     ]
   },
   "source": {
-    "source_id": "8c14154bdcb8c7d38588a7434348acdf5ea50d1c7ef4eb12b86374db1d78c065",
-    "semantic_id": "3ae0fa433457316d21e3d1796e5c9c6d1b82b5c8387045b4977e3a1efd182c50",
-    "lock_sha256": "bdf5e69d77596b2b8ab504249ab57f4241b8752ad2201a4e2fd655d99e9e4b08"
+    "source_id": "2e05f7993ae425f01c9f7dfd63560e9d64e464f73c5e980d2565ec1b7891f8fb",
+    "semantic_id": "83ad1ce0a8d67a7308af43603482795df58c62a50a8564f1f8ad892be7dd710f",
+    "lock_sha256": "348f5ea5f678a956b7809c2c346f7889746a15d23faa7fc694c7f5f62105f482"
   },
   "compiler": {
     "lean_toolchain": "leanprover/lean4:v4.32.1",
@@ -44,7 +44,7 @@
     "version": "0.3.0"
   },
   "same_program_as": {
-    "package": "mcp_lifecycle",
-    "program_sha256": "f4033e2e9978b23e879f4ddafff01aef2246efe761c516224a01693bfabedfc3"
+    "package": "mcp_conformance",
+    "program_sha256": "e95e5363acbb9e398639953dd1cbf172625d9e7e830d78f15bbe1153ab561bb4"
   }
 }

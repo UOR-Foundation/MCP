@@ -580,19 +580,121 @@ level = "build"
 suite = "transport"
 statement = "The transport scenarios and the streaming probes are accounted for: every request the vendored sse-multiple-streams.ts and dns-rebinding.ts send is a vector, every check id they emit is a vector's or is listed, and each probe of server-stateless that issue 7 left to this issue is a vector or is listed with a reason and an owner."
 
+[[id]]
+id = "TK-01"
+level = "build"
+suite = "tasks"
+statement = "The server declares the extension io.modelcontextprotocol/tasks under capabilities.extensions of its server/discover result, with the empty object that means support without settings, and declares no capabilities.tasks member; the declaration is the server's and does not depend on what the client declared."
+
+[[id]]
+id = "TK-02"
+level = "build"
+suite = "tasks"
+statement = "tasks/get, tasks/update and tasks/cancel from a client whose request does not declare the extension, in the session capabilities or in the request's own _meta, are refused as missingRequiredClientCapability (-32021, HTTP 400) with data.requiredCapabilities.extensions naming the extension, before the task is looked up and without changing the task table."
+
+[[id]]
+id = "TK-03"
+level = "build"
+suite = "tasks"
+statement = "Whether a tools/call becomes a task is the server's decision and no request member asks for it: a tool that supports tasks answers a client that declared the extension with a CreateTaskResult and any other client with the result it would have returned at once; a tool that does not support tasks never answers a task, whatever a legacy task member of the request says; the arguments are validated and the rate limit applies before a task is created."
+
+[[id]]
+id = "TK-04"
+level = "build"
+suite = "tasks"
+statement = "A tools/call of a tool that can only be a task, from a client that did not declare the extension, is refused as missingRequiredClientCapability (-32021, HTTP 400) with data.requiredCapabilities.extensions naming the extension, and creates no task."
+
+[[id]]
+id = "TK-05"
+level = "build"
+suite = "tasks"
+statement = "A created task is answered as a flat CreateTaskResult: resultType task and the task's taskId, status, createdAt, lastUpdatedAt and ttlMs at the top level, with no nested task member, no result, error, inputRequests or requestState, and no notification; the identifier and the instants are the host's, and a tasks/get for the identifier resolves as soon as the result is returned, because the task is in the table the response returns."
+
+[[id]]
+id = "TK-06"
+level = "build"
+suite = "tasks"
+statement = "ttlMs and pollIntervalMs are integers in milliseconds (ttlMs null when unlimited) and the legacy ttl and pollInterval members are not written; a task is kept for its ttlMs and is dropped from the table, and so answered as unknown, only once that has elapsed; the inlined result carries no related-task _meta."
+
+[[id]]
+id = "TK-07"
+level = "build"
+suite = "tasks"
+statement = "tasks/get answers the DetailedTask of the instant it is asked: working without a result, input_required with inputRequests, completed with the tool's result inlined (a tool error is completed with isError true), failed with the JSON-RPC error and no result, or cancelled; resultType is complete and no requestState is written; a working task whose work has finished by the host's clock is answered as finished."
+
+[[id]]
+id = "TK-08"
+level = "build"
+suite = "tasks"
+statement = "tasks/get, tasks/update and tasks/cancel for a task the table does not hold are refused as invalidParams (-32602, HTTP 400), and tasks/result and tasks/list, which the extension removed, are not offered: methodNotFound (-32601, HTTP 404)."
+
+[[id]]
+id = "TK-09"
+level = "build"
+suite = "tasks"
+statement = "tasks/cancel is acknowledged with an empty result whose resultType is complete; a working or waiting task becomes cancelled; a task that is already terminal, or that finished by the host's clock before the cancel arrived, is acknowledged and stays as it was."
+
+[[id]]
+id = "TK-10"
+level = "build"
+suite = "tasks"
+statement = "A task that waits for input is answered input_required with inputRequests keyed by identifiers that are unique over the task; tasks/update with inputResponses is acknowledged with an empty result and removes the keys it answers; answers to keys that are not outstanding are ignored; the task stays input_required while any key remains and resumes when none does; a task that is not waiting for input is not changed by an update."
+
+[[id]]
+id = "TK-11"
+level = "build"
+suite = "tasks"
+statement = "tasks/get, tasks/update and tasks/cancel need an Mcp-Name header equal to params.taskId, and every request an Mcp-Method equal to its method; a missing or different value is refused as headerMismatch (-32020, HTTP 400) without changing the table."
+
+[[id]]
+id = "TK-12"
+level = "build"
+suite = "tasks"
+statement = "A change the core makes to a task while it answers a request (the task settles, parks for input, is answered or is cancelled) is written, beside the body, as a notifications/tasks notification that carries the complete task exactly as tasks/get would have answered it at that moment; creating a task and a request that changes nothing write none, and the encoding of the stream is #11's. The pinned scenario tasks-status-notifications sends no request, so no vector stands for this row."
+
+[[id]]
+id = "TK-13"
+level = "build"
+suite = "tasks"
+statement = "A tool that asks for input before it becomes a task answers its first round with an input_required result that carries inputRequests and no taskId, and its last round with a CreateTaskResult that carries no requestState or inputRequests, whose task finishes with a result that reflects the answer given; the last round is refused to a client that did not declare the extension."
+
+[[id]]
+id = "TK-14"
+level = "build"
+suite = "tasks"
+statement = "The task lifecycle is stated in kernel-checked theorems: a task in a terminal state is not changed by settling, answering or cancelling; an update changes a task only while it is input_required; cancelling a working or waiting task yields a cancelled task; only a completed task carries a result; every step keeps the task's identifier and creation instant; a task is expired only once its ttl has elapsed."
+
+[[id]]
+id = "TK-15"
+level = "build"
+suite = "tasks"
+statement = "The core keeps no task state: the host supplies a clock, the identifier of a task the request may create and the task table with each request, and stores the table the response returns; a table that cannot be read, a host that supplies no identifier, a host that supplies the identifier of a task the table holds and a frame whose host section is cut or is not text are server errors (-32603 or the fixed internal body, HTTP 500) that leave the table as it was; the table is returned only when a task was created or touched."
+
+[[id]]
+id = "TK-16"
+level = "build"
+suite = "tasks"
+statement = "The ten tasks scenarios at the pinned suite commit and the pinned ext-tasks commit are accounted for: every request they send is a step of vectors/tasks.json with its file and line, every check id they emit is covered or listed with its reason, the vendored files match the checksums the authorities record, and the requirements file runs the scenarios as extension scenarios that are not scored."
+
+[[id]]
+id = "TK-17"
+level = "build"
+suite = "tasks"
+statement = "The step serve writes the task table through one host effect and never in the response frame: a response that wrote a table is a perform of the store effect, under the tag the provider declares, whose payload is the table preceded by its length in four bytes; once the host's outcome of that effect is in the log, the response is written without the table; a response that wrote no table, a request that was refused and a request that fails a check ask for no effect; a tag that does not fit four bytes is not a perform. The byte serve still returns the table in its response frame."
+
 # The conformance build and the oracle run (issue #13): CF-01..CF-08.
 
 [[id]]
 id = "CF-01"
 level = "build"
 suite = "conformance"
-statement = "The conformance build is a PrismPM server application declared in this repository: its core is the unchanged production root UorMcp.Fixture.fixtureRun, its one host effect is the tool-call counter that fills the tool-call section of the request frame, its listener is bound to 127.0.0.1, and its binding crate answers each client's count of tools/call requests in the current window, not counting the request being served."
+statement = "The conformance build is a PrismPM server application declared in this repository: its core is the production root UorMcp.ConformanceFixture.conformanceRun, the step serve over the unchanged fixture provider; its host effects are the tool-call counter, the clock, the identifier of a task and the table of tasks, which fill the sections of the request frame, and the store of the task table, the one effect the core requests; its listener is bound to 127.0.0.1; and its binding crate answers each client's count of tools/call requests in the current window, not counting the request being served, the clock, a fresh identifier, and holds the table the core stores."
 
 [[id]]
 id = "CF-02"
 level = "build"
 suite = "conformance"
-statement = "Every acceptance vector and every served vector of the declaration is the committed core package's own answer to the request it holds, byte for byte, as the HTTP adapter frames the request and serializes the answer, so the declaration cannot disagree with the core it names."
+statement = "Every acceptance vector and every served vector of the declaration is the committed core package's own answer to the request it holds, byte for byte, as the HTTP adapter frames the request and serializes the answer, so the declaration cannot disagree with the core it names; the acceptance transcripts hold the effect requests the core makes while it answers the vectors that write a task table, so the one effect the core requests is exercised."
 
 [[id]]
 id = "CF-03"
@@ -604,7 +706,7 @@ statement = "The pinned conformance suite's server runner, at specification revi
 id = "CF-04"
 level = "build"
 suite = "conformance"
-statement = "Every JSON-RPC message of the transcripts recorded during that run, each request, each result, each error and each event of a stream, validates against the pinned 2026-07-28 schema.json, a response against the definition of the request it answers, and a body that is not a JSON-RPC message is a failure and not a skipped message."
+statement = "Every JSON-RPC message of the transcripts recorded during that run, each request, each result, each error and each event of a stream, validates against the pinned 2026-07-28 schema.json, a response against the definition of the request it answers, and a body that is not a JSON-RPC message is a failure and not a skipped message. The messages of the tasks extension, which the specification's schema does not define, validate against the pinned ext-tasks schema.json: a request or notification by the method it names, its result by the definition of the same name, and a result whose resultType is task by CreateTaskResult; the oracle refuses to run when that file is not the pinned one, and without it those messages are findings. The inputResponses of a tasks/update under a key that is not outstanding for the task are not held to the schema of an input response, because the extension tells a server to ignore them; they are counted, and the values under outstanding keys are held to it."
 
 [[id]]
 id = "CF-05"
@@ -684,7 +786,7 @@ statement = "The kernel checks the laws of the step: the step of a done response
 id = "PE-09"
 level = "build"
 suite = "provider-effects"
-statement = "The conformance fixture requests no effect: the fixture provider and the root fixtureRun import neither the effect module nor the step serve, every request of the committed vectors is answered done by the step serve of the fixture provider, and the conformance build still names fixtureRun, so its core identity moves only with the source and semantic IDs and the program of the modules it imports."
+statement = "The conformance fixture provider requests no effect: the fixture provider and the root fixtureRun import neither the effect module nor the step serve, every request of the committed vectors is answered done by the step serve of the fixture provider, and the conformance build names conformanceRun, the step serve over the fixture provider, whose only effect request is the store of a task table (TK-17)."
 
 [[id]]
 id = "IR-01"

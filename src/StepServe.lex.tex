@@ -15,6 +15,7 @@
 \importmodule{RpcWire}
 \importmodule{Serve}
 \importmodule{Status}
+\importmodule{Tasks}
 \importmodule{Transport}
 \importmodule{Validation}
 \importmodule{Extension}
@@ -33,6 +34,7 @@ structure{
   parameters: [],
   fields: [
     {name: completed, type: (List HostEffect::Completed)},
+    {name: host, type: Tasks::TaskHost},
     {name: request, type: Methods::ClientRequest}
   ]
 }
@@ -166,21 +168,71 @@ definition{
 }
 
 definition{
-  name: performed,
-  parameters: [accepts : Bool, handled : Dispatch::Handled, request : HostEffect::EffectRequest],
+  name: tagFault,
+  parameters: [],
   result: HostEffect::Step,
-  body: (if (HostEffect::tagFits (project request tag)) then (ctor HostEffect::Step.perform request) else (ctor HostEffect::Step.done (Frame::writeResponse (Serve::respond accepts (record Dispatch::Handled {id := (project handled id), outcome := (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (tagRefusal))}))))),
+  body: (ctor HostEffect::Step.done (Frame::writeResponse (Serve::internalResponse))),
+  executable: true
+}
+
+definition{
+  name: performed,
+  parameters: [
+    host : Tasks::TaskHost,
+    accepts : Bool,
+    handled : Dispatch::Handled,
+    request : HostEffect::EffectRequest
+  ],
+  result: HostEffect::Step,
+  body: (if (HostEffect::tagFits (project request tag)) then (ctor HostEffect::Step.perform request) else (ctor HostEffect::Step.done (Frame::writeResponse (Serve::respond host accepts (record Dispatch::Handled {id := (project handled id), outcome := (ctor Result.error [Dispatch::Reply, Refusal::Refusal] (tagRefusal))}))))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
 
 definition{
+  name: storeRequest,
+  parameters: [info : Extension::ProviderInfo, table : (List Nat)],
+  result: HostEffect::EffectRequest,
+  body: (record HostEffect::EffectRequest {tag := (project info taskStoreTag), payload := (JsonText::listToBytes (JsonText::emptyBytes) (prim append (Frame::u32List (prim length table : Nat)) table : (List Nat)))}),
+  executable: true
+}
+
+definition{
+  name: storing,
+  parameters: [
+    info : Extension::ProviderInfo,
+    stored : Bool,
+    table : (List Nat),
+    response : Http::HttpResponse
+  ],
+  result: HostEffect::Step,
+  body: (if stored then (ctor HostEffect::Step.done (Frame::writeResponse (Serve::withoutTable response))) else (if (HostEffect::tagFits (project info taskStoreTag)) then (ctor HostEffect::Step.perform (storeRequest info table)) else (tagFault))),
+  executable: true
+}
+
+definition{
+  name: finished,
+  parameters: [info : Extension::ProviderInfo, stored : Bool, response : Http::HttpResponse],
+  result: HostEffect::Step,
+  body: (match (project response tasks)
+    | Option.none => (ctor HostEffect::Step.done (Frame::writeResponse response))
+    | Option.some table => (storing info stored table response)),
+  executable: true
+}
+
+definition{
   name: stepOfHandled,
-  parameters: [accepts : Bool, handled : Dispatch::Handled],
+  parameters: [
+    info : Extension::ProviderInfo,
+    stored : Bool,
+    host : Tasks::TaskHost,
+    accepts : Bool,
+    handled : Dispatch::Handled
+  ],
   result: HostEffect::Step,
   body: (match (effectOf (project handled outcome))
-    | Option.some request => (performed accepts handled request)
-    | Option.none => (ctor HostEffect::Step.done (Frame::writeResponse (Serve::respond accepts handled)))),
+    | Option.some request => (performed host accepts handled request)
+    | Option.none => (finished info stored (Serve::respond host accepts handled))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -188,14 +240,16 @@ definition{
 definition{
   name: answerRequestStep,
   parameters: [
+    host : Tasks::TaskHost,
     info : Extension::ProviderInfo,
     answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    stored : Bool,
     used : Nat,
     fields : (List Http::Field),
     rpc : JsonRpc::Request
   ],
   result: HostEffect::Step,
-  body: (stepOfHandled (Transport::acceptsStream fields) (Dispatch::handleWith info answer used (ctor Option.some [Validation::Headers] (Http::headersOf fields (project info paramRules) (Serve::toolNameOf rpc) (project rpc method))) (Validation::supportedVersions) rpc)),
+  body: (stepOfHandled info stored host (Transport::acceptsStream fields) (Dispatch::handleWith info answer used (ctor Option.some [Validation::Headers] (Http::headersOf fields (project info paramRules) (Serve::toolNameOf rpc) (project rpc method))) (Validation::supportedVersions) rpc)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -203,8 +257,10 @@ definition{
 definition{
   name: afterDecodeStep,
   parameters: [
+    host : Tasks::TaskHost,
     info : Extension::ProviderInfo,
     answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    stored : Bool,
     used : Nat,
     fields : (List Http::Field),
     decoded : (Result JsonRpc::Request RpcWire::Fault)
@@ -212,7 +268,7 @@ definition{
   result: HostEffect::Step,
   body: (match decoded
     | Result.error fault => (ctor HostEffect::Step.done (Frame::writeResponse (Serve::jsonResponse (Status::faultStatus fault) (RpcWire::errorResponse (RpcWire::faultId fault) (RpcWire::faultObject fault)))))
-    | Result.ok rpc => (answerRequestStep info answer used fields rpc)),
+    | Result.ok rpc => (answerRequestStep host info answer stored used fields rpc)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -220,8 +276,10 @@ definition{
 definition{
   name: afterParseStep,
   parameters: [
+    host : Tasks::TaskHost,
     info : Extension::ProviderInfo,
     answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    stored : Bool,
     used : Nat,
     fields : (List Http::Field),
     parsed : (Result Json::Json JsonText::JsonRefusal)
@@ -229,7 +287,7 @@ definition{
   result: HostEffect::Step,
   body: (match parsed
     | Result.error refusal => (ctor HostEffect::Step.done (Frame::writeResponse (Serve::jsonResponse (Status::badRequestStatus) (RpcWire::errorResponse (ctor Option.none [JsonRpc::RequestId]) (RpcWire::faultObject (ctor RpcWire::Fault.parseError))))))
-    | Result.ok message => (afterDecodeStep info answer used fields (RpcWire::decodeRequest message))),
+    | Result.ok message => (afterDecodeStep host info answer stored used fields (RpcWire::decodeRequest message))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -238,11 +296,12 @@ definition{
   name: serveOpenStep,
   parameters: [
     info : Extension::ProviderInfo,
-    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    answerWith : (Fn (Tasks::TaskHost Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    stored : Bool,
     request : Http::HttpRequest
   ],
   result: HostEffect::Step,
-  body: (if (Http::isPost (project request method)) then (afterParseStep (Serve::keyed info (project request stateKey)) answer (project request toolCalls) (project request fields) (JsonRead::readJson (project request body))) else (ctor HostEffect::Step.done (Frame::writeResponse (Serve::notAllowedResponse)))),
+  body: (if (Http::isPost (project request method)) then (afterParseStep (project request host) (Serve::keyed info (project request stateKey)) (fun [answerWith, request] (typed : Methods::ClientRequest) => (apply answerWith (project request host) typed)) stored (project request toolCalls) (project request fields) (JsonRead::readJson (project request body))) else (ctor HostEffect::Step.done (Frame::writeResponse (Serve::notAllowedResponse)))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -251,14 +310,15 @@ definition{
   name: serveGatedStep,
   parameters: [
     info : Extension::ProviderInfo,
-    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    answerWith : (Fn (Tasks::TaskHost Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    stored : Bool,
     request : Http::HttpRequest,
     gate : (Option Transport::TransportRefusal)
   ],
   result: HostEffect::Step,
   body: (match gate
     | Option.some refusal => (ctor HostEffect::Step.done (Frame::writeResponse (Serve::forbiddenResponse refusal)))
-    | Option.none => (serveOpenStep info answer request)),
+    | Option.none => (serveOpenStep info answerWith stored request)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -267,11 +327,12 @@ definition{
   name: serveRequestStep,
   parameters: [
     info : Extension::ProviderInfo,
-    answer : (Fn (Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    answerWith : (Fn (Tasks::TaskHost Methods::ClientRequest) (Result Methods::ResultBody Refusal::ProviderRefusal)),
+    stored : Bool,
     request : Http::HttpRequest
   ],
   result: HostEffect::Step,
-  body: (serveGatedStep info answer request (Transport::gateOf (project request fields) (project request allowedHosts))),
+  body: (serveGatedStep info answerWith stored request (Transport::gateOf (project request fields) (project request allowedHosts))),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }
@@ -295,7 +356,7 @@ definition{
   result: HostEffect::Step,
   body: (match read
     | Result.error fault => (unreadable)
-    | Result.ok request => (serveRequestStep info (fun [answerWith, turn] (typed : Methods::ClientRequest) => (apply answerWith (record Asked {completed := (project turn completed), request := typed}))) request)),
+    | Result.ok request => (serveRequestStep info (fun [answerWith, turn] (host : Tasks::TaskHost) (typed : Methods::ClientRequest) => (apply answerWith (record Asked {completed := (project turn completed), host := host, request := typed}))) (HostEffect::hasTag (project turn completed) (project info taskStoreTag)) request)),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true
 }

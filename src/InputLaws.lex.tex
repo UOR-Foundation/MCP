@@ -204,7 +204,8 @@ definition{
       | Methods::ResultBody.complete found => (ctor Option.none [(List String)])
       | Methods::ResultBody.getTask found => (ctor Option.none [(List String)])
       | Methods::ResultBody.acknowledged => (ctor Option.none [(List String)])
-      | Methods::ResultBody.taskCreated found => (ctor Option.none [(List String)]))),
+      | Methods::ResultBody.taskCreated found => (ctor Option.none [(List String)])
+      | Methods::ResultBody.stored found => (ctor Option.none [(List String)]))),
   executable: true
 }
 
@@ -228,7 +229,8 @@ definition{
       | Methods::ResultBody.complete found => false
       | Methods::ResultBody.getTask found => false
       | Methods::ResultBody.acknowledged => false
-      | Methods::ResultBody.taskCreated found => false)),
+      | Methods::ResultBody.taskCreated found => false
+      | Methods::ResultBody.stored found => false)),
   executable: true
 }
 
