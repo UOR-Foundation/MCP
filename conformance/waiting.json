@@ -25,46 +25,6 @@
       "issue": 10,
       "pr": 30,
       "reason": "the scenario's tool needs a requestState and the core refuses to write one without the host's key (IR-16), and the conformance application's request frame has no section that carries it; the key section of the application is the open work (MCP#10, INPUT-REQUIRED.md, Not met)"
-    },
-    "tasks-lifecycle": {
-      "issue": 44,
-      "pr": null,
-      "reason": "the scenario's only failing check is the suite's own wire-schema-valid, which holds the result of a task-creating tools/call to CallToolResult (required property content) at the pinned suite commit 232a9014; the response is the CreateTaskResult of ext-tasks 899c1bbc (resultType task, no content) and every other check of the scenario passes; the suite accepts it from modelcontextprotocol/conformance#468 (cf022cb), after the pin (MCP#44)"
-    },
-    "tasks-capability-negotiation": {
-      "issue": 44,
-      "pr": null,
-      "reason": "the scenario's only failing check is the suite's own wire-schema-valid, which holds the result of a task-creating tools/call to CallToolResult (required property content) at the pinned suite commit 232a9014; the response is the CreateTaskResult of ext-tasks 899c1bbc (resultType task, no content) and every other check of the scenario passes; the suite accepts it from modelcontextprotocol/conformance#468 (cf022cb), after the pin (MCP#44)"
-    },
-    "tasks-wire-fields": {
-      "issue": 44,
-      "pr": null,
-      "reason": "the scenario's only failing check is the suite's own wire-schema-valid, which holds the result of a task-creating tools/call to CallToolResult (required property content) at the pinned suite commit 232a9014; the response is the CreateTaskResult of ext-tasks 899c1bbc (resultType task, no content) and every other check of the scenario passes; the suite accepts it from modelcontextprotocol/conformance#468 (cf022cb), after the pin (MCP#44)"
-    },
-    "tasks-request-state-removal": {
-      "issue": 44,
-      "pr": null,
-      "reason": "the scenario's only failing check is the suite's own wire-schema-valid, which holds the result of a task-creating tools/call to CallToolResult (required property content) at the pinned suite commit 232a9014; the response is the CreateTaskResult of ext-tasks 899c1bbc (resultType task, no content) and every other check of the scenario passes; the suite accepts it from modelcontextprotocol/conformance#468 (cf022cb), after the pin (MCP#44)"
-    },
-    "tasks-mrtr-input": {
-      "issue": 44,
-      "pr": null,
-      "reason": "the scenario's only failing check is the suite's own wire-schema-valid, which holds the result of a task-creating tools/call to CallToolResult (required property content) at the pinned suite commit 232a9014; the response is the CreateTaskResult of ext-tasks 899c1bbc (resultType task, no content) and every other check of the scenario passes; the suite accepts it from modelcontextprotocol/conformance#468 (cf022cb), after the pin (MCP#44)"
-    },
-    "tasks-request-headers": {
-      "issue": 44,
-      "pr": null,
-      "reason": "the scenario's only failing check is the suite's own wire-schema-valid, which holds the result of a task-creating tools/call to CallToolResult (required property content) at the pinned suite commit 232a9014; the response is the CreateTaskResult of ext-tasks 899c1bbc (resultType task, no content) and every other check of the scenario passes; the suite accepts it from modelcontextprotocol/conformance#468 (cf022cb), after the pin (MCP#44)"
-    },
-    "tasks-dispatch-and-envelope": {
-      "issue": 44,
-      "pr": null,
-      "reason": "the scenario's only failing check is the suite's own wire-schema-valid, which holds the result of a task-creating tools/call to CallToolResult (required property content) at the pinned suite commit 232a9014; the response is the CreateTaskResult of ext-tasks 899c1bbc (resultType task, no content) and every other check of the scenario passes; the suite accepts it from modelcontextprotocol/conformance#468 (cf022cb), after the pin (MCP#44)"
-    },
-    "tasks-mrtr-composition": {
-      "issue": 44,
-      "pr": null,
-      "reason": "the scenario's only failing check is the suite's own wire-schema-valid, which holds the result of a task-creating tools/call to CallToolResult (required property content) at the pinned suite commit 232a9014; the response is the CreateTaskResult of ext-tasks 899c1bbc (resultType task, no content) and every other check of the scenario passes; the suite accepts it from modelcontextprotocol/conformance#468 (cf022cb), after the pin (MCP#44)"
     }
   },
   "suite_skipped": {

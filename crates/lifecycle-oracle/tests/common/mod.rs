@@ -17,7 +17,7 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 /// The commit of the conformance suite the vectors are taken from.
-pub const PIN: &str = "232a9014457eaf4c59559916e3d616d2f7f28f05";
+pub const PIN: &str = "cf022cbb541f9d939068d7f84758b9728be7fc23";
 
 /// The commit of the MCP specification whose `schema/2026-07-28/schema.json` every
 /// response is checked against.

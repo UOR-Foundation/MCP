@@ -294,7 +294,7 @@ statement = "An integer parameter header is compared numerically with the body n
 id = "TL-01"
 level = "build"
 suite = "tools"
-statement = "tools/list answers with the tool catalog in its fixed declaration order, every tool with a name of 1 to 64 characters from A-Z, a-z, 0-9, underscore, dot and hyphen (the intersection of the specification and of the suite check), a description and an inputSchema, and an outputSchema when it declares one; the catalog is one page, so a request that carries a cursor is refused as invalidParams (-32602); a kernel-checked theorem states the order."
+statement = "tools/list answers with the tool catalog in its fixed declaration order, every tool with a name of 1 to 64 characters from A-Z, a-z, 0-9, underscore, dot and hyphen (inside the specification's rule, 1 to 128 characters, which the suite check holds from conformance commit cf022cbb), a description and an inputSchema, and an outputSchema when it declares one; the catalog is one page, so a request that carries a cursor is refused as invalidParams (-32602); a kernel-checked theorem states the order."
 
 [[id]]
 id = "TL-02"

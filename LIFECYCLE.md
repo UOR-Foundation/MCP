@@ -31,7 +31,7 @@ then params.
 | `crates/lifecycle-oracle/tests/schema.rs`, `tests/common/mod.rs` | LC-15: every response a test produces is validated against the specification's JSON Schema |
 | `crates/lifecycle-oracle/tests/stress.rs` | LC-16: the largest frames the tests build, on a 2 MiB stack |
 | `crates/lifecycle-oracle/suite/mcp-spec-80041ab0a139a8f4fb3adbc99f7ae9113ea59671` | the vendored `schema/2026-07-28/schema.json` and the licence |
-| `crates/lifecycle-oracle/suite/conformance-232a9014457eaf4c59559916e3d616d2f7f28f05` | the vendored suite files: eight of #7 and #8, and the two scenarios of [TRANSPORT.md](TRANSPORT.md) |
+| `crates/lifecycle-oracle/suite/conformance-cf022cbb541f9d939068d7f84758b9728be7fc23` | the vendored suite files: eight of #7 and #8, and the two scenarios of [TRANSPORT.md](TRANSPORT.md) |
 
 Regenerate the pins and the package in the same commit as any change to the sources, the
 lock or the pinned compiler (it verifies the project first, which takes about ten minutes
@@ -241,7 +241,7 @@ cargo run -p xtask -- validate
 `server-stateless`, `http-header-validation` and `http-custom-header-server-validation`
 send to a server that implements the scope of #7, built as the scenario builds it, with
 the checks the scenario makes on the answer. Each cites the scenario file, the suite
-commit `232a9014457eaf4c59559916e3d616d2f7f28f05`, the line of the call, a quoted
+commit `cf022cbb541f9d939068d7f84758b9728be7fc23`, the line of the call, a quoted
 fragment of that line and the check identifiers it stands for. `tests/provenance.rs`
 checks every citation against the vendored files and checks that every call site and
 every check identifier in those two files is a vector, a listed probe that is not run,
@@ -251,13 +251,18 @@ A vector the root fails is a defect of the root. A vector it passes shows that t
 request meets these checks in process. It is not the verdict of the suite: the suite
 run against the conformance build (issue #13) is, and it has not been done.
 
-The pin: the suite at commit `232a9014457eaf4c59559916e3d616d2f7f28f05` (2026-08-07),
+The pin: the suite at commit `cf022cbb541f9d939068d7f84758b9728be7fc23` (2026-09-06),
 whose `requirements/2026-07-28.yaml` has SHA-256
 `ae2f4f6210fd729e2e318edd5bbfa31a43cee0bc608e48052fa26dbf1d939b57`. That file was
-introduced at this commit and is unchanged at the suite's head (`c37eec8`). It is
-absent at the commit that bumped the package to 0.2.0-alpha.10 (`468e535`); the file's
+introduced at `232a9014457eaf4c59559916e3d616d2f7f28f05` (2026-08-07), the pin before
+MCP#44, and is byte for byte the same at `cf022cbb`, which is the earliest suite commit
+that contains `modelcontextprotocol/conformance#468`, and at the suite's head (`c37eec8`).
+It is absent at the commit that bumped the package to 0.2.0-alpha.10 (`468e535`); the file's
 own comment names alpha.10 as its anchor, and between those two commits only lines
 889 to 900 of `stateless.ts` changed, inside a streaming probe that is not run here.
+Of the vendored files, `tools.ts`, `input-required-result.ts`, `negative-mrtr.test.ts` and
+`everything-server.ts` differ between `232a9014` and `cf022cbb`; the other twenty-five are byte for
+byte the same, and the vectors cite the lines of the new files.
 The authority row `A-MCP-CONFORMANCE` records the commit and a manifest checksum over
 the ten vendored files.
 

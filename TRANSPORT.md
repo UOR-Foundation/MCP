@@ -12,7 +12,7 @@ specification at commit `80041ab0a139a8f4fb3adbc99f7ae9113ea59671`; RFC 9110 (se
 12.4.2, 12.5.1 and 15.5.4); the event stream format of the WHATWG HTML Standard, section 9.2
 (`https://html.spec.whatwg.org/multipage/server-sent-events.html`); and the pinned conformance
 scenarios `server-sse-multiple-streams` and `dns-rebinding-protection` of
-`modelcontextprotocol/conformance` at `232a9014457eaf4c59559916e3d616d2f7f28f05`.
+`modelcontextprotocol/conformance` at `cf022cbb541f9d939068d7f84758b9728be7fc23`.
 
 ## Where it lives
 
@@ -26,7 +26,7 @@ scenarios `server-sse-multiple-streams` and `dns-rebinding-protection` of
 | `crates/lifecycle-oracle/vectors/transport.json` | the requests of the two scenarios and of the streaming probes, with file and line at the pinned suite commit |
 | `crates/lifecycle-oracle/tests/transport.rs` | SH-01 to SH-10 |
 | `crates/lifecycle-oracle/src/lib.rs` | `encode_request_allowing`, `exchange_allowing`, and `parse_event_stream`, an independent reader of the WHATWG format that the tests use to read every stream |
-| `crates/lifecycle-oracle/suite/conformance-232a9014457eaf4c59559916e3d616d2f7f28f05` | now ten vendored suite files: also `sse-multiple-streams.ts` and `dns-rebinding.ts` |
+| `crates/lifecycle-oracle/suite/conformance-cf022cbb541f9d939068d7f84758b9728be7fc23` | now ten vendored suite files: also `sse-multiple-streams.ts` and `dns-rebinding.ts` |
 
 Regenerate the packages after any change to the sources, as [LIFECYCLE.md](LIFECYCLE.md)
 describes; `generated/request.json` names both roots.

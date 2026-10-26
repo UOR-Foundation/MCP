@@ -17,7 +17,7 @@ pass and why.
 | --- | --- | --- |
 | the extension text and schema | `modelcontextprotocol/ext-tasks` at `899c1bbc869567670093face3591b39c28ce3219` (2026-10-09), `specification/2026-07-28/tasks.md` and `schema/2026-07-28/schema.json` | the normative text, and the types of `CreateTaskResult`, `GetTaskResult`, the two acknowledgements and `notifications/tasks`. The specification's own `schema.json` (80041ab) has no task type: the extension keeps its schema apart, so the responses of this layer are checked against both schemas |
 | the proposal | `docs/seps/2663-tasks-extension.mdx` of `modelcontextprotocol/modelcontextprotocol` at `80041ab0a139a8f4fb3adbc99f7ae9113ea59671` | the design as accepted; not vendored, because the extension text above is the specification and the proposal says it is a historical record |
-| the scenarios | `modelcontextprotocol/conformance` at `232a9014457eaf4c59559916e3d616d2f7f28f05` | `src/scenarios/server/tasks/*.ts` (twelve files) and `input-required-result-helpers.ts`, vendored beside the earlier files; authority row `A-MCP-CONFORMANCE` records the new manifest checksum |
+| the scenarios | `modelcontextprotocol/conformance` at `cf022cbb541f9d939068d7f84758b9728be7fc23` | `src/scenarios/server/tasks/*.ts` (twelve files) and `input-required-result-helpers.ts`, vendored beside the earlier files; authority row `A-MCP-CONFORMANCE` records the new manifest checksum |
 
 The pin of `ext-tasks` is the last commit at or before the pinned specification commit
 (2026-10-20). Its next commit (`b3d28ac`, 2026-10-21) changes one sentence of the overview.

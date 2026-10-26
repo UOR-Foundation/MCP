@@ -76,17 +76,26 @@ loopback; the schema oracle validates the recorded transcript against the pinned
 
 **The server-suite step is exact, not lenient.** It passes only when the set of failing
 scenarios equals the set `conformance/waiting.json` lists as waiting, each entry naming
-its issue and pull request (MCP#10 and PR #30, MCP#12 and PR #32). A failing scenario
+its issue and pull request (MCP#10 and PR #30). A failing scenario
 that is not listed fails the job (`FAILING and not named in waiting.json`, first in the
 annotation); a listed scenario that passes fails the job (`named as waiting but not
 failing`, so the entry is deleted in the pull request that delivers it); an entry that
 names neither an issue nor a pull request fails the job. The waiting scenarios are
 failures in the report, the step summary and `report.json` (`valid: false`), and the
-required scenarios passing are counted without them (27 of 37 today); the list is a
+required scenarios passing are counted without them (32 of 37 today); the list is a
 classification of known failures, never a pass. A scenario the suite itself skips at the
 pin (`suite_skipped`) is reported as skipped and never counted as passing. A red job is
 therefore always a regression, a delivery that left a stale entry, or a broken oracle,
 and a merge queue on `main` is not blocked by a known failure.
+
+**The suite pin.** `conformance/oracle/fetch-suite.sh` is the only place that fetches the suite, and
+its `COMMIT` is the pin: `cf022cbb541f9d939068d7f84758b9728be7fc23`, the earliest commit of
+`modelcontextprotocol/conformance` that contains #468 (MCP#44; the pin before was `232a9014`). The script
+checks out that commit, refuses any other, requires every vendored file under
+`crates/lifecycle-oracle/suite/conformance-<COMMIT>` to equal the checkout's, and only then runs `npm ci`.
+`server-suite.mjs` refuses a requirements file whose SHA-256 is not the one it names. The authority
+`A-MCP-CONFORMANCE`, the vectors, the tests' `PIN` and the oracle's label must agree with the script, and
+CF-07 and the provenance tests (LC-12) fail when one of them does not.
 
 `.github/prismpm.rev` is the only place the PrismPM revision is written. It names
 PrismPM#339 at its head, and it moves to the PrismPM SDK release before MCP v0.1.0.

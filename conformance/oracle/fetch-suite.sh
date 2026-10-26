@@ -10,7 +10,7 @@
 # take from them are taken from the suite that runs.
 set -euo pipefail
 
-COMMIT=232a9014457eaf4c59559916e3d616d2f7f28f05
+COMMIT=cf022cbb541f9d939068d7f84758b9728be7fc23
 REPOSITORY=https://github.com/modelcontextprotocol/conformance
 
 dest=${1:?usage: fetch-suite.sh DESTINATION}

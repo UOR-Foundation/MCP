@@ -23,7 +23,7 @@ bytes and nothing else. Issue #8; register rows TL-01 to TL-18; TL-19 (#13) adds
 | `crates/lifecycle-oracle/generated/mcp_lifecycle`, `mcp_crowd` | LexLean's exports of the two roots, unedited |
 | `crates/lifecycle-oracle/vectors/tools.json` | the requests of the tool scenarios, with file and line at the pinned suite commit |
 | `crates/lifecycle-oracle/tests/tools.rs`, `stress.rs`, `provenance.rs` | TL-01 to TL-19 |
-| `crates/lifecycle-oracle/suite/conformance-232a9014457eaf4c59559916e3d616d2f7f28f05` | now eight vendored suite files: also `tools.ts`, `json-schema-2020-12.ts` and `everything-server.ts` |
+| `crates/lifecycle-oracle/suite/conformance-cf022cbb541f9d939068d7f84758b9728be7fc23` | now eight vendored suite files: also `tools.ts`, `json-schema-2020-12.ts` and `everything-server.ts` |
 
 Regenerate the packages after any change to the sources, as [LIFECYCLE.md](LIFECYCLE.md)
 describes; `generated/request.json` names both roots.
@@ -103,7 +103,7 @@ operator, never with the schema):
 
 | Fault | When |
 | --- | --- |
-| `nameInvalid` | a name that is not 1 to 64 characters of A-Z, a-z, 0-9, `_`, `-` and `.`: the intersection of the specification (1 to 128, no solidus) and the suite's check (1 to 64, solidus allowed) |
+| `nameInvalid` | a name that is not 1 to 64 characters of A-Z, a-z, 0-9, `_`, `-` and `.`: inside the specification's rule (1 to 128, no solidus), which the suite's check holds from `cf022cbb` (at `232a9014` it was 1 to 64 with solidus allowed, and the core's rule was the intersection of the two) |
 | `nameDuplicate` | two tools with one name |
 | `dialectUnsupported` | a `$schema` other than `https://json-schema.org/draft/2020-12/schema` |
 | `rootNotObject` | an `inputSchema` whose `type` is not `object` |
