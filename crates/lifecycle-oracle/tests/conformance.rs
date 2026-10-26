@@ -247,8 +247,9 @@ fn the_vectors_of_the_declaration_are_the_core_packages_answers_cf_02() {
     .collect();
     assert!(declared.windows(2).all(|pair| pair[0] < pair[1]));
     assert_eq!(common::application::STORE_TAG, 4);
-    assert!(read("src/ConformanceFixture.lex.tex")
-        .contains("name: storeEffectTag,\n  parameters: [],\n  result: Nat,\n  body: 4,"));
+    assert!(read("src/ConformanceFixture.lex.tex").contains(
+        "definition{name: storeEffectTag, parameters: [], result: Nat, body: 4, executable: true}"
+    ));
     // No served vector depends on the host's count, which starts at zero in each run.
     for id in common::application::SERVED {
         let vector = common::application::vector(id);
