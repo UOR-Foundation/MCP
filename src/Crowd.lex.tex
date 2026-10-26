@@ -10,6 +10,7 @@
 \importmodule{Numeric}
 \importmodule{Refusal}
 \importmodule{Serve}
+\importmodule{Tasks}
 \importmodule{Tools}
 \title{MCP stress catalog}
 \begin{semanticmodule}
@@ -95,10 +96,19 @@ definition{
 }
 
 definition{
+  name: crowdAnswerWith,
+  parameters: [host : Tasks::TaskHost, request : Methods::ClientRequest],
+  result: (Result Methods::ResultBody Refusal::ProviderRefusal),
+  body: (crowdAnswer request),
+  axioms: [Classical.choice, Quot.sound, propext],
+  executable: true
+}
+
+definition{
   name: crowdRun,
   parameters: [input : Bytes],
   result: (List Nat),
-  body: (Serve::serve (crowdInfo) (ref crowdAnswer) input),
+  body: (Serve::serveTasks (crowdInfo) (ref crowdAnswerWith) input),
   axioms: [Classical.choice, Quot.sound, propext],
   executable: true,
   production: {effects: [allocation, overflow], targets: [rust-std]}

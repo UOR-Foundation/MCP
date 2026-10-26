@@ -179,8 +179,9 @@ fn store_outcome(tag: u32, _payload: &[u8]) -> Vec<u8> {
 
 /// The vectors that exercise the one effect the core requests: a task is created (the core
 /// stores the table), read back with the table the host holds (the core stores the table it
-/// read, as the byte serve returns it for every request that touched a task), and cancelled
-/// (the core stores the table again).
+/// read, as the byte serve returns it for every request that touched a task), cancelled
+/// (the core stores the table again) and asked for a task the table does not hold (refused,
+/// no effect).
 pub fn task_vectors() -> Vec<TaskVector> {
     let mut out = Vec::new();
     let mut table: Vec<u8> = Vec::new();
@@ -202,6 +203,13 @@ pub fn task_vectors() -> Vec<TaskVector> {
             json!({"taskId": "task-0001"}),
             "task-0001",
             true,
+        ),
+        // a task the table does not hold is refused and the core asks for no effect
+        (
+            "tasks/get",
+            json!({"taskId": "task-9999"}),
+            "task-9999",
+            false,
         ),
     ];
     for (issued, (method, params, name, stores)) in sequence.into_iter().enumerate() {

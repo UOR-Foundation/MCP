@@ -19,9 +19,8 @@ use common::{
     META,
 };
 use lifecycle_oracle::{
-    decode_response, decode_step, drive, drive_conformance, encode_request,
-    encode_request_allowing, encode_turn, exchange_step, DriveError, Driven, Request, Response,
-    Step, StepError, TaskHost,
+    decode_step, drive, drive_conformance, encode_request, encode_request_allowing, encode_turn,
+    exchange_step, DriveError, Driven, Request, Response, Step, StepError, TaskHost,
 };
 use serde_json::Value;
 
@@ -415,14 +414,22 @@ fn refused_requests() -> Vec<Refused> {
         let body = rpc("tools/frob", &format!(r#"{{"_meta":{META}}}"#), "1");
         post_owned(&standard("tools/frob", None), &body)
     };
-    let not_offered = {
-        // The fixture declares no tasks extension, so tasks/get is not a method it offers.
+    let undeclared = {
+        // The fixture serves the tasks extension to a client that declares it; this one does not.
         let body = rpc(
             "tasks/get",
             &format!(r#"{{"taskId":"t","_meta":{META}}}"#),
             "1",
         );
         post_owned(&standard("tasks/get", Some("t")), &body)
+    };
+    let not_offered = {
+        let body = rpc(
+            "logging/setLevel",
+            &format!(r#"{{"level":"info","_meta":{META}}}"#),
+            "1",
+        );
+        post_owned(&standard("logging/setLevel", None), &body)
     };
     let undecodable = {
         let body = rpc(
@@ -494,6 +501,12 @@ fn refused_requests() -> Vec<Refused> {
             code: Some(-32601),
         },
         Refused {
+            what: "a tasks method from a client that did not declare the extension",
+            request: undeclared,
+            status: 400,
+            code: Some(-32021),
+        },
+        Refused {
             what: "a method the provider does not offer",
             request: not_offered,
             status: 404,
@@ -525,7 +538,13 @@ fn a_request_that_fails_a_check_of_the_core_performs_no_effect_pe_04() {
         assert_eq!(seen.turns, 1, "{}", case.what);
         assert!(seen.performed.is_empty(), "{}", case.what);
         let response = step_response_checked(&seen.response);
-        assert_eq!(response.status, case.status, "{}", case.what);
+        assert_eq!(
+            response.status,
+            case.status,
+            "{} {}",
+            case.what,
+            String::from_utf8_lossy(&response.body)
+        );
         if case.code.is_some() {
             assert_eq!(code_of(&json_of(&response)), case.code, "{}", case.what);
         }
@@ -698,7 +717,7 @@ fn the_named_laws_of_the_step_are_declared_pe_08() {
         "a_message_that_is_not_a_request_never_reaches_the_provider",
         "a_refused_check_is_never_an_effect",
         "a_handled_request_that_ended_in_an_effect_is_a_perform",
-        "a_handled_request_that_did_not_end_in_an_effect_is_done",
+        "a_handled_request_that_did_not_end_in_an_effect_is_finished_as_the_byte_serve_responds",
         "a_tag_that_does_not_fit_thirty_two_bits_is_not_a_perform",
         "an_effect_request_is_an_internal_error_with_no_data",
         "an_effect_request_is_a_server_error_status",
@@ -801,27 +820,21 @@ fn task_frame(
     (request, frame)
 }
 
+/// A generated root driven through the step protocol with a host that performs effects.
+type Driver = fn(&[u8], usize, &mut dyn FnMut(u32, &[u8]) -> Vec<u8>) -> Result<Driven, DriveError>;
+
 fn create_params() -> Value {
     serde_json::json!({"name": "slow_compute", "arguments": {"seconds": 2, "label": "store"}})
 }
 
 /// The table the byte serve returns for the same frame: the host the byte root would store.
 fn byte_serve_table(frame: &[u8]) -> Vec<u8> {
-    decode_response(&byte_root_frame(frame))
-        .expect("a response frame")
+    step_response_checked(&byte_root_frame(frame))
         .tasks
         .expect("the byte serve returns the table it wrote")
 }
 
-fn drive_with(
-    root_driver: fn(
-        &[u8],
-        usize,
-        &mut dyn FnMut(u32, &[u8]) -> Vec<u8>,
-    ) -> Result<Driven, DriveError>,
-    frame: &[u8],
-    store: u32,
-) -> Driven {
+fn drive_with(root_driver: Driver, frame: &[u8], store: u32) -> Driven {
     root_driver(frame, BUDGET, &mut |tag, payload| {
         assert_eq!(
             tag, store,
@@ -853,10 +866,7 @@ fn conformance_driver(
     drive_conformance(frame, budget, host)
 }
 
-fn check_store_of_a_task_lifecycle(
-    driver: fn(&[u8], usize, &mut dyn FnMut(u32, &[u8]) -> Vec<u8>) -> Result<Driven, DriveError>,
-    store: u32,
-) {
+fn check_store_of_a_task_lifecycle(driver: Driver, store: u32) {
     // creating a task stores the table once and the response frame carries none
     let (_, frame) = task_frame("tools/call", &create_params(), "slow_compute", &[], 0);
     let created = drive_with(driver, &frame, store);
@@ -883,9 +893,7 @@ fn check_store_of_a_task_lifecycle(
         "the table stored is the table the byte serve returns"
     );
     assert_eq!(
-        decode_response(&byte_root_frame(&frame))
-            .expect("a response frame")
-            .body,
+        step_response_checked(&byte_root_frame(&frame)).body,
         response.body,
         "the step serve and the byte serve write the same body"
     );
@@ -908,7 +916,9 @@ fn check_store_of_a_task_lifecycle(
     assert_ne!(stored, table, "the table changed");
     assert_eq!(stored, byte_serve_table(&frame));
     let body = json_of(&step_response_checked(&cancelled.response));
-    assert_eq!(body["result"]["status"], "cancelled", "{body}");
+    assert_eq!(body["result"]["resultType"], "complete", "{body}");
+    let held: Value = serde_json::from_slice(&stored).expect("the table is JSON");
+    assert_eq!(held[0]["task"]["status"], "cancelled", "{held}");
 }
 
 #[test]
@@ -955,7 +965,7 @@ fn a_refused_request_and_a_failed_check_ask_for_no_effect_tk_17() {
 #[test]
 fn the_byte_serve_returns_the_table_in_its_response_frame_tk_17() {
     let (_, frame) = task_frame("tools/call", &create_params(), "slow_compute", &[], 0);
-    let response = decode_response(&byte_root_frame(&frame)).expect("a response frame");
+    let response = step_response_checked(&byte_root_frame(&frame));
     assert!(response.tasks.is_some(), "the byte serve carries the table");
 }
 
