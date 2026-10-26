@@ -18,12 +18,12 @@
       },
       {
         "path": "package.json",
-        "sha256": "c0e4698b14a7996a85494973bf3005b8fa332c563a673ce47888f43f2cf2a89f",
+        "sha256": "a0f1520886e989a3843d91c56319a4b6e30db2244980dfe1ead8ace920d5c549",
         "byte_length": 1657582
       },
       {
         "path": "provenance.json",
-        "sha256": "cb8d0934e2cee65acd1ab6758f63b051dd7b56ee01cee3d10be6766cd1d85b18",
+        "sha256": "c5bd387f3ff486ed514f22b68299ccd1a3d668587bff3201205c14cbd61c87cf",
         "byte_length": 673
       },
       {
