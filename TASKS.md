@@ -254,9 +254,15 @@ minute and each is stopped by the kernel.
 | a task outlives its ttl by one instant | `Tasks.isExpired`: `limit < elapsed` for `elapsed >= limit` | same | `LLV7002`, `Tactic rfl failed` in three theorems: `a_task_is_expired_only_when_its_ttl_has_elapsed` (`TaskLaws.lex.tex:343`, `Tasks.isExpired (workingEntry 0) 60000` is not `true`), `an_entry_is_found_by_its_identifier_while_it_lives` (`:353`) and `an_expired_entry_leaves_the_table_with_the_next_change` (`:371`) |
 | a cancel that arrives after the plan finished cancels the task | `Tasks.cancel`: `cancelSettled (kept entry) now` for `cancelSettled (settle entry nowMs now) now` | same | `LLV7002`, `Tactic rfl failed` in `a_working_task_that_finished_is_not_cancelled` (`TaskLaws.lex.tex:279`): `statusAfter (Tasks.cancel (workingEntry 2000) 2000 "n")` is not definitionally equal to `Tasks.TaskStatus.completed` |
 
-No defect was planted in the encoder (`TaskJson`) or the serving module (`TaskServe`): a plant there
-needs a new export (about 25 minutes of CI each), and the 46 tests of `tests/tasks.rs` have not
-been shown to stop one. That is the evidence the table does not give.
+| a task id is reused: the entry already holding the identifier survives beside the new one, so the table holds the identifier twice | `Tasks.withEntry`: `survivorsOnto ""` for `survivorsOnto (idOf entry)` | same | `LLV7002`, `Tactic rfl failed` in `TaskLaws.lex.tex:367`: `Tasks.withEntry (workingEntry 5) [workingEntry 9] 0` is not definitionally equal to `[workingEntry 5]` |
+| a cancel after completion is accepted (the plant in the row above, re-run on the merged tree) | `Tasks.cancel`: `cancelSettled (kept entry) now` | same | `LLV7002`, `Tactic rfl failed` at `TaskLaws.lex.tex:283`: `statusAfter (Tasks.cancel (workingEntry 2000) 2000 "n")` is not `Tasks.TaskStatus.completed` |
+| a tool that requires a task is answered without one | `TaskServe.fallThrough`: `Tools::checkExecuted tool sync` for `missingTasks` in the `TaskSupport.required` arm | same | `LLV7002`, `Tactic rfl failed` at `TaskLaws.lex.tex:455` in `a_tool_that_needs_a_task_is_not_answered_without_one`: `TaskServe.fallThrough TaskServe.TaskSupport.required tool sync` is not `Except.error TaskServe.missingTasks` |
+
+The id-reuse defect, the late cancel and the required-without-task defect were planted on the merged
+tree, each alone in a copy of the clone, and stopped by the kernel with `lexlean verify
+src/TaskLaws.lex.tex`. The Rust-level refusal of a reused identifier (`TaskServe.idInUse`, an internal
+error) is covered by the id-in-use test of `tests/tasks.rs`; no defect was planted in the encoder
+(`TaskJson`).
 
 Restored result: every defect was reverted with `git checkout`, and on the final tree
 `lexlean check` reports 51 modules, `cargo fmt --all -- --check` and `cargo clippy --workspace

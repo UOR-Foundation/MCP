@@ -131,10 +131,10 @@ fn the_generated_package_is_the_recorded_export_of_the_lifecycle_root_lc_13() {
     assert_eq!(
         roots.len(),
         4,
-        "the crowd root, the fixture root, the step root and the conformance root"
+        "the conformance root, the crowd root, the fixture root and the step root"
     );
-    assert_eq!(roots[1]["root"], "UorMcp.Fixture.fixtureRun");
-    assert_eq!(roots[1]["package"]["name"], "mcp_lifecycle");
+    assert_eq!(roots[2]["root"], "UorMcp.Fixture.fixtureRun");
+    assert_eq!(roots[2]["package"]["name"], "mcp_lifecycle");
 
     let source = std::fs::read(dir.join("src").join("lib.rs")).expect("the package source");
     let recorded = provenance["files"]["src/lib.rs"]
@@ -381,8 +381,8 @@ fn the_crowd_package_is_the_recorded_export_of_the_crowd_root_tl_18() {
         .expect("request.json"),
     )
     .expect("request.json is JSON");
-    assert_eq!(request["roots"][0]["root"], "UorMcp.Crowd.crowdRun");
-    assert_eq!(request["roots"][0]["package"]["name"], "mcp_crowd");
+    assert_eq!(request["roots"][1]["root"], "UorMcp.Crowd.crowdRun");
+    assert_eq!(request["roots"][1]["package"]["name"], "mcp_crowd");
     let source = std::fs::read(dir.join("src").join("lib.rs")).expect("the package source");
     let recorded = provenance["files"]["src/lib.rs"]
         .as_str()
@@ -437,10 +437,10 @@ fn the_step_package_is_the_recorded_export_of_the_step_root_pe_02() {
     )
     .expect("request.json is JSON");
     assert_eq!(
-        request["roots"][2]["root"],
+        request["roots"][3]["root"],
         "UorMcp.StepFixture.stepFixtureRun"
     );
-    assert_eq!(request["roots"][2]["package"]["name"], "mcp_step");
+    assert_eq!(request["roots"][3]["package"]["name"], "mcp_step");
     let source = std::fs::read(dir.join("src").join("lib.rs")).expect("the package source");
     let recorded = provenance["files"]["src/lib.rs"]
         .as_str()
@@ -495,10 +495,10 @@ fn the_conformance_package_is_the_recorded_export_of_the_conformance_root_cf_01(
     )
     .expect("request.json is JSON");
     assert_eq!(
-        request["roots"][3]["root"],
+        request["roots"][0]["root"],
         "UorMcp.ConformanceFixture.conformanceRun"
     );
-    assert_eq!(request["roots"][3]["package"]["name"], "mcp_conformance");
+    assert_eq!(request["roots"][0]["package"]["name"], "mcp_conformance");
     let source = std::fs::read(dir.join("src").join("lib.rs")).expect("the package source");
     let recorded = provenance["files"]["src/lib.rs"]
         .as_str()
