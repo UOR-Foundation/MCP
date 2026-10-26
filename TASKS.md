@@ -4,11 +4,12 @@ The core registers the tasks extension `io.modelcontextprotocol/tasks` (SEP-2663
 revision 2026-07-28: a `tools/call` may answer a task handle instead of a result, and
 `tasks/get`, `tasks/update` and `tasks/cancel` serve the handle. It is LexLean source in
 language 1.2 (`src/*.lex.tex`); the host adapter (PrismPM issue 216) moves bytes and holds
-the state the core cannot. Issue #12; register rows TK-01 to TK-16.
+the state the core cannot. Issue #12; register rows TK-01 to TK-17.
 
 The extension is optional by definition: the pinned requirements run its ten scenarios and do
-not score them (`reason: extension`). Nothing here is a claim about the verdict of the suite,
-which has not been run against a conformance build (#13).
+not score them (`reason: extension`). The verdict of the suite over the conformance build is in
+`CONFORMANCE-RUN.md` and `conformance/waiting.json`; "Not met" below says which scenarios do not
+pass and why.
 
 ## Authorities
 
