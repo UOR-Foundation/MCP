@@ -10,7 +10,10 @@
 //!   which a task's `createdAt`, `lastUpdatedAt` and time to live are read from;
 //! * `task.id`: an identifier no task has had and no client can guess, which the core
 //!   uses only when the request creates a task;
-//! * `task.table`: the table of tasks the host holds.
+//! * `task.table`: the table of tasks the host holds;
+//! * `request.state.key`: the key that seals and opens a `requestState`, thirty-two
+//!   bytes from the same operating-system source, held for the life of the process so a
+//!   state sealed on one request opens on the next (`INPUT-REQUIRED.md`, "The key").
 //!
 //! The core asks for one effect, `task.store`: the table of tasks a request changed, which
 //! the host holds until the core is given it with the next request (`TASKS.md`, "The host's
@@ -29,7 +32,7 @@ use std::io::Read;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use mcp_conformance_host_api::protocol::{
-    clock_now, task_id, task_store, task_table, tool_calls, Host, HostError,
+    clock_now, request_state_key, task_id, task_store, task_table, tool_calls, Host, HostError,
 };
 
 /// How long a window of counted requests lasts.
@@ -86,12 +89,13 @@ fn random_hex() -> String {
 }
 
 /// Counts the `tools/call` requests of the current window, tells the time, issues task
-/// identifiers and holds the table of tasks.
+/// identifiers, holds the table of tasks and holds the `requestState` key.
 pub struct Native {
     window: Option<(Instant, u32)>,
     started: Instant,
     started_epoch_ms: u64,
     table: Vec<u8>,
+    state_key: Vec<u8>,
 }
 
 impl Default for Native {
@@ -105,6 +109,7 @@ impl Default for Native {
                     u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX)
                 }),
             table: Vec::new(),
+            state_key: random_hex().into_bytes(),
         }
     }
 }
@@ -178,6 +183,15 @@ impl Host for Native {
     ) -> Result<task_store::Completed, HostError<task_store::Failure>> {
         self.table = request.table;
         Ok(task_store::Completed {})
+    }
+
+    fn request_state_key(
+        &mut self,
+        _request: request_state_key::Request,
+    ) -> Result<request_state_key::Completed, HostError<request_state_key::Failure>> {
+        Ok(request_state_key::Completed {
+            key: self.state_key.clone(),
+        })
     }
 }
 
@@ -258,6 +272,22 @@ mod tests {
         assert_eq!(first.len(), 32);
         assert!(first.bytes().all(|byte| byte.is_ascii_hexdigit()));
         assert_ne!(first, second);
+    }
+
+    #[test]
+    fn the_request_state_key_is_at_least_the_floor_and_does_not_change() {
+        let mut host = Native::default();
+        let first = host
+            .request_state_key(request_state_key::Request {})
+            .ok()
+            .map(|done| done.key);
+        let second = host
+            .request_state_key(request_state_key::Request {})
+            .ok()
+            .map(|done| done.key);
+        let first = first.expect("a key");
+        assert!(first.len() >= 32, "a key of at least the digest size");
+        assert_eq!(Some(first), second, "one key for the life of the host");
     }
 
     #[test]
