@@ -173,6 +173,10 @@ Read them with
 gh api repos/UOR-Foundation/MCP/check-runs/<job id>/annotations
 ```
 
+The conformance job's per-scenario table (step 9c) is written to the step summary and, for the same
+reason, as the notice annotation "the per-scenario table", which holds every scenario with its status and
+its checks passed (MCP#44).
+
 ## Planted defects
 
 Each was planted alone in a tree that passes, and reverted.

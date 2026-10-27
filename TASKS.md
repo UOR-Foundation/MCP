@@ -8,8 +8,12 @@ the state the core cannot. Issue #12; register rows TK-01 to TK-17.
 
 The extension is optional by definition: the pinned requirements run its ten scenarios and do
 not score them (`reason: extension`). The verdict of the suite over the conformance build is in
-`CONFORMANCE-RUN.md` and `conformance/waiting.json`; "Not met" below says which scenarios do not
-pass and why.
+`CONFORMANCE-RUN.md` and `conformance/waiting.json`. Nine of the ten pass against the conformance
+build; `tasks-status-notifications` is skipped by the suite, which sends no request ("Not met" below).
+Eight of the nine failed one check each, the suite's own `wire-schema-valid`, until MCP#44 moved the
+suite pin to `cf022cbb`, which contains `modelcontextprotocol/conformance#468`: that commit accepts the
+`CreateTaskResult` of the extension (`resultType: "task"`, no `content`) as an extension result
+instead of holding it to `CallToolResult`. The core did not change.
 
 ## Authorities
 
@@ -272,16 +276,6 @@ three packages equal to a fresh export.
 
 ## Not met
 
-* The acceptance of #12 is that the ten scenarios pass against the conformance build (#13). They run
-  against it (`CONFORMANCE-RUN.md`): `tasks-required-task-error` passes (3 of 3 checks) and
-  `tasks-status-notifications` is skipped by the suite, which sends no request. The other eight each
-  pass every check but one. That one is the suite's own `wire-schema-valid`: at the pinned suite
-  commit `232a9014` it holds the result of every `tools/call` to the core schema's `CallToolResult`,
-  which requires `content`, and the `CreateTaskResult` the extension requires has none.
-  `modelcontextprotocol/conformance#468` (`cf022cb`, after the pin) accepts it. The eight are listed
-  in `conformance/waiting.json` with MCP#44, which asks for the pin to move. Not met until it does;
-  the core is not changed to satisfy a check that contradicts the extension, and the schema oracle
-  finds every message of the run valid against the specification's schema and the extension's.
 * `tasks-status-notifications` is skipped by the suite at the pinned commit (it awaits a
   `subscriptions/listen` rewrite); its row has no vector. The notifications are modeled and tested
   here, and their stream is #11's.
