@@ -2,7 +2,7 @@
  "spec": "lifecycle-vectors/1",
  "suite": {
   "repository": "https://github.com/modelcontextprotocol/conformance",
-  "commit": "232a9014457eaf4c59559916e3d616d2f7f28f05"
+  "commit": "cf022cbb541f9d939068d7f84758b9728be7fc23"
  },
  "vectors": [
   {
@@ -177,7 +177,7 @@
    "id": "SP-01",
    "scenario": "tools-call-with-progress",
    "file": "src/scenarios/server/tools.ts",
-   "line": 678,
+   "line": 861,
    "quote": "const result = await conn.request<CallToolResult>('tools/call', {",
    "suite_checks": [
     "tools-call-with-progress"

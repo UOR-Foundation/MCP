@@ -287,31 +287,14 @@ fn the_server_suite_verdict_is_read_from_the_per_scenario_checks_cf_03() {
             all.contains(&name),
             "{name} is not a scenario of the frozen requirements"
         );
-        let pr = &entry["pr"];
-        assert!(
-            pr.is_null() || pr.as_u64() == Some(30),
-            "{name} waits on an unknown pull request"
-        );
+        assert_eq!(entry["pr"], 30, "{name} waits on an unknown pull request");
         assert!(entry["reason"]
             .as_str()
             .is_some_and(|reason| !reason.is_empty()));
-        if name.starts_with("input-required-result-") {
-            assert_eq!(
-                entry["pr"], 30,
-                "{name} is delivered by the input-required results"
-            );
-        }
-        if name.starts_with("tasks-") {
-            // the suite's own check rejects the extension's result (MCP#44); no pull
-            // request delivers a new pin, and the reason names the check
-            assert!(entry["pr"].is_null(), "{name} waits on the suite pin");
-            assert!(
-                entry["reason"].as_str().is_some_and(
-                    |reason| reason.contains("wire-schema-valid") && reason.contains("MCP#44")
-                ),
-                "{name} names the check that fails and the issue"
-            );
-        }
+        assert!(
+            name.starts_with("input-required-result-"),
+            "{name} waits, and only the input-required results do"
+        );
     }
     for (name, entry) in waiting["suite_skipped"].as_object().expect("suite_skipped") {
         assert!(
@@ -334,24 +317,18 @@ fn the_server_suite_verdict_is_read_from_the_per_scenario_checks_cf_03() {
     // the job passes only when the failing scenarios are exactly these.
     for (name, entry) in waiting["waiting"].as_object().expect("waiting") {
         let issue = entry["issue"].as_u64().expect("an issue number");
-        let expected = if name.starts_with("tasks-") { 44 } else { 10 };
-        assert_eq!(issue, expected, "{name} names the issue that delivers it");
+        assert_eq!(issue, 10, "{name} names the issue that delivers it");
     }
-    // The tasks scenarios: eight fail the suite's wire-schema-valid and wait on the pin, one
-    // passes, one is skipped by the suite.
+    // The tasks scenarios: since the pin of MCP#44 the suite accepts the extension's
+    // result, so none waits: eight pass beside tasks-required-task-error, and
+    // tasks-status-notifications is skipped by the suite.
     let tasks: Vec<&String> = waiting["waiting"]
         .as_object()
         .expect("waiting")
         .keys()
         .filter(|name| name.starts_with("tasks-"))
         .collect();
-    assert_eq!(tasks.len(), 8, "{tasks:?}");
-    for passing in ["tasks-required-task-error", "tasks-status-notifications"] {
-        assert!(
-            waiting["waiting"].get(passing).is_none(),
-            "{passing} does not wait"
-        );
-    }
+    assert!(tasks.is_empty(), "{tasks:?}");
     assert!(waiting["suite_skipped"]
         .get("tasks-status-notifications")
         .is_some());
@@ -565,7 +542,7 @@ fn the_pins_of_the_oracle_run_agree_with_their_authority_records_cf_07() {
     let fetch = read("conformance/oracle/fetch-suite.sh");
     assert!(fetch.contains(&format!("COMMIT={PIN}\n")));
     assert!(authority("A-MCP-CONFORMANCE").citation.contains(PIN));
-    assert_eq!(PIN, "232a9014457eaf4c59559916e3d616d2f7f28f05");
+    assert_eq!(PIN, "cf022cbb541f9d939068d7f84758b9728be7fc23");
 
     // The frozen requirements: the digest the runner refuses to run without is the
     // digest of the vendored file and the authority's.
@@ -581,7 +558,7 @@ fn the_pins_of_the_oracle_run_agree_with_their_authority_records_cf_07() {
         .contains(REQUIREMENTS_SHA256));
     let (required, unscored) = server_scenarios();
     assert_eq!((required.len(), unscored.len()), (37, 13));
-    assert!(runner.contains("`mcp-conformance/232a9014+${REVISION}`"));
+    assert!(runner.contains(&format!("`mcp-conformance/{}+${{REVISION}}`", &PIN[..8])));
 
     // The schema: the pinned specification commit, whose digest the authority records.
     let schema = authority("A-MCP-SCHEMA-2026-07-28");

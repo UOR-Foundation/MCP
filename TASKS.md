@@ -8,8 +8,12 @@ the state the core cannot. Issue #12; register rows TK-01 to TK-17.
 
 The extension is optional by definition: the pinned requirements run its ten scenarios and do
 not score them (`reason: extension`). The verdict of the suite over the conformance build is in
-`CONFORMANCE-RUN.md` and `conformance/waiting.json`; "Not met" below says which scenarios do not
-pass and why.
+`CONFORMANCE-RUN.md` and `conformance/waiting.json`. Nine of the ten pass against the conformance
+build; `tasks-status-notifications` is skipped by the suite, which sends no request ("Not met" below).
+Eight of the nine failed one check each, the suite's own `wire-schema-valid`, until MCP#44 moved the
+suite pin to `cf022cbb`, which contains `modelcontextprotocol/conformance#468`: that commit accepts the
+`CreateTaskResult` of the extension (`resultType: "task"`, no `content`) as an extension result
+instead of holding it to `CallToolResult`. The core did not change.
 
 ## Authorities
 
@@ -17,7 +21,7 @@ pass and why.
 | --- | --- | --- |
 | the extension text and schema | `modelcontextprotocol/ext-tasks` at `899c1bbc869567670093face3591b39c28ce3219` (2026-10-09), `specification/2026-07-28/tasks.md` and `schema/2026-07-28/schema.json` | the normative text, and the types of `CreateTaskResult`, `GetTaskResult`, the two acknowledgements and `notifications/tasks`. The specification's own `schema.json` (80041ab) has no task type: the extension keeps its schema apart, so the responses of this layer are checked against both schemas |
 | the proposal | `docs/seps/2663-tasks-extension.mdx` of `modelcontextprotocol/modelcontextprotocol` at `80041ab0a139a8f4fb3adbc99f7ae9113ea59671` | the design as accepted; not vendored, because the extension text above is the specification and the proposal says it is a historical record |
-| the scenarios | `modelcontextprotocol/conformance` at `232a9014457eaf4c59559916e3d616d2f7f28f05` | `src/scenarios/server/tasks/*.ts` (twelve files) and `input-required-result-helpers.ts`, vendored beside the earlier files; authority row `A-MCP-CONFORMANCE` records the new manifest checksum |
+| the scenarios | `modelcontextprotocol/conformance` at `cf022cbb541f9d939068d7f84758b9728be7fc23` | `src/scenarios/server/tasks/*.ts` (twelve files) and `input-required-result-helpers.ts`, vendored beside the earlier files; authority row `A-MCP-CONFORMANCE` records the new manifest checksum |
 
 The pin of `ext-tasks` is the last commit at or before the pinned specification commit
 (2026-10-20). Its next commit (`b3d28ac`, 2026-10-21) changes one sentence of the overview.
@@ -272,16 +276,6 @@ three packages equal to a fresh export.
 
 ## Not met
 
-* The acceptance of #12 is that the ten scenarios pass against the conformance build (#13). They run
-  against it (`CONFORMANCE-RUN.md`): `tasks-required-task-error` passes (3 of 3 checks) and
-  `tasks-status-notifications` is skipped by the suite, which sends no request. The other eight each
-  pass every check but one. That one is the suite's own `wire-schema-valid`: at the pinned suite
-  commit `232a9014` it holds the result of every `tools/call` to the core schema's `CallToolResult`,
-  which requires `content`, and the `CreateTaskResult` the extension requires has none.
-  `modelcontextprotocol/conformance#468` (`cf022cb`, after the pin) accepts it. The eight are listed
-  in `conformance/waiting.json` with MCP#44, which asks for the pin to move. Not met until it does;
-  the core is not changed to satisfy a check that contradicts the extension, and the schema oracle
-  finds every message of the run valid against the specification's schema and the extension's.
 * `tasks-status-notifications` is skipped by the suite at the pinned commit (it awaits a
   `subscriptions/listen` rewrite); its row has no vector. The notifications are modeled and tested
   here, and their stream is #11's.

@@ -2,14 +2,14 @@
  "spec": "lifecycle-vectors/1",
  "suite": {
   "repository": "https://github.com/modelcontextprotocol/conformance",
-  "commit": "232a9014457eaf4c59559916e3d616d2f7f28f05"
+  "commit": "cf022cbb541f9d939068d7f84758b9728be7fc23"
  },
  "vectors": [
   {
    "id": "TS-01",
    "scenario": "tools-list",
    "file": "src/scenarios/server/tools.ts",
-   "line": 123,
+   "line": 274,
    "quote": "conn.request<ListToolsResult>('tools/list')",
    "suite_checks": [
     "tools-list",
@@ -67,9 +67,9 @@
      {
       "at": "/result/tools",
       "each_name_charset": {
-       "allowed": "A-Za-z0-9_./-",
+       "allowed": "A-Za-z0-9_.-",
        "min": 1,
-       "max": 64
+       "max": 128
       }
      }
     ]
@@ -80,7 +80,7 @@
    "id": "TS-02",
    "scenario": "tools-call-simple-text",
    "file": "src/scenarios/server/tools.ts",
-   "line": 214,
+   "line": 397,
    "quote": "const result = await conn.request<CallToolResult>('tools/call', {",
    "suite_checks": [
     "tools-call-simple-text"
@@ -146,7 +146,7 @@
    "id": "TS-03",
    "scenario": "tools-call-image",
    "file": "src/scenarios/server/tools.ts",
-   "line": 302,
+   "line": 485,
    "quote": "const result = await conn.request<CallToolResult>('tools/call', {",
    "suite_checks": [
     "tools-call-image"
@@ -211,7 +211,7 @@
    "id": "TS-04",
    "scenario": "tools-call-mixed-content",
    "file": "src/scenarios/server/tools.ts",
-   "line": 400,
+   "line": 583,
    "quote": "const result = await conn.request<CallToolResult>('tools/call', {",
    "suite_checks": [
     "tools-call-mixed-content"
@@ -296,7 +296,7 @@
    "id": "TS-05",
    "scenario": "tools-call-error",
    "file": "src/scenarios/server/tools.ts",
-   "line": 586,
+   "line": 769,
    "quote": "const result: any = await conn.request<CallToolResult>('tools/call', {",
    "suite_checks": [
     "tools-call-error"
@@ -358,7 +358,7 @@
    "id": "TS-06",
    "scenario": "tools-call-with-progress",
    "file": "src/scenarios/server/tools.ts",
-   "line": 678,
+   "line": 861,
    "quote": "const result = await conn.request<CallToolResult>('tools/call', {",
    "suite_checks": [
     "tools-call-with-progress"
@@ -438,7 +438,7 @@
    "id": "TS-07",
    "scenario": "tools-call-audio",
    "file": "src/scenarios/server/tools.ts",
-   "line": 1057,
+   "line": 1240,
    "quote": "const result = await conn.request<CallToolResult>('tools/call', {",
    "suite_checks": [
     "tools-call-audio"
@@ -503,7 +503,7 @@
    "id": "TS-08",
    "scenario": "tools-call-embedded-resource",
    "file": "src/scenarios/server/tools.ts",
-   "line": 1153,
+   "line": 1336,
    "quote": "const result = await conn.request<CallToolResult>('tools/call', {",
    "suite_checks": [
     "tools-call-embedded-resource"
@@ -867,12 +867,82 @@
     ]
    },
    "note": "The request sets no log level, so no notifications/message may be written; the core declares no logging capability and writes none with a level either (TL-19). The id is the scenario's Date.now(), fixed here."
+  },
+  {
+   "id": "TS-12",
+   "scenario": "tools-list",
+   "file": "src/scenarios/server/tools.ts",
+   "line": 326,
+   "quote": "conn.request<ListToolsResult>('tools/list')",
+   "suite_checks": [
+    "tools-list-deterministic-order"
+   ],
+   "register": [
+    "TL-01"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":302,\"method\":\"tools/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/tools",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/tools",
+      "each_has": [
+       "name",
+       "description",
+       "inputSchema"
+      ]
+     },
+     {
+      "at": "/result/tools",
+      "each_name_charset": {
+       "allowed": "A-Za-z0-9_.-",
+       "min": 1,
+       "max": 128
+      }
+     }
+    ]
+   },
+   "note": "From 2026-07-28 the suite sends tools/list twice more after the one of TS-01 and compares the order of the three answers (the check is a warning, not a failure, when it differs). The request is TS-01's again. The answer is the catalog in its fixed declaration order (TL-01), so the three are equal."
   }
  ],
  "not_run": [
   {
    "file": "src/scenarios/server/tools.ts",
-   "line": 494,
+   "line": 677,
    "quote": "await connection.client.callTool({",
    "scenario": "tools-call-with-logging",
    "checks": [
@@ -883,7 +953,7 @@
   },
   {
    "file": "src/scenarios/server/tools.ts",
-   "line": 835,
+   "line": 1018,
    "quote": "const result = await connection.client.callTool({",
    "scenario": "tools-call-sampling",
    "checks": [
@@ -894,7 +964,7 @@
   },
   {
    "file": "src/scenarios/server/tools.ts",
-   "line": 970,
+   "line": 1153,
    "quote": "const result = await connection.client.callTool({",
    "scenario": "tools-call-elicitation",
    "checks": [

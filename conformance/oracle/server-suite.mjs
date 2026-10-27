@@ -41,7 +41,7 @@ import { exchanges, startRecorder, transcript } from './recorder.mjs';
 import { verdict } from './verdict.mjs';
 
 const REVISION = '2026-07-28';
-// The frozen requirements file of the suite commit 232a9014.
+// The frozen requirements file: the same bytes at the suite commits 232a9014 and cf022cbb.
 const FROZEN_REQUIREMENTS_SHA256 = 'ae2f4f6210fd729e2e318edd5bbfa31a43cee0bc608e48052fa26dbf1d939b57';
 const READY_MILLIS = 60000;
 const SUITE_MILLIS = 600000;
@@ -230,7 +230,7 @@ async function main() {
 
     const { rows, diagnostics, failing, skipped, waits, stale, unexplained, unnamed, unexpected, valid, matchesWaiting } = verdict({ required, unscored, results, suiteSkipped, waiting });
     const report = {
-      oracle: `mcp-conformance/232a9014+${REVISION}`,
+      oracle: `mcp-conformance/cf022cbb+${REVISION}`,
       requirements_sha256: FROZEN_REQUIREMENTS_SHA256,
       required: { scenarios: required.length, passing: rows.filter((row) => row.kind === 'required' && row.status === 'pass').length },
       not_scored: { scenarios: unscored.length, passing: rows.filter((row) => row.kind === 'not scored' && row.status === 'pass').length },

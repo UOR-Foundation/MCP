@@ -22,7 +22,7 @@ adapter (PrismPM issue 216) moves bytes and holds the key. Issue #10; register r
 | `crates/lifecycle-oracle/generated/mcp_lifecycle`, `mcp_crowd` | LexLean's exports of the two roots, unedited |
 | `crates/lifecycle-oracle/vectors/input-required.json` | the requests of the pinned scenarios, with file and line at the pinned suite commit |
 | `crates/lifecycle-oracle/tests/input_required.rs` | IR-01 to IR-19 |
-| `crates/lifecycle-oracle/suite/conformance-232a9014457eaf4c59559916e3d616d2f7f28f05` | now eleven vendored suite files: also `input-required-result.ts`, `input-required-result-helpers.ts` and `negative-mrtr.test.ts` |
+| `crates/lifecycle-oracle/suite/conformance-cf022cbb541f9d939068d7f84758b9728be7fc23` | now eleven vendored suite files: also `input-required-result.ts`, `input-required-result-helpers.ts` and `negative-mrtr.test.ts` |
 
 Regenerate the packages after any change to the sources, as [LIFECYCLE.md](LIFECYCLE.md)
 describes.

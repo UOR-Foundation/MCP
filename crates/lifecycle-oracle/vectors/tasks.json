@@ -2,7 +2,7 @@
  "spec": "task-vectors/1",
  "suite": {
   "repository": "https://github.com/modelcontextprotocol/conformance",
-  "commit": "232a9014457eaf4c59559916e3d616d2f7f28f05",
+  "commit": "cf022cbb541f9d939068d7f84758b9728be7fc23",
   "requirements_sha256": "ae2f4f6210fd729e2e318edd5bbfa31a43cee0bc608e48052fa26dbf1d939b57"
  },
  "extension": {

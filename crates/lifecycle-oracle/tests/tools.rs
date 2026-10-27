@@ -117,8 +117,12 @@ fn assert_tool_error(body: &Value, expected: &str) {
 
 #[test]
 fn tools_list_answers_the_catalog_in_its_declared_order_tl_01() {
-    assert_eq!(run_register("TL-01"), 1);
+    // TS-01, and TS-12: the suite lists the tools twice more and compares the order
+    assert_eq!(run_register("TL-01"), 2);
     let tools = listed();
+    for _ in 0..2 {
+        assert_eq!(listed(), tools, "consecutive tools/list answers differ");
+    }
     let names: Vec<&str> = tools
         .iter()
         .map(|t| t["name"].as_str().expect("a name"))

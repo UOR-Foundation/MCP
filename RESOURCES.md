@@ -19,7 +19,7 @@ nothing else. Issue #9; register rows RP-01 to RP-19.
 | `crates/lifecycle-oracle/generated/mcp_lifecycle`, `mcp_crowd` | LexLean's exports of the two roots, unedited |
 | `crates/lifecycle-oracle/vectors/resources.json` | the requests of the twelve scenarios, with file and line at the pinned suite commit |
 | `crates/lifecycle-oracle/tests/resources.rs` | RP-01 to RP-19; `provenance.rs` accounts for every request the four new scenario files send |
-| `crates/lifecycle-oracle/suite/conformance-232a9014457eaf4c59559916e3d616d2f7f28f05` | now twelve vendored suite files: also `resources.ts`, `prompts.ts`, `caching.ts` and `utils.ts`, which holds `completion-complete` |
+| `crates/lifecycle-oracle/suite/conformance-cf022cbb541f9d939068d7f84758b9728be7fc23` | now twelve vendored suite files: also `resources.ts`, `prompts.ts`, `caching.ts` and `utils.ts`, which holds `completion-complete` |
 
 Regenerate the packages after any change to the sources, as [LIFECYCLE.md](LIFECYCLE.md)
 describes; `generated/request.json` names both roots.

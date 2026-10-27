@@ -74,7 +74,7 @@ the runner refuses any other file) and decides:
 * every failing check is reported as `scenario: check id: message`, the suite's own text;
 * the job passes (exit 0) only when the set of failing scenarios equals the set
   `conformance/waiting.json` lists as waiting, each entry naming its issue and pull request
-  (MCP#10 and #30; MCP#44, which has no pull request). A failing scenario that is not listed fails the job
+  (MCP#10 and #30). A failing scenario that is not listed fails the job
   (`FAILING and not named in waiting.json`, printed first); a listed scenario that does not
   fail fails the job (`named as waiting but not failing`); an entry that names neither an issue
   nor a pull request fails the job. The last lines of the diagnostic group the failing scenarios
@@ -109,18 +109,18 @@ counted, not excused:
 ## What passes today
 
 Run of the core of this commit (core digest below), spec 2026-07-28,
-420 JSON-RPC messages, 39 refused probes, 1 transport refusal, every message valid: the schema
+424 JSON-RPC messages, 39 refused probes, 1 transport refusal, every message valid: the schema
 oracle held 194 of them to the tasks extension's schema, and counted one `inputResponses` entry,
 a key the suite made up for a task that was not waiting for it, as ignored (the extension tells a
 server to ignore it).
 
-Required: 32 of 37 pass. Not scored: 4 of 13 pass, 1 is skipped by the suite, 8 fail. Every failing scenario waits on #30 (five required) or #44 (eight `tasks-*`).
+Required: 32 of 37 pass. Not scored: 12 of 13 pass, 1 is skipped by the suite, none fails. Every failing scenario waits on #30 (five required). The suite is at `cf022cbb541f9d939068d7f84758b9728be7fc23` (MCP#44); the table is the notice annotation "the per-scenario table" of the conformance job at commit `c38953f`.
 
 | # | kind | scenario | result | checks | waits on |
 |---|---|---|---|---|---|
 | 1 | required | `server-stateless` | pass | 25 of 30 (5 skipped) |  |
 | 2 | required | `completion-complete` | pass | 2 of 2 |  |
-| 3 | required | `tools-list` | pass | 3 of 3 |  |
+| 3 | required | `tools-list` | pass | 4 of 4 |  |
 | 4 | required | `tools-call-simple-text` | pass | 2 of 2 |  |
 | 5 | required | `tools-call-image` | pass | 2 of 2 |  |
 | 6 | required | `tools-call-audio` | pass | 2 of 2 |  |
@@ -155,16 +155,16 @@ Required: 32 of 37 pass. Not scored: 4 of 13 pass, 1 is skipped by the suite, 8 
 | 35 | required | `input-required-result-capability-check` | **fail** | 1 of 2 | #10 (PR #30) |
 | 36 | required | `input-required-result-ignore-extra-params` | pass | 2 of 2 |  |
 | 37 | required | `input-required-result-validate-input` | pass | 3 of 3 |  |
-| 38 | not scored | `tasks-lifecycle` | **fail** | 8 of 9 | #44 (the suite's wire-schema-valid) |
-| 39 | not scored | `tasks-capability-negotiation` | **fail** | 4 of 5 | #44 (the suite's wire-schema-valid) |
-| 40 | not scored | `tasks-wire-fields` | **fail** | 3 of 4 | #44 (the suite's wire-schema-valid) |
-| 41 | not scored | `tasks-request-state-removal` | **fail** | 2 of 3 | #44 (the suite's wire-schema-valid) |
-| 42 | not scored | `tasks-mrtr-input` | **fail** | 3 of 4 | #44 (the suite's wire-schema-valid) |
-| 43 | not scored | `tasks-request-headers` | **fail** | 4 of 5 | #44 (the suite's wire-schema-valid) |
-| 44 | not scored | `tasks-dispatch-and-envelope` | **fail** | 8 of 9 | #44 (the suite's wire-schema-valid) |
+| 38 | not scored | `tasks-lifecycle` | pass | 9 of 9 |  |
+| 39 | not scored | `tasks-capability-negotiation` | pass | 5 of 5 |  |
+| 40 | not scored | `tasks-wire-fields` | pass | 4 of 4 |  |
+| 41 | not scored | `tasks-request-state-removal` | pass | 3 of 3 |  |
+| 42 | not scored | `tasks-mrtr-input` | pass | 4 of 4 |  |
+| 43 | not scored | `tasks-request-headers` | pass | 5 of 5 |  |
+| 44 | not scored | `tasks-dispatch-and-envelope` | pass | 9 of 9 |  |
 | 45 | not scored | `tasks-status-notifications` | skipped by the suite | 0 of 1 (1 skipped) |  |
 | 46 | not scored | `tasks-required-task-error` | pass | 3 of 3 |  |
-| 47 | not scored | `tasks-mrtr-composition` | **fail** | 1 of 2 | #44 (the suite's wire-schema-valid) |
+| 47 | not scored | `tasks-mrtr-composition` | pass | 2 of 2 |  |
 | 48 | not scored | `json-schema-2020-12` | pass | 8 of 8 |  |
 | 49 | not scored | `http-header-validation` | pass | 14 of 14 |  |
 | 50 | not scored | `http-custom-header-server-validation` | pass | 10 of 10 |  |
@@ -179,6 +179,40 @@ for changes to the tool list"; `ToolListChangedNotification`: "An optional notif
 advertises none and does not register `subscriptions/listen`, so the skips stand; they are listed in the
 report with their check ids.
 
+### The pin of the suite (MCP#44)
+
+The suite is pinned at `cf022cbb541f9d939068d7f84758b9728be7fc23` (`fix(validation): accept extension
+result envelopes (#468)`, committed 2026-09-06), the earliest commit that contains
+`modelcontextprotocol/conformance#468`. The pin before was `232a9014457eaf4c59559916e3d616d2f7f28f05`.
+At that commit eight `tasks-*` scenarios failed one check each, the suite's own `wire-schema-valid`: it
+holds the result of every `tools/call` to the core schema's `CallToolResult`, which requires `content`, and
+a task-creating call is answered with the extension's `CreateTaskResult` (`resultType: "task"`,
+`Result & Task`), which has none. #468 admits that `resultType` as an extension result. The core is not
+changed; the schema oracle, which holds the messages of the extension to the extension's schema, found every
+message valid before and after.
+
+What the move changes, from the two checkouts:
+
+* The frozen requirements file is byte for byte the same (SHA-256
+  `ae2f4f6210fd729e2e318edd5bbfa31a43cee0bc608e48052fa26dbf1d939b57`): the same 37 required and 13
+  not-scored server scenarios, none added, removed or re-scored. The twelve `tasks/*.ts` files are the
+  same too.
+* The pin is not #468 alone: 18 other commits come with it. Four of the 29 vendored files differ:
+  `tools.ts`, `input-required-result.ts`, `negative-mrtr.test.ts` and `everything-server.ts`; the
+  vectors cite the new lines, and the authority row records the new manifest checksum.
+* `tools-list` has a fourth check, `tools-list-deterministic-order` (the suite lists the tools twice more
+  and compares the order; a warning when it differs, a success here), which is why the row reads 4 of 4.
+  Vector TS-12 stands for the two requests and TL-01 states the order.
+* `tools-name-format` holds tool names to the specification's rule (1 to 128 characters of `A-Za-z0-9_.-`,
+  no solidus) and reports a violation as a warning, not a failure. The core admits 1 to 64 characters of
+  the same set, inside both; the vector follows the suite's new rule.
+* `input-required-result-capability-check` reports an `input_required` result that names no `inputRequests`
+  as not testable, which fails the check. It failed before and still waits on #30.
+* The runner bounds each scenario to 30 s (`--timeout`); the whole server run takes about 11 s.
+
+Every scenario that passed at `232a9014` passes at `cf022cbb`, and so do the eight `tasks-*`: 32 of 37
+required and 12 of 13 not scored pass, and the five that fail are the five that wait on #30.
+
 ### Not met
 
 * Five `input-required-result-*` scenarios in the table (required): `request-state`,
@@ -188,19 +222,6 @@ report with their check ids.
   section, the count of tool calls, and no key, so the core refuses them with an internal error.
   The key section of the application is the open work. The other nine `input-required-result-*`
   scenarios pass.
-* Eight `tasks-*` scenarios (not scored) fail one check each, the suite's own `wire-schema-valid`,
-  and pass every other: `lifecycle`, `capability-negotiation`, `wire-fields`,
-  `request-state-removal`, `mrtr-input`, `request-headers`, `dispatch-and-envelope` and
-  `mrtr-composition` (8 of 9, 4 of 5, 3 of 4, 2 of 3, 3 of 4, 4 of 5, 8 of 9 and 1 of 2 checks).
-  The check holds the result of every `tools/call` to the core schema's `CallToolResult`, which
-  requires `content`; a task-creating call is answered with the extension's `CreateTaskResult`
-  (`resultType: "task"`, `Result & Task`), which has none, and the suite at the pinned commit
-  `232a9014` knows no such result. `modelcontextprotocol/conformance#468` (`cf022cb`, after the
-  pin) accepts it. MCP#44 is the decision to move the pin; the core is not changed to satisfy a
-  check that the extension contradicts. The schema oracle, which holds the messages of the
-  extension to the extension's schema, finds every one of them valid.
-  `tasks-required-task-error` passes (3 of 3). `tasks-status-notifications` is skipped by the
-  suite.
 
 ### `server-stateless` and the two diagnostic tools
 
@@ -215,7 +236,7 @@ writes no log message, so both probes pass. The core digest changed with the fix
 ## The identity of the core
 
 `conformance/core-identity.json` records the core by the SHA-256 of its compiled program,
-`7cbffcf5422d15c36bdaf4d9284c13df5e7651f5c60fd3b31ca2959943cd7b77`, with the package, its file
+`e95e5363acbb9e398639953dd1cbf172625d9e7e830d78f15bbe1153ab561bb4`, with the package, its file
 digests, the source and semantic IDs and the lock it was exported from, and the compiler that
 exported it. That program digest is the one the committed export `mcp_lifecycle` of the same root
 records: the compiled program does not depend on the compiler that exported it, while the
@@ -240,6 +261,15 @@ above. "Green" below means the exit status of `server-suite.mjs`, which is the s
 The first defect passes `lexlean check` and the production build of the conformance project, whose
 entrypoints are the declaration and the fixture root, and so is found by the suite and by the
 core identity record, not by the kernel.
+
+The pin move (MCP#44) was checked with a stale pin planted in one place at a time, in the tree that passes
+(`cargo test -p lifecycle-oracle`, `fetch-suite.sh` and `server-suite.mjs`), and each reverted with `git checkout`:
+
+| Defect | Planted in | Run | Diagnostic |
+| --- | --- | --- | --- |
+| the requirements digest is stale: its last digit is 8 for 7 | `FROZEN_REQUIREMENTS_SHA256` in `conformance/oracle/server-suite.mjs` | `cargo test -p lifecycle-oracle --test conformance the_pins_of_the_oracle_run_agree_with_their_authority_records_cf_07`: exit 101; `server-suite.mjs --suite-root <the suite at cf022cbb> --out <dir> true`: exit 2 | CF-07: `assertion failed: runner.contains(&format!("const FROZEN_REQUIREMENTS_SHA256 = '{REQUIREMENTS_SHA256}';"))`; the oracle: `the suite's 2026-07-28 requirements differ from the frozen file: expected ...939b58, observed ...939b57`, before the subject starts |
+| the suite commit is stale: `COMMIT` is `232a9014` | `conformance/oracle/fetch-suite.sh` | the same CF-07 test: exit 101; `fetch-suite.sh DIR`: exit 1 | CF-07: `assertion failed: fetch.contains(&format!("COMMIT={PIN}\n"))`; the script: `cd: .../crates/lifecycle-oracle/suite/conformance-232a9014...: No such file or directory` |
+| a vendored suite file is not the suite's: a newline appended | `crates/lifecycle-oracle/suite/conformance-cf022cbb.../src/scenarios/server/tools.ts` | `cargo test -p lifecycle-oracle --test provenance the_vendored_suite_is_the_pinned_commit_and_matches_its_recorded_checksum_lc_12`: exit 101; `fetch-suite.sh DIR`: exit 1 | LC-12: `the vendored files are not the files the authority records` (left `b0a6b091...`, right `11ec4b0e...`); the script: `fetch-suite: vendored ./src/scenarios/server/tools.ts differs from the suite at cf022cbb541f9d939068d7f84758b9728be7fc23` |
 
 ## The PrismPM pin, and what slice 3 still needs
 
