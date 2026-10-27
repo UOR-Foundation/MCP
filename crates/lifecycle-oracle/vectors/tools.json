@@ -13,8 +13,7 @@
    "quote": "conn.request<ListToolsResult>('tools/list')",
    "suite_checks": [
     "tools-list",
-    "tools-name-format",
-    "tools-list-deterministic-order"
+    "tools-name-format"
    ],
    "register": [
     "TL-01"
@@ -868,6 +867,76 @@
     ]
    },
    "note": "The request sets no log level, so no notifications/message may be written; the core declares no logging capability and writes none with a level either (TL-19). The id is the scenario's Date.now(), fixed here."
+  },
+  {
+   "id": "TS-12",
+   "scenario": "tools-list",
+   "file": "src/scenarios/server/tools.ts",
+   "line": 326,
+   "quote": "conn.request<ListToolsResult>('tools/list')",
+   "suite_checks": [
+    "tools-list-deterministic-order"
+   ],
+   "register": [
+    "TL-01"
+   ],
+   "request": {
+    "method": "POST",
+    "target": "/mcp",
+    "headers": [
+     [
+      "Content-Type",
+      "application/json"
+     ],
+     [
+      "Accept",
+      "application/json, text/event-stream"
+     ],
+     [
+      "MCP-Protocol-Version",
+      "2026-07-28"
+     ],
+     [
+      "Mcp-Method",
+      "tools/list"
+     ]
+    ],
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":302,\"method\":\"tools/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientInfo\":{\"name\":\"conformance-test-client\",\"version\":\"1.0.0\"},\"io.modelcontextprotocol/clientCapabilities\":{\"sampling\":{},\"elicitation\":{},\"roots\":{\"listChanged\":true}}}}}"
+   },
+   "expect": {
+    "status": 200,
+    "checks": [
+     {
+      "at": "/error",
+      "absent": true
+     },
+     {
+      "at": "/result/resultType",
+      "eq": "complete"
+     },
+     {
+      "at": "/result/tools",
+      "nonempty_array": true
+     },
+     {
+      "at": "/result/tools",
+      "each_has": [
+       "name",
+       "description",
+       "inputSchema"
+      ]
+     },
+     {
+      "at": "/result/tools",
+      "each_name_charset": {
+       "allowed": "A-Za-z0-9_.-",
+       "min": 1,
+       "max": 128
+      }
+     }
+    ]
+   },
+   "note": "From 2026-07-28 the suite sends tools/list twice more after the one of TS-01 and compares the order of the three answers (the check is a warning, not a failure, when it differs). The request is TS-01's again. The answer is the catalog in its fixed declaration order (TL-01), so the three are equal."
   }
  ],
  "not_run": [

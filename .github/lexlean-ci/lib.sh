@@ -472,11 +472,14 @@ run_schema_oracle() {
     "$(conformance_out)/transcript.json"
 }
 
-# conformance_summary: the per-scenario table of the run, to the step summary and the log.
+# conformance_summary: the per-scenario table of the run, to the step summary and the log, and
+# as a notice annotation, because the step summary and the log cannot be downloaded from every
+# sandbox and an annotation can (`gh api .../check-runs/<id>/annotations`).
 conformance_summary() {
-  local report
+  local report table
   report="$(conformance_out)/report.json"
   test -f "$report" || { echo "no report: the suite did not run" >&2; return 1; }
+  table=$(mktemp "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/table.XXXXXX")
   node -e '
     const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
     const lines = ["| kind | scenario | status | checks passed | other |", "|---|---|---|---|---|"];
@@ -486,5 +489,8 @@ conformance_summary() {
     for (const [label, names] of [["failing and not named in waiting.json", r.unexplained], ["named as waiting but not failing", r.stale_waiting], ["skipped by the suite, not passing", r.skipped_by_the_suite]]) if (names.length) lines.push("", `${label}: ${names.join(", ")}`);
     for (const [label, names] of Object.entries(r.waits)) lines.push("", `${label}: ${names.join(", ")}`);
     console.log(lines.join("\n"));
-  ' "$report" | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
+  ' "$report" >"$table"
+  annotate notice "the per-scenario table" 100 "$table"
+  tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}" <"$table"
+  rm -f "$table"
 }

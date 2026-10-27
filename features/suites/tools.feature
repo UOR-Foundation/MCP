@@ -3,7 +3,7 @@ Feature: Tools
   The LexLean core lists and calls the tools of a provider's catalog, validates arguments and results against their JSON Schema, reports progress, limits the rate of calls and sanitizes what it writes, against the MCP specification revision 2026-07-28 and the pinned conformance scenarios.
 
   @TL-01 @build
-  Scenario: tools/list answers with the tool catalog in its fixed declaration order, every tool with a name of 1 to 64 characters from A-Z, a-z, 0-9, underscore, dot and hyphen (the intersection of the specification and of the suite check), a description and an inputSchema, and an outputSchema when it declares one; the catalog is one page, so a request that carries a cursor is refused as invalidParams (-32602); a kernel-checked theorem states the order.
+  Scenario: tools/list answers with the tool catalog in its fixed declaration order, every tool with a name of 1 to 64 characters from A-Z, a-z, 0-9, underscore, dot and hyphen (inside the specification's rule, 1 to 128 characters, which the suite check holds from conformance commit cf022cbb), a description and an inputSchema, and an outputSchema when it declares one; the catalog is one page, so a request that carries a cursor is refused as invalidParams (-32602); a kernel-checked theorem states the order.
     Given the fixture catalog of thirty-five tools
     When tools/list is requested, with and without a cursor
     Then the names are the catalog's in its declared order, every tool has the members and the name format, and a cursor is refused as -32602
