@@ -76,14 +76,14 @@ loopback; the schema oracle validates the recorded transcript against the pinned
 
 **The server-suite step is exact, not lenient.** It passes only when the set of failing
 scenarios equals the set `conformance/waiting.json` lists as waiting, each entry naming
-its issue and pull request (MCP#10 and PR #30). A failing scenario
+its issue and pull request. A failing scenario
 that is not listed fails the job (`FAILING and not named in waiting.json`, first in the
 annotation); a listed scenario that passes fails the job (`named as waiting but not
 failing`, so the entry is deleted in the pull request that delivers it); an entry that
 names neither an issue nor a pull request fails the job. The waiting scenarios are
 failures in the report, the step summary and `report.json` (`valid: false`), and the
-required scenarios passing are counted without them (32 of 37 today); the list is a
-classification of known failures, never a pass. A scenario the suite itself skips at the
+required scenarios passing are counted without them (37 of 37 today; the list is empty);
+the list is a classification of known failures, never a pass. A scenario the suite itself skips at the
 pin (`suite_skipped`) is reported as skipped and never counted as passing. A red job is
 therefore always a regression, a delivery that left a stale entry, or a broken oracle,
 and a merge queue on `main` is not blocked by a known failure.

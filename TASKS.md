@@ -282,15 +282,13 @@ three packages equal to a fresh export.
 * A task whose plan parks on a sampling request has no wire form; the fixture never parks on one.
 * The extension's `subscriptions/listen` subscription by task id, and the `-32021` it returns to a
   client that lists task ids without declaring the extension, are #11's.
-* The host adapter keeps the table, the clock and the identifiers (PrismPM#216). The conformance
-  host (`conformance/bindings/mcp-binding`) is the adapter's host for the run; the tests drive the
-  core with a host of their own. Two requests that overlap read the table before either stores it, and
-  the later store wins; the suite sends its requests one after another.
+* The host adapter keeps the table, the clock, the identifiers and the `requestState` key
+  (PrismPM#216). The conformance host (`conformance/bindings/mcp-binding`) is the adapter's host for
+  the run; the tests drive the core with a host of their own. Two requests that overlap read the table
+  before either stores it, and the later store wins; the suite sends its requests one after another.
 * The conformance application declares the table at most 512 KiB in either direction
-  (`TABLE_MAXIMUM` in `tests/common/application.rs`); a larger table is outside what the run carries.
-* The five `input-required-result-*` scenarios that wait on #30 (`conformance/waiting.json`, as on
-  `main`) need the key of `requestState`, which the conformance application does not carry; they are
-  not this change's.
+  (`TABLE_MAXIMUM` in `tests/common/application.rs`) and the key at most 64 bytes (`KEY_MAXIMUM`);
+  the binding sends 32. A larger table or key is outside what the run carries.
 * The suite validates each response against its own wire schema; here every response is validated
   against the specification's schema and the extension's by another validator. That is falsifying
   evidence, not the oracle for the protocol.

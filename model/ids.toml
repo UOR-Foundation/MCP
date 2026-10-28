@@ -688,7 +688,7 @@ statement = "The step serve writes the task table through one host effect and ne
 id = "CF-01"
 level = "build"
 suite = "conformance"
-statement = "The conformance build is a PrismPM server application declared in this repository: its core is the production root UorMcp.ConformanceFixture.conformanceRun, the step serve over the unchanged fixture provider; its host effects are the tool-call counter, the clock, the identifier of a task and the table of tasks, which fill the sections of the request frame, and the store of the task table, the one effect the core requests; its listener is bound to 127.0.0.1; and its binding crate answers each client's count of tools/call requests in the current window, not counting the request being served, the clock, a fresh identifier, and holds the table the core stores."
+statement = "The conformance build is a PrismPM server application declared in this repository: its core is the production root UorMcp.ConformanceFixture.conformanceRun, the step serve over the unchanged fixture provider; its host effects are the tool-call counter, the clock, the identifier of a task, the table of tasks and the requestState key, which fill the sections of the request frame, and the store of the task table, the one effect the core requests; its listener is bound to 127.0.0.1; and its binding crate answers each client's count of tools/call requests in the current window, not counting the request being served, the clock, a fresh identifier and the requestState key, and holds the table the core stores."
 
 [[id]]
 id = "CF-02"

@@ -22,6 +22,11 @@ use super::{
 /// The instant of the acceptance vectors, in the host's millisecond counter.
 pub const ACCEPTANCE_MS: u64 = 1_790_000_000_000;
 
+/// The `requestState` key every acceptance vector carries: thirty-two bytes, the floor
+/// the core accepts, so the declaration's frames are the frames the served adapter builds
+/// with a key of its own (`INPUT-REQUIRED.md`, "The `requestState`").
+pub const ACCEPTANCE_KEY: &[u8] = b"0123456789abcdef0123456789abcdef";
+
 /// The tag of the effect that stores the task table: its position in the declaration
 /// (`task.store` is the fifth effect), and the tag `ConformanceFixture.storeEffectTag` names.
 pub const STORE_TAG: u32 = 4;
@@ -99,6 +104,7 @@ pub fn vector(id: &str) -> Vector {
     ));
     request.tool_calls = 0;
     request.host = acceptance_host(1, &[]);
+    request.state_key = ACCEPTANCE_KEY.to_vec();
 
     let mut http_request = format!(
         "{} {} HTTP/1.1\r\n",
@@ -215,6 +221,7 @@ pub fn task_vectors() -> Vec<TaskVector> {
     for (issued, (method, params, name, stores)) in sequence.into_iter().enumerate() {
         let mut request = tasks_request(method, &params, name);
         request.host = acceptance_host(u32::try_from(issued).expect("few") + 1, &table);
+        request.state_key = ACCEPTANCE_KEY.to_vec();
         let frame_request = encode_request(&request);
         let driven = drive_conformance(&frame_request, 1, store_outcome)
             .expect("the conformance root answers the task vector");
@@ -297,6 +304,10 @@ fn word(value: u32) -> String {
 
 /// The largest table the conformance host carries in either direction, in bytes.
 pub const TABLE_MAXIMUM: u32 = 524_288;
+
+/// The largest `requestState` key the conformance host sends, in bytes. The binding sends
+/// thirty-two; the bound leaves room for a longer key without changing the core.
+pub const KEY_MAXIMUM: u32 = 64;
 
 fn section(name: &str, kind: &str, effect: &str, field: &str) -> String {
     record(
@@ -467,6 +478,7 @@ pub fn render() -> String {
                         section("now", "Text", "clock.now", "iso"),
                         section("fresh_task_id", "Text", "task.id", "id"),
                         section("task_table", "Bytes", "task.table", "table"),
+                        section("request_state_key", "Bytes", "request.state.key", "key"),
                     ],
                 ),
             ),
@@ -498,6 +510,13 @@ pub fn render() -> String {
             TABLE_MAXIMUM + 8,
             8,
         ),
+        effect(
+            "request.state.key",
+            &[],
+            &[("key", "Bytes")],
+            8,
+            KEY_MAXIMUM + 8,
+        ),
     ];
     let host = record(
         "HostProtocol",
@@ -505,7 +524,7 @@ pub fn render() -> String {
             ("protocol", text("prismpm/host-effects/1")),
             (
                 "description",
-                text("The conformance build asks its host for four things that fill the request frame, how many tools/call requests the client has made in the current window (not counting the one being served), the host's clock, an identifier for a task the request may create and the table of tasks the host holds, and for one thing the core requests, that the host store the table of tasks the request changed.\n"),
+                text("The conformance build asks its host for five things that fill the request frame, how many tools/call requests the client has made in the current window (not counting the one being served), the host's clock, an identifier for a task the request may create, the table of tasks the host holds and the key that seals and opens a requestState, and for one thing the core requests, that the host store the table of tasks the request changed.\n"),
             ),
             ("usageCode", "(64 : UInt8)".to_owned()),
             ("ioCode", "(74 : UInt8)".to_owned()),
