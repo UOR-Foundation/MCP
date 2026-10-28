@@ -14,10 +14,10 @@ is evidence for what it checks, not a proof about the core.
 | The declaration, a PrismPM `ServerApplication` whose core is `UorMcp.ConformanceFixture.conformanceRun`, the step serve over the fixture provider | `conformance/src/Application.lex.tex`, generated from the vectors of the pinned scenarios: `cargo run -p lifecycle-oracle --example conformance_application -- --write` |
 | The LexLean and PrismPM projects the declaration is built in | `lexlean.conformance.toml`, `lexlean.conformance.lock`, `prismpm.toml`; the main project (`lexlean.toml`) does not see them |
 | The copies of PrismPM's `Foundation.Bytes`, `Foundation.Server.V1.Model` and the `prism.arch` lexicon | `conformance/src/Foundation`, `language/prism.arch`; byte for byte the files at the revision of `.github/prismpm.rev` (authority `A-PRISMPM-SERVER-APPLICATION`) |
-| The binding: the host effects `tool.calls` (the count of `tools/call` requests in the last 60 s), `clock.now`, `task.id` and `task.table`, which fill the request frame, and `task.store`, which the core requests to store the task table | `conformance/bindings/mcp-binding` |
+| The binding: the host effects `tool.calls` (the count of `tools/call` requests in the last 60 s), `clock.now`, `task.id`, `task.table` and `request.state.key` (the 32-byte key that seals and opens a `requestState`, held for the life of the process), which fill the request frame, and `task.store`, which the core requests to store the task table | `conformance/bindings/mcp-binding` |
 | The consumer workspace: the generated core and host packages beside the binding | `conformance/Cargo.toml`; the three generated packages are not committed |
 | The oracles | `conformance/oracle/`: `server-suite.mjs`, `recorder.mjs`, `verdict.mjs`, `schema-oracle.mjs`, `identity.mjs`, `fetch-suite.sh` |
-| What is not a pass, and which pull request it waits on | `conformance/waiting.json` |
+| What is not a pass, and which pull request it waits on; empty today | `conformance/waiting.json` |
 | The identity of the core | `conformance/core-identity.json` |
 
 `prismpm build` (PrismPM at `.github/prismpm.rev`) certifies the core and generates three
@@ -73,15 +73,15 @@ the runner refuses any other file) and decides:
 * a scenario with no checks, or whose checks are all skipped or warnings, is a failure;
 * every failing check is reported as `scenario: check id: message`, the suite's own text;
 * the job passes (exit 0) only when the set of failing scenarios equals the set
-  `conformance/waiting.json` lists as waiting, each entry naming its issue and pull request
-  (MCP#10 and #30). A failing scenario that is not listed fails the job
+  `conformance/waiting.json` lists as waiting, each entry naming its issue and pull request.
+  A failing scenario that is not listed fails the job
   (`FAILING and not named in waiting.json`, printed first); a listed scenario that does not
   fail fails the job (`named as waiting but not failing`); an entry that names neither an issue
-  nor a pull request fails the job. The last lines of the diagnostic group the failing scenarios
-  by the pull request that is to deliver what they need.
+  nor a pull request fails the job. When there are failing scenarios, the last lines of the
+  diagnostic group them by the pull request that is to deliver what they need.
 * a waiting scenario is still a failure: it is `fail` in the table and in `report.json`, which says
   `valid: false`, the step summary groups it under the pull request it waits on, and the scenarios
-  passing are counted without it (32 of 37 required today). The list classifies; it never turns a
+  passing are counted without it (37 of 37 required today). The list classifies; it never turns a
   failure into a pass, and it is shortened in the pull request that delivers a scenario.
 
 One scenario cannot pass on any server at this pin: `tasks-status-notifications` sends no
@@ -109,12 +109,12 @@ counted, not excused:
 ## What passes today
 
 Run of the core of this commit (core digest below), spec 2026-07-28,
-424 JSON-RPC messages, 39 refused probes, 1 transport refusal, every message valid: the schema
+434 JSON-RPC messages, 35 refused probes, 1 transport refusal, every message valid: the schema
 oracle held 194 of them to the tasks extension's schema, and counted one `inputResponses` entry,
 a key the suite made up for a task that was not waiting for it, as ignored (the extension tells a
 server to ignore it).
 
-Required: 32 of 37 pass. Not scored: 12 of 13 pass, 1 is skipped by the suite, none fails. Every failing scenario waits on #30 (five required). The suite is at `cf022cbb541f9d939068d7f84758b9728be7fc23` (MCP#44); the table is the notice annotation "the per-scenario table" of the conformance job at commit `c38953f`.
+Required: 37 of 37 pass. Not scored: 12 of 13 pass, 1 is skipped by the suite, none fails. No scenario waits. The suite is at `cf022cbb541f9d939068d7f84758b9728be7fc23` (MCP#44); the table is the notice annotation "the per-scenario table" of the conformance job of [run 40534826655](https://github.com/UOR-Foundation/MCP/actions/runs/40534826655).
 
 | # | kind | scenario | result | checks | waits on |
 |---|---|---|---|---|---|
@@ -144,15 +144,15 @@ Required: 32 of 37 pass. Not scored: 12 of 13 pass, 1 is skipped by the suite, n
 | 24 | required | `input-required-result-basic-elicitation` | pass | 3 of 3 |  |
 | 25 | required | `input-required-result-basic-sampling` | pass | 3 of 3 |  |
 | 26 | required | `input-required-result-basic-list-roots` | pass | 3 of 3 |  |
-| 27 | required | `input-required-result-request-state` | **fail** | 1 of 2 | #10 (PR #30) |
-| 28 | required | `input-required-result-multiple-input-requests` | **fail** | 1 of 2 | #10 (PR #30) |
-| 29 | required | `input-required-result-multi-round` | **fail** | 1 of 2 | #10 (PR #30) |
+| 27 | required | `input-required-result-request-state` | pass | 3 of 3 |  |
+| 28 | required | `input-required-result-multiple-input-requests` | pass | 3 of 3 |  |
+| 29 | required | `input-required-result-multi-round` | pass | 4 of 4 |  |
 | 30 | required | `input-required-result-missing-input-response` | pass | 2 of 2 |  |
 | 31 | required | `input-required-result-non-tool-request` | pass | 3 of 3 |  |
 | 32 | required | `input-required-result-result-type` | pass | 2 of 2 |  |
 | 33 | required | `input-required-result-unsupported-methods` | pass | 2 of 2 |  |
-| 34 | required | `input-required-result-tampered-state` | **fail** | 1 of 2 | #10 (PR #30) |
-| 35 | required | `input-required-result-capability-check` | **fail** | 1 of 2 | #10 (PR #30) |
+| 34 | required | `input-required-result-tampered-state` | pass | 2 of 2 |  |
+| 35 | required | `input-required-result-capability-check` | pass | 2 of 2 |  |
 | 36 | required | `input-required-result-ignore-extra-params` | pass | 2 of 2 |  |
 | 37 | required | `input-required-result-validate-input` | pass | 3 of 3 |  |
 | 38 | not scored | `tasks-lifecycle` | pass | 9 of 9 |  |
@@ -178,6 +178,17 @@ notifications optional (`ServerCapabilities.tools.listChanged`: "Whether this se
 for changes to the tool list"; `ToolListChangedNotification`: "An optional notification"). The core
 advertises none and does not register `subscriptions/listen`, so the skips stand; they are listed in the
 report with their check ids.
+
+### The requestState key
+
+Five `input-required-result-*` scenarios ask for a `requestState`: `request-state`,
+`multiple-input-requests`, `multi-round`, `tampered-state` and `capability-check`. The core writes a
+state only with the host's key (`LIFECYCLE.md`, "key"), and the declaration carried no key section, so
+the core refused them with an internal error (IR-16, as designed). The declaration now declares
+`request.state.key` as a host effect and as a frame section after the task table; its acceptance
+vectors carry a 32-byte key, the floor the core accepts, so the served frames are the modeled frames;
+and the binding holds one key for the life of the process, from the same operating-system source as the
+task identifiers. The five scenarios pass. The core did not change, so its program digest stands.
 
 ### The pin of the suite (MCP#44)
 
@@ -207,21 +218,17 @@ What the move changes, from the two checkouts:
   no solidus) and reports a violation as a warning, not a failure. The core admits 1 to 64 characters of
   the same set, inside both; the vector follows the suite's new rule.
 * `input-required-result-capability-check` reports an `input_required` result that names no `inputRequests`
-  as not testable, which fails the check. It failed before and still waits on #30.
+  as not testable, which fails the check. It failed before the key section and passes with it.
 * The runner bounds each scenario to 30 s (`--timeout`); the whole server run takes about 11 s.
 
-Every scenario that passed at `232a9014` passes at `cf022cbb`, and so do the eight `tasks-*`: 32 of 37
-required and 12 of 13 not scored pass, and the five that fail are the five that wait on #30.
+Every scenario that passed at `232a9014` passes at `cf022cbb`, and so do the eight `tasks-*`: 37 of 37
+required and 12 of 13 not scored pass; none fails.
 
 ### Not met
 
-* Five `input-required-result-*` scenarios in the table (required): `request-state`,
-  `multiple-input-requests`, `multi-round`, `tampered-state` and `capability-check`. Their tools
-  are registered by MCP#10, PR #30, and ask for a `requestState`, which the core writes only
-  with the host's key (`LIFECYCLE.md`, "key"). The conformance application declares one frame
-  section, the count of tool calls, and no key, so the core refuses them with an internal error.
-  The key section of the application is the open work. The other nine `input-required-result-*`
-  scenarios pass.
+* No required scenario fails: 37 of 37 pass and the set of failing scenarios is empty. The one
+  not-scored scenario the suite skips at this pin, `tasks-status-notifications`, sends no request and
+  is not a pass (`suite_skipped`); its row stands as skipped, and the stream it needs is #11's.
 
 ### `server-stateless` and the two diagnostic tools
 
@@ -245,14 +252,14 @@ reproduced; lexlean-mcp checks the program digest.
 
 ## Planted defects
 
-Each was planted alone against the green state (the 19 waiting scenarios failing and every
-other scenario passing, exit 0), the build and the run repeated. A reverted tree is the clean run
-above. "Green" below means the exit status of `server-suite.mjs`, which is the status of step 9a.
+Each was planted alone against the green state (every scenario passing but the one the suite
+skips, exit 0), the build and the run repeated. A reverted tree is the clean run above. "Green"
+below means the exit status of `server-suite.mjs`, which is the status of step 9a.
 
 | Defect | Planted in | Run | Diagnostic |
 | --- | --- | --- | --- |
-| `test_simple_text` answers an empty content array instead of its text block | `src/Fixture.lex.tex`, the `callTool` of the fixture provider; production build and host rebuilt, core digest `8f1335055a9149073644484f22f1aa59f6feb1190b647ebe34e0d21b17a1b01c` | exit 1; 26 of 37 required pass; `check_core_identity` fails as well: `the program differs from the committed export mcp_lifecycle` | `FAILING and not named in waiting.json (1): tools-call-simple-text`, then `tools-call-simple-text: tools-call-simple-text: content array is empty; No text content found` |
-| a failing scenario is not listed | `conformance/waiting.json` without `tasks-lifecycle`, same build | exit 1 | `FAILING and not named in waiting.json (1): tasks-lifecycle`, then the suite's check messages, and `the failing scenarios are not the ones .../waiting.json names` |
+| `test_simple_text` answers an empty content array instead of its text block | `src/Fixture.lex.tex`, the `callTool` of the fixture provider; production build and host rebuilt, core digest `8f1335055a9149073644484f22f1aa59f6feb1190b647ebe34e0d21b17a1b01c` | exit 1; 36 of 37 required pass; `check_core_identity` fails as well: `the program differs from the committed export mcp_lifecycle` | `FAILING and not named in waiting.json (1): tools-call-simple-text`, then `tools-call-simple-text: tools-call-simple-text: content array is empty; No text content found` |
+| a failing scenario is not listed | `conformance/waiting.json` as committed (empty), same build | exit 1 | `FAILING and not named in waiting.json (1): tasks-lifecycle`, then the suite's check messages, and `the failing scenarios are not the ones .../waiting.json names` |
 | a listed scenario passes (stale) | `conformance/waiting.json` with `caching` added, same build | exit 1 | `named as waiting but not failing (1): caching` |
 | an entry names neither an issue nor a pull request | `conformance/waiting.json`, `tasks-lifecycle` with only a reason | exit 1 | `named as waiting without an issue or a pull request (1): tasks-lifecycle` |
 | the split is broken by dropping `#[ignore]` from `the_schema_oracle_node_tests_pass_cf_04` | `crates/lifecycle-oracle/tests/conformance.rs`; `cargo test -p lifecycle-oracle --test conformance` with `MCP_CONFORMANCE_SUITE_ROOT` unset, as in the SDK image | exit 101; `the_schema_oracle_node_tests_pass_cf_04` fails and so does CF-08 | `MCP_CONFORMANCE_SUITE_ROOT names the installed conformance suite (conformance/oracle/fetch-suite.sh DIR installs it): NotPresent` (the failure that turned `bootstrap` red), and CF-08: `the_schema_oracle_node_tests_pass_cf_04 needs node or the installed suite and is not ignored: the workspace gate runs without them` |
