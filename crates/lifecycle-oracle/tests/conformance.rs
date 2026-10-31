@@ -783,9 +783,20 @@ fn the_workspace_gate_needs_neither_node_nor_the_suite_and_the_job_runs_the_rest
         ci.contains("run_oracle_tests"),
         "a job runs the oracle tests"
     );
-    // The cargo job is the workspace gate: it installs no suite and sets no root.
-    let cargo_job = &ci[ci.find("  cargo:").expect("the cargo job")
-        ..ci.find("  lexlean:").expect("the lexlean job")];
-    assert!(!cargo_job.contains("install_suite"));
-    assert!(!cargo_job.contains("run_oracle_tests"));
+    // The workspace gate is `just test`, which `just vv` runs in the SDK: it
+    // installs no suite, sets no root and runs no oracle test.
+    let justfile = read("Justfile");
+    let recipe = &justfile[justfile.find("\ntest:\n").expect("the test recipe") + 1..];
+    let recipe = &recipe[..recipe.find("\n\n").unwrap_or(recipe.len())];
+    assert!(recipe.contains("cargo test --workspace"), "{recipe}");
+    for forbidden in [
+        "install_suite",
+        "run_oracle_tests",
+        concat!("MCP_CONFORMANCE_", "SUITE_ROOT"),
+    ] {
+        assert!(
+            !recipe.contains(forbidden),
+            "the workspace gate uses {forbidden}"
+        );
+    }
 }
