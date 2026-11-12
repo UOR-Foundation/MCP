@@ -285,7 +285,7 @@ Nothing in PrismPM changes. #339 vendors LexLean `cee0fbade`, which cannot read 
 sources (`LLP2001` on `term_cases`, `src/Json.lex.tex:230`) and has no `nested_induction`, so for
 development `install_prismpm` builds `prismpm` from a copy of the PrismPM tree whose
 `vendor/lexlean` is the package `cargo package` makes of the LexLean tree at `.github/lexlean.rev`
-(`0b0c95d96`, SM-37). One pin drives both tools. `Cargo.lock` is PrismPM's own (`--locked`). The
+(`5dccf9e5b`, release/v0.4 head, with SM-37). One pin drives both tools. `Cargo.lock` is PrismPM's own (`--locked`). The
 compiler that certifies the core is then the compiler both locks were made with, and CI checks that:
 `lexlean.lock` and `lexlean.conformance.lock` record the same `compiler_semantics`, and so does the
 production result of `prismpm build`. The generated `src/lib.rs` of the core is byte for byte the
