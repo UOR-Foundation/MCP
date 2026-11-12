@@ -4,15 +4,15 @@
 # application with it (conformance/, prismpm.toml).
 #
 # The LexLean it is built with is not the one PrismPM vendors but the revision of
-# .github/lexlean.rev, so one pin drives both tools: the vendored lexlean (cee0fbade)
-# cannot read this repository's sources (LLP2001 on `term_cases`, src/Json.lex.tex:230),
-# and `JsonWriteLaws` uses `nested_induction`, which only SM-37 and later has. Nothing
-# in PrismPM changes; the workflow replaces vendor/lexlean in its own copy of the tree
-# (.github/lexlean-ci/lib.sh, `install_prismpm`; CI.md).
+# .github/lexlean.rev, so one pin drives both tools: the vendored lexlean (e0b74b81e,
+# the v0.4.0 tag) lacks SM-37, and `JsonWriteLaws` uses `nested_induction`, which
+# only SM-37 and later has. Nothing in PrismPM changes; the workflow replaces
+# vendor/lexlean in its own copy of the tree (.github/lexlean-ci/lib.sh, `install_prismpm`; CI.md).
 #
 # The pin moves to the PrismPM SDK release before MCP v0.1.0, and that release must
 # pin a LexLean release that contains SM-37.
 #
-# Currently: UOR-Foundation/PrismPM#339 at its head, the `ServerApplication` model,
-# the server build and the host packages.
-rev = f5927bf46b92179d807ee6bf987f024b2f5a4e7e
+# Currently: PrismPM main at 585ee8eb3 (version 0.4.0), whose workspace requires
+# lexlean 0.4.0, the version of .github/lexlean.rev; #339 (version 0.3.0) cannot
+# take it.
+rev = 585ee8eb3123e624a189edbcba1001b6b7c57855

@@ -98,10 +98,10 @@ checks out that commit, refuses any other, requires every vendored file under
 CF-07 and the provenance tests (LC-12) fail when one of them does not.
 
 `.github/prismpm.rev` is the only place the PrismPM revision is written. It names
-PrismPM#339 at its head, and it moves to the PrismPM SDK release before MCP v0.1.0.
+PrismPM main at `585ee8eb3` (version 0.4.0), and it moves to the PrismPM SDK release before MCP v0.1.0.
 
-**One LexLean pin drives both tools.** PrismPM vendors its own LexLean (`cee0fbade` at
-#339's head), which cannot read this repository's sources and has no `nested_induction`.
+**One LexLean pin drives both tools.** PrismPM vendors its own LexLean (`e0b74b81e`, the
+v0.4.0 tag), which has no `nested_induction`.
 Development imports commits, so `install_prismpm` builds `prismpm` from a copy of the PrismPM
 tree at the pinned revision whose `vendor/lexlean` is the package `cargo package` makes of
 the LexLean tree at `.github/lexlean.rev`. Nothing in PrismPM changes, `Cargo.lock` is

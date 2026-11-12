@@ -280,9 +280,9 @@ The pin move (MCP#44) was checked with a stale pin planted in one place at a tim
 
 ## The PrismPM pin, and what slice 3 still needs
 
-`.github/prismpm.rev` names PrismPM#339 at its head, `f5927bf46b92179d807ee6bf987f024b2f5a4e7e`.
-Nothing in PrismPM changes. #339 vendors LexLean `cee0fbade`, which cannot read this repository's
-sources (`LLP2001` on `term_cases`, `src/Json.lex.tex:230`) and has no `nested_induction`, so for
+`.github/prismpm.rev` names PrismPM main at `585ee8eb3123e624a189edbcba1001b6b7c57855` (version 0.4.0).
+Nothing in PrismPM changes. PrismPM vendors LexLean `e0b74b81e` (the v0.4.0 tag), which has no
+`nested_induction`, so for
 development `install_prismpm` builds `prismpm` from a copy of the PrismPM tree whose
 `vendor/lexlean` is the package `cargo package` makes of the LexLean tree at `.github/lexlean.rev`
 (`5dccf9e5b`, release/v0.4 head, with SM-37). One pin drives both tools. `Cargo.lock` is PrismPM's own (`--locked`). The

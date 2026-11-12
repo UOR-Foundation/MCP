@@ -602,9 +602,9 @@ fn the_pins_of_the_oracle_run_agree_with_their_authority_records_cf_07() {
     let prismpm = authority("A-PRISMPM-SERVER-APPLICATION");
     assert!(prismpm
         .citation
-        .contains("f5927bf46b92179d807ee6bf987f024b2f5a4e7e"));
+        .contains("585ee8eb3123e624a189edbcba1001b6b7c57855"));
     assert_eq!(
-        revision, "f5927bf46b92179d807ee6bf987f024b2f5a4e7e",
+        revision, "585ee8eb3123e624a189edbcba1001b6b7c57855",
         "the pin is the commit the authority cites"
     );
     let mut lines = Vec::new();
