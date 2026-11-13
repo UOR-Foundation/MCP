@@ -108,7 +108,7 @@ the LexLean tree at `.github/lexlean.rev`. Nothing in PrismPM changes, `Cargo.lo
 PrismPM's own (`--locked`), and the binary is accepted only when `$PRISMPM_ROOT/pins` names
 both revisions, which are also the cache key. The profile is debug, because PrismPM's release
 profile is killed for memory on a 7 GB runner. The compiler that certifies the core is then the
-compiler `lexlean.lock` was made with, and CI checks it twice: `lexlean.conformance.lock` and
+compiler `lexlean.lock` was made with, and CI checks it twice: `conformance/lexlean.conformance.lock` and
 `lexlean.lock` record the same `compiler_semantics`, and the production result `prismpm build`
 writes names that same compiler (`conformance/oracle/identity.mjs`).
 

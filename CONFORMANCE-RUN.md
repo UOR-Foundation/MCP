@@ -12,8 +12,8 @@ is evidence for what it checks, not a proof about the core.
 | Part | Where |
 | --- | --- |
 | The declaration, a PrismPM `ServerApplication` whose core is `UorMcp.ConformanceFixture.conformanceRun`, the step serve over the fixture provider | `conformance/src/Application.lex.tex`, generated from the vectors of the pinned scenarios: `cargo run -p lifecycle-oracle --example conformance_application -- --write` |
-| The LexLean and PrismPM projects the declaration is built in | `lexlean.conformance.toml`, `lexlean.conformance.lock`, `prismpm.toml`; the main project (`lexlean.toml`) does not see them |
-| The copies of PrismPM's `Foundation.Bytes`, `Foundation.Server.V1.Model` and the `prism.arch` lexicon | `conformance/src/Foundation`, `language/prism.arch`; byte for byte the files at the revision of `.github/prismpm.rev` (authority `A-PRISMPM-SERVER-APPLICATION`) |
+| The LexLean and PrismPM projects the declaration is built in | `conformance/lexlean.conformance.toml`, `conformance/lexlean.conformance.lock`, `conformance/prismpm.toml`; `conformance/` is the Prism project root, because PrismPM takes the consumer's Cargo workspace root to be the project root, and `conformance/stage-shared.sh` copies the sources it shares with the main project (`src/`, `language/mcp.core`) into `conformance/shared/`, which git ignores, because LexLean accepts no path that leaves its project; the main project (`lexlean.toml`) does not see any of it |
+| The copies of PrismPM's `Foundation.Bytes`, `Foundation.Server.V1.Model` and the `prism.arch` lexicon | `conformance/src/Foundation`, `conformance/language/prism.arch`; byte for byte the files at the revision of `.github/prismpm.rev` (authority `A-PRISMPM-SERVER-APPLICATION`) |
 | The binding: the host effects `tool.calls` (the count of `tools/call` requests in the last 60 s), `clock.now`, `task.id`, `task.table` and `request.state.key` (the 32-byte key that seals and opens a `requestState`, held for the life of the process), which fill the request frame, and `task.store`, which the core requests to store the task table | `conformance/bindings/mcp-binding` |
 | The consumer workspace: the generated core and host packages beside the binding | `conformance/Cargo.toml`; the three generated packages are not committed |
 | The oracles | `conformance/oracle/`: `server-suite.mjs`, `recorder.mjs`, `verdict.mjs`, `schema-oracle.mjs`, `identity.mjs`, `fetch-suite.sh` |
@@ -35,14 +35,15 @@ The adapter enforces only what PrismPM's model states: loopback, the origins `lo
 ```sh
 bash conformance/oracle/fetch-suite.sh "$SUITE"            # the pinned commit, then npm ci
 ( . .github/lexlean-ci/lib.sh && PRISMPM_ROOT="$PRISMPM" install_prismpm )   # PrismPM at .github/prismpm.rev, built with the LexLean of .github/lexlean.rev
-PATH="$PRISMPM/bin:$PATH" prismpm build                    # prints: build published: <id>
-bash conformance/lay-out.sh .prism/build/<id> production-result.json
+bash conformance/stage-shared.sh                           # src and language/mcp.core into conformance/shared
+(cd conformance && PATH="$PRISMPM/bin:$PATH" prismpm build)   # prints: build published: <id>
+bash conformance/lay-out.sh conformance/.prism/build/<id> production-result.json
 (cd conformance && cargo build --release --locked)
 node conformance/oracle/server-suite.mjs --suite-root "$SUITE" --out out \
     "$PWD/conformance/target/release/mcp-conformance-host" serve
 node conformance/oracle/schema-oracle.mjs --suite-root "$SUITE" \
     crates/lifecycle-oracle/suite/mcp-spec-80041ab0a139a8f4fb3adbc99f7ae9113ea59671/schema/2026-07-28/schema.json out/transcript.json
-node conformance/oracle/identity.mjs --result production-result.json --lock lexlean.conformance.lock \
+node conformance/oracle/identity.mjs --result production-result.json --lock conformance/lexlean.conformance.lock \
     --package conformance/mcp_conformance_core \
     --reference crates/lifecycle-oracle/generated/mcp_lifecycle/provenance.json --check conformance/core-identity.json
 ```
@@ -298,7 +299,7 @@ For PrismPM slice 3:
 
 * the vendored LexLean has to read MCP's sources, which needs SM-37 (`nested_induction`) or a
   release that contains it;
-* the build controller reads the LexLean build root as `.lexlean`, so `lexlean.conformance.toml`
+* the build controller reads the LexLean build root as `.lexlean`, so `conformance/lexlean.conformance.toml`
   sets `build_root = ".lexlean"`;
 * `prismpm verify` of a server application is still PP2014;
 * the release profile of `prismpm` (thin LTO, one codegen unit) is killed for memory on a 7 GB

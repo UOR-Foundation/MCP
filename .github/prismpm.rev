@@ -1,7 +1,7 @@
 # The PrismPM revision `prismpm build` is made by in .github/workflows/lexlean.yml,
 # the only place it is written (AGENTS.md R1), like .github/lexlean.rev. The
 # workflow builds `prismpm` at this commit and builds the conformance server
-# application with it (conformance/, prismpm.toml).
+# application with it (conformance/, the Prism project root; conformance/prismpm.toml).
 #
 # The LexLean it is built with is not the one PrismPM vendors but the revision of
 # .github/lexlean.rev, so one pin drives both tools: the vendored lexlean (e0b74b81e,

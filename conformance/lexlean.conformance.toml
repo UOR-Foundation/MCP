@@ -2,8 +2,8 @@ spec = "lexlean/project/1"
 name = "mcp-conformance"
 language = "1.2"
 module_prefix = "UorMcp"
-source_roots = ["conformance/src", "src"]
-entrypoints = ["conformance/src/Application.lex.tex", "src/ConformanceFixture.lex.tex"]
+source_roots = ["shared/src", "src"]
+entrypoints = ["shared/src/ConformanceFixture.lex.tex", "src/Application.lex.tex"]
 build_root = ".lexlean"
 lockfile = "lexlean.conformance.lock"
 lean_workspace = "."
@@ -20,7 +20,7 @@ kind = "builtin"
 [[lexicon_source]]
 package = "mcp.core"
 kind = "path"
-path = "language/mcp.core"
+path = "shared/language/mcp.core"
 
 [[lexicon_source]]
 package = "prism.arch"

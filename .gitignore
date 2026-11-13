@@ -34,3 +34,7 @@ criterion/
 /conformance/mcp-conformance-host-api/
 /conformance/mcp-conformance-host/
 /conformance/target/
+/conformance/shared/
+/conformance/.prism/
+/conformance/.lexlean/
+/conformance/.lake/

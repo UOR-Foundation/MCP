@@ -7,7 +7,7 @@
     "version": "1.0.0",
     "export": "run",
     "target": {
-      "digest": "25e8eba5c28e98c5787c168bb517113e55de605e8e3cd7a517efd914dbc8b73c",
+      "digest": "f5095d80d7771c6ab6a6aa4c38fdce0621322c9d1e5b6f85435a4f2dbd410b35",
       "id": "rust-std"
     },
     "files": [
@@ -18,30 +18,30 @@
       },
       {
         "path": "package.json",
-        "sha256": "4f45ade550d1dc3188913bb5b2a2d85d351ca68a5d8dfd0a4dcffb591531bce5",
+        "sha256": "6ee79ea317634469862d6ab058f4e83e5e4bc7ab0ce204bcf88f7c000fea7f0b",
         "byte_length": 1657582
       },
       {
         "path": "provenance.json",
-        "sha256": "36bf9af8e8127a4b85804cdd58651ffe072cab8bb18e9291a11dcce37860dc67",
+        "sha256": "3d7d84d96af943651a771ac066ebaf08f7c7eca94af1a9d35cbe8437284269a5",
         "byte_length": 673
       },
       {
         "path": "src/lib.rs",
-        "sha256": "4bf53ec38117fdde5f0f5c7c6bb8a04c6a90fde3ea6d52b735d44ce3267529d7",
-        "byte_length": 849797
+        "sha256": "aaf619ddda094b86acc54bd28d23de7ab3124004a7c51beb6ab275e5096d8d73",
+        "byte_length": 853119
       }
     ]
   },
   "source": {
-    "source_id": "173967136b995e5d9e89e4d77bdaa55cbd08149e3a26eb71833f3fd7eb3d28c5",
-    "semantic_id": "5e01f4ad62bcf83c56a1091449c2dc1edc9218c095c5a3257ac4166507e85bd2",
-    "lock_sha256": "348f5ea5f678a956b7809c2c346f7889746a15d23faa7fc694c7f5f62105f482"
+    "source_id": "2fd43d9a404906eb6918c47fb4c8b9b22bcb8d383db61820d8b6ff496db94cdd",
+    "semantic_id": "0a5db87952c8056f612571dd9610bd4924f5adad8cd557d07d12ffe37fc71cda",
+    "lock_sha256": "e59199cd5c9249aef04c0f35ac65548e0f1381c0bddd2e4eab107b08afdfc82b"
   },
   "compiler": {
     "lean_toolchain": "leanprover/lean4:v4.32.1",
-    "semantics": "81a5f530241bed4ca42585e2345d91be731fe46121284fbe4c199ea356489b10",
-    "version": "0.3.0"
+    "semantics": "635a25acb886587f8777525e778092e9599d1f2df26da59403ee39e9e299151a",
+    "version": "0.4.0"
   },
   "same_program_as": {
     "package": "mcp_conformance",

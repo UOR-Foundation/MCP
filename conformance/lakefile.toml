@@ -1,0 +1,6 @@
+name = "UorMcp"
+version = "0.1.0"
+defaultTargets = ["UorMcp"]
+
+[[lean_lib]]
+name = "UorMcp"

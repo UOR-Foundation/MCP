@@ -345,10 +345,10 @@ sdk_copies_agree() {
       status=1
     fi
   done
-  if diff -rq language/prism.arch "$scratch/language/prism.arch"; then
-    echo "language/prism.arch equals the SDK's"
+  if diff -rq conformance/language/prism.arch "$scratch/language/prism.arch"; then
+    echo "conformance/language/prism.arch equals the SDK's"
   else
-    echo "language/prism.arch differs from the SDK's at $rev" >&2
+    echo "conformance/language/prism.arch differs from the SDK's at $rev" >&2
     status=1
   fi
   rm -rf "$scratch"
@@ -414,30 +414,34 @@ run_oracle_tests() {
 # of the export beside the build. The build id is the step output `build`.
 build_conformance() {
   local id
-  prismpm build | tee "${RUNNER_TEMP:?}/prismpm-build.log"
+  # conformance/ is the Prism project root (PrismPM takes the consumer's Cargo workspace
+  # root to be the project root); the sources it shares with the main project are
+  # staged into it first.
+  bash conformance/stage-shared.sh
+  (cd conformance && prismpm build) | tee "${RUNNER_TEMP:?}/prismpm-build.log"
   id=$(sed -n 's/^build published: \([0-9a-f]\{64\}\)$/\1/p' "$RUNNER_TEMP/prismpm-build.log" | tail -n 1)
   if [[ -z $id ]]; then
     echo "prismpm build did not print 'build published: <id>'" >&2
     return 1
   fi
   echo "build=$id" >>"${GITHUB_OUTPUT:-/dev/null}"
-  bash conformance/lay-out.sh ".prism/build/$id" "$RUNNER_TEMP/production-result.json"
+  bash conformance/lay-out.sh "conformance/.prism/build/$id" "$RUNNER_TEMP/production-result.json"
 }
 
 # check_core_identity: a rebuild reproduces the recorded identity of the core.
 check_core_identity() {
   local main conformance
   main=$(sed -n 's/^compiler_semantics = "\(.*\)"$/\1/p' lexlean.lock)
-  conformance=$(sed -n 's/^compiler_semantics = "\(.*\)"$/\1/p' lexlean.conformance.lock)
+  conformance=$(sed -n 's/^compiler_semantics = "\(.*\)"$/\1/p' conformance/lexlean.conformance.lock)
   echo "lexlean.lock records compiler-semantics $main"
-  echo "lexlean.conformance.lock records       $conformance"
+  echo "conformance/lexlean.conformance.lock records $conformance"
   if [[ -z $main || $main != "$conformance" ]]; then
     echo "The two locks were made by different compilers; .github/lexlean.rev is the one pin." >&2
     return 1
   fi
   node conformance/oracle/identity.mjs \
     --result "${RUNNER_TEMP:?}/production-result.json" \
-    --lock lexlean.conformance.lock \
+    --lock conformance/lexlean.conformance.lock \
     --package conformance/mcp_conformance_core \
     --reference crates/lifecycle-oracle/generated/mcp_conformance/provenance.json \
     --check conformance/core-identity.json
