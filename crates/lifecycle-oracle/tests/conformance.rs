@@ -138,11 +138,11 @@ fn the_conformance_build_is_a_server_application_over_the_fixture_core_cf_01() {
     assert!(fixture.contains("StepServe::serveStep (conformanceInfo)"));
 
     // The declaration is part of a LexLean project and a PrismPM project of its own.
-    let project = read("lexlean.conformance.toml");
+    let project = read("conformance/lexlean.conformance.toml");
     assert!(project.contains(
-        "entrypoints = [\"conformance/src/Application.lex.tex\", \"src/ConformanceFixture.lex.tex\"]"
+        "entrypoints = [\"shared/src/ConformanceFixture.lex.tex\", \"src/Application.lex.tex\"]"
     ));
-    let prismpm = read("prismpm.toml");
+    let prismpm = read("conformance/prismpm.toml");
     assert!(prismpm.contains("lexlean_project = \"lexlean.conformance.toml\""));
     // The main project does not see it, so its gates are the ones they were.
     assert!(!read("lexlean.toml").contains("Application.lex.tex"));
@@ -440,7 +440,8 @@ fn the_core_artifact_is_recorded_by_digest_cf_06() {
     assert_eq!(identity["same_program_as"]["program_sha256"], program);
 
     // The record is of the sources the build was made from.
-    let lock = std::fs::read(root().join("lexlean.conformance.lock")).expect("the lock");
+    let lock =
+        std::fs::read(root().join("conformance/lexlean.conformance.lock")).expect("the lock");
     assert_eq!(
         identity["source"]["lock_sha256"],
         hex(&Sha256::digest(&lock)),
@@ -458,7 +459,7 @@ fn the_core_artifact_is_recorded_by_digest_cf_06() {
             .unwrap_or_else(|| panic!("{lock} records a compiler"))
     };
     assert_eq!(
-        semantics("lexlean.conformance.lock"),
+        semantics("conformance/lexlean.conformance.lock"),
         semantics("lexlean.lock"),
         "both locks are made by the compiler of .github/lexlean.rev"
     );
@@ -515,7 +516,11 @@ fn the_identity_checker_refuses_another_core_cf_06() {
         .arg("conformance/oracle/identity.mjs")
         .args(["--result"])
         .arg(&result)
-        .args(["--lock", "lexlean.conformance.lock", "--package"])
+        .args([
+            "--lock",
+            "conformance/lexlean.conformance.lock",
+            "--package",
+        ])
         .arg(&dir)
         .args([
             "--reference",
@@ -602,13 +607,16 @@ fn the_pins_of_the_oracle_run_agree_with_their_authority_records_cf_07() {
     let prismpm = authority("A-PRISMPM-SERVER-APPLICATION");
     assert!(prismpm
         .citation
-        .contains("f5927bf46b92179d807ee6bf987f024b2f5a4e7e"));
+        .contains("585ee8eb3123e624a189edbcba1001b6b7c57855"));
     assert_eq!(
-        revision, "f5927bf46b92179d807ee6bf987f024b2f5a4e7e",
+        revision, "585ee8eb3123e624a189edbcba1001b6b7c57855",
         "the pin is the commit the authority cites"
     );
     let mut lines = Vec::new();
-    for dir in ["conformance/src/Foundation", "language/prism.arch"] {
+    for dir in [
+        "conformance/src/Foundation",
+        "conformance/language/prism.arch",
+    ] {
         for (name, bytes) in common::files_under(&root().join(dir)) {
             lines.push(format!("{}  {dir}/{name}\n", hex(&Sha256::digest(&bytes))));
         }

@@ -1,5 +1,5 @@
-# The consumer workspace of the conformance build (`prismpm build` at the repository
-# root, then `conformance/lay-out.sh`): the core package and the two host packages
+# The consumer workspace of the conformance build (`prismpm build` in conformance/, the Prism project root, after
+# `conformance/stage-shared.sh`, then `conformance/lay-out.sh`): the core package and the two host packages
 # that PrismPM generates, laid beside the binding crate this repository owns. The
 # members are listed exactly, no glob, as PrismPM's `server_host::workspace::verify`
 # requires; the three generated packages are not committed (.gitignore) and exist

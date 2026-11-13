@@ -7,8 +7,8 @@
 # Move this line together with `lexlean lock`, in one commit: the lock is made by
 # the compiler this line names.
 #
-# Currently: UOR-Foundation/LexLean PR #292 (SM-37, `nested_induction`) at 0b0c95d96,
-# stacked on PR #284 (DF-19, the recursive family of a nested type) at 9d0896b18,
-# on release/v0.4. Both are accepted by the maintainer and wait for a release; the
-# pin moves to a LexLean release before any release of this repository.
-rev = 0b0c95d96ad544723dceee31e936c5d0b27445cf
+# Currently: the head of UOR-Foundation/LexLean release/v0.4 at 5dccf9e5b (version
+# 0.4.0), which carries SM-37 (`nested_induction`) and DF-19 (the recursive family
+# of a nested type). The v0.4.0 release tag (e0b74b81e) does not; the pin moves to
+# a LexLean release that does before any release of this repository.
+rev = 5dccf9e5ba20d91d81f4f702f46a79e8b363bfb6

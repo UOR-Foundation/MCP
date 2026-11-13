@@ -32,8 +32,8 @@ semantic ID and the SHA-256 of `lexlean.lock` it was exported from (SPEC section
 `cargo xtask export` writes those pins and the target digest, runs
 `lexlean production build --request` and replaces the package in
 `crates/json-oracle/generated/mcp_json_codec` with the export. The lock was made with the compiler
-pinned in `.github/lexlean.rev` (LexLean PR #292 at `0b0c95d96`, on PR #284, on
-`release/v0.4`; see [CI.md](CI.md)).
+pinned in `.github/lexlean.rev` (the head of LexLean
+`release/v0.4` at `5dccf9e5b`; see [CI.md](CI.md)).
 
 ## Decisions
 

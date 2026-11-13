@@ -58,8 +58,8 @@ crates/lifecycle-oracle/generated/mcp_lifecycle` is empty), and the `lexlean / e
 job of CI repeats the comparison for every `generated/request.json`. The package records
 the semantic ID of the sources it states in `provenance.json` (`sources`), which equals
 the `semantic` ID that `lexlean check` prints for the tree. The lock was made
-with the compiler pinned in `.github/lexlean.rev` (LexLean PR #292 at `0b0c95d96`, on PR
-#284, on `release/v0.4`; see [CI.md](CI.md)).
+with the compiler pinned in `.github/lexlean.rev` (the head of LexLean
+`release/v0.4` at `5dccf9e5b`; see [CI.md](CI.md)).
 
 ## The boundary encoding
 

@@ -583,6 +583,7 @@ pub fn render() -> String {
                 ),
             ),
             ("serving", list(&format!("{MODEL}::ServerServing"), &[serving])),
+            ("verifyBuildTimeoutSeconds", "(1800 : UInt32)".to_owned()),
             ("host", host),
         ],
     );

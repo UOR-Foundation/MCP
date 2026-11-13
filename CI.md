@@ -98,17 +98,17 @@ checks out that commit, refuses any other, requires every vendored file under
 CF-07 and the provenance tests (LC-12) fail when one of them does not.
 
 `.github/prismpm.rev` is the only place the PrismPM revision is written. It names
-PrismPM#339 at its head, and it moves to the PrismPM SDK release before MCP v0.1.0.
+PrismPM main at `585ee8eb3` (version 0.4.0), and it moves to the PrismPM SDK release before MCP v0.1.0.
 
-**One LexLean pin drives both tools.** PrismPM vendors its own LexLean (`cee0fbade` at
-#339's head), which cannot read this repository's sources and has no `nested_induction`.
+**One LexLean pin drives both tools.** PrismPM vendors its own LexLean (`e0b74b81e`, the
+v0.4.0 tag), which has no `nested_induction`.
 Development imports commits, so `install_prismpm` builds `prismpm` from a copy of the PrismPM
 tree at the pinned revision whose `vendor/lexlean` is the package `cargo package` makes of
 the LexLean tree at `.github/lexlean.rev`. Nothing in PrismPM changes, `Cargo.lock` is
 PrismPM's own (`--locked`), and the binary is accepted only when `$PRISMPM_ROOT/pins` names
 both revisions, which are also the cache key. The profile is debug, because PrismPM's release
 profile is killed for memory on a 7 GB runner. The compiler that certifies the core is then the
-compiler `lexlean.lock` was made with, and CI checks it twice: `lexlean.conformance.lock` and
+compiler `lexlean.lock` was made with, and CI checks it twice: `conformance/lexlean.conformance.lock` and
 `lexlean.lock` record the same `compiler_semantics`, and the production result `prismpm build`
 writes names that same compiler (`conformance/oracle/identity.mjs`).
 
